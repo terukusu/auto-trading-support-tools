@@ -165,11 +165,12 @@ winecfg
 "\xff2d\xff33 \xff30\x30b4\x30b7\x30c3\x30af"="VL PGothic"
 ```
 
-**モロモロのライブラリ導入**  
+**モロモロのWindows用ライブラリ導入**  
 ```
-(不要かも？)$ winetricks dotnet40
-(不要かも？)$ winetricks winhttp
-(不要かも？)$ winetricks wininet
+(不要かもしれない)
+$ winetricks dotnet40
+$ winetricks winhttp
+$ winetricks wininet
 ```
 ↑インストーラーが途中で止まるときに適宜突っ込んで見ると突破できることも有る
 (2017/11/12 時点で、Ubuntu16.04にMT4を入れた時はインストールが途中で止まることもなく上記作業は不要だった)
@@ -179,11 +180,12 @@ winecfg
 ```
 wget https://download.mql5.com/cdn/web/metaquotes.software.corp/mt4/mt4setup.exe
 ```
-(↑何故かMT5がインストールされるので、どこかのFXブローカー(XM等)からMT4をDLしてくるのが良さそう)
+(↑何故かMT5がインストールされるので、どこかのFXブローカー([XM](https://www.xm.com/mt4)等)からWindows用のMT4インストーラをDLしてくればOK)
 
 **インストーラ起動**  
 ```
 wine mt4setup.exe
+(XMからDLした場合は xmtrading4setup.exe)
 ```
 
 セットアップ中のDLで止まる → インストールキャンセル → 再インストール を繰り返すとそのうち最後まで行ける
@@ -191,6 +193,7 @@ wine mt4setup.exe
 **MetaTrader4の起動**  
 ```
 $ DISPALY=:1 WINARCH=win32 wine "/home/teru/.wine/drive_c/Program Files/MetaTrader 4/terminal.exe"
+(XMからDLした場合は 「MetaTrader 4」→「XMTrading MT4」に読み替え)
 ```
 
 あとは普通に使うだけ。
