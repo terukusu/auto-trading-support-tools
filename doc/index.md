@@ -59,6 +59,50 @@ $ sudo apt-get update -y
 $ sudo apt-get upgrade -y
 ```
 
+# セキュリティ設定
+外部からの接続は http、https、sshだけ受け付けられれば十分なのでそれだけに絞っておく。
+
+**IPv4用の iptables の設定**  
+```
+$ sudo iptables -P INPUT DROP
+$ sudo iptables -P FORWARD DROP
+$ sudo iptables -P OUTPUT ACCEPT
+$ sudo iptables -A INPUT -i lo -j ACCEPT
+$ sudo iptables -A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG NONE -j DROP
+$ sudo iptables -A INPUT -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m state --state NEW -j DROP
+$ sudo iptables -A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG FIN,SYN,RST,PSH,ACK,URG -j DROP
+$ sudo iptables -A INPUT -p icmp -m icmp6 --icmp-type 128 -m hashlimit --hashlimit-upto 1/min --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-name t_icmp --hashlimit-htable-expire 120000 -j ACCEPT
+$ sudo iptables -A INPUT -p tcp -m state --state RELATED,ESTABLISHED -j ACCEPT
+$ sudo iptables -A INPUT -p udp -m udp --sport 53 -j ACCEPT
+$ sudo iptables -A INPUT -p tcp -m state --state NEW -m tcp --dport 22 --tcp-flags FIN,SYN,RST,ACK SYN -m hashlimit --hashlimit-upto 1/min --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-name t_sshd --hashlimit-htable-expire 120000 -j ACCEPT
+$ sudo iptables -A INPUT -p tcp -m tcp --dport 80 -j ACCEPT
+$ sudo iptables -A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
+```
+
+**IPv6用の iptables の設定**  
+```
+$ sudo iptables -P INPUT DROP
+$ sudo iptables -P FORWARD DROP
+$ sudo iptables -P OUTPUT ACCEPT
+$ sudo iptables -A INPUT -i lo -j ACCEPT
+$ sudo iptables -A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG NONE -j DROP
+$ sudo iptables -A INPUT -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m state --state NEW -j DROP
+$ sudo iptables -A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG FIN,SYN,RST,PSH,ACK,URG -j DROP
+$ sudo iptables -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 128 -m hashlimit --hashlimit-upto 1/min --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-name t_icmp --hashlimit-htable-expire 120000 -j ACCEPT
+$ sudo iptables -A INPUT -p tcp -m state --state RELATED,ESTABLISHED -j ACCEPT
+$ sudo iptables -A INPUT -p udp -m udp --sport 53 -j ACCEPT
+$ sudo iptables -A INPUT -p tcp -m state --state NEW -m tcp --dport 22 --tcp-flags FIN,SYN,RST,ACK SYN -m hashlimit --hashlimit-upto 1/min --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-name t_sshd --hashlimit-htable-expire 120000 -j ACCEPT
+$ sudo iptables -A INPUT -p tcp -m tcp --dport 80 -j ACCEPT
+$ sudo iptables -A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
+```
+
+**iptablesを永続化するためのパッケージ**  
+インストールするタイミング注意。パッケージインストール時の iptables の設定が保存されるので iptables を設定してからインストールすること。
+```
+sudo apt install iptables-persistent
+sudo dpkg-reconfigure iptables-persistent
+```
+
 # デスクトップ環境  
 ウィンドウマネージャ、Xサーバー、フォント等等必要な物をインストールする
 ```
@@ -292,47 +336,6 @@ function share_history {
 PROMPT_COMMAND='share_history'
 shopt -u histappend
 export HISTSIZE=9999
-```
-
-# セキュリティ設定
-**IPv4用の iptables の設定**  
-```
-$ sudo iptables -P INPUT DROP
-$ sudo iptables -P FORWARD DROP
-$ sudo iptables -P OUTPUT ACCEPT
-$ sudo iptables -A INPUT -i lo -j ACCEPT
-$ sudo iptables -A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG NONE -j DROP
-$ sudo iptables -A INPUT -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m state --state NEW -j DROP
-$ sudo iptables -A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG FIN,SYN,RST,PSH,ACK,URG -j DROP
-$ sudo iptables -A INPUT -p icmp -m icmp6 --icmp-type 128 -m hashlimit --hashlimit-upto 1/min --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-name t_icmp --hashlimit-htable-expire 120000 -j ACCEPT
-$ sudo iptables -A INPUT -p tcp -m state --state RELATED,ESTABLISHED -j ACCEPT
-$ sudo iptables -A INPUT -p udp -m udp --sport 53 -j ACCEPT
-$ sudo iptables -A INPUT -p tcp -m state --state NEW -m tcp --dport 22 --tcp-flags FIN,SYN,RST,ACK SYN -m hashlimit --hashlimit-upto 1/min --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-name t_sshd --hashlimit-htable-expire 120000 -j ACCEPT
-$ sudo iptables -A INPUT -p tcp -m tcp --dport 80 -j ACCEPT
-$ sudo iptables -A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
-```
-
-**IPv6用の iptables の設定**  
-```
-$ sudo iptables -P INPUT DROP
-$ sudo iptables -P FORWARD DROP
-$ sudo iptables -P OUTPUT ACCEPT
-$ sudo iptables -A INPUT -i lo -j ACCEPT
-$ sudo iptables -A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG NONE -j DROP
-$ sudo iptables -A INPUT -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m state --state NEW -j DROP
-$ sudo iptables -A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG FIN,SYN,RST,PSH,ACK,URG -j DROP
-$ sudo iptables -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 128 -m hashlimit --hashlimit-upto 1/min --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-name t_icmp --hashlimit-htable-expire 120000 -j ACCEPT
-$ sudo iptables -A INPUT -p tcp -m state --state RELATED,ESTABLISHED -j ACCEPT
-$ sudo iptables -A INPUT -p udp -m udp --sport 53 -j ACCEPT
-$ sudo iptables -A INPUT -p tcp -m state --state NEW -m tcp --dport 22 --tcp-flags FIN,SYN,RST,ACK SYN -m hashlimit --hashlimit-upto 1/min --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-name t_sshd --hashlimit-htable-expire 120000 -j ACCEPT
-$ sudo iptables -A INPUT -p tcp -m tcp --dport 80 -j ACCEPT
-$ sudo iptables -A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
-```
-
-iptablesを永続化するためのパッケージ。インストールするタイミング注意。パッケージインストール時の iptables の設定が保存されるので iptables を設定してからインストールすること。
-```
-sudo apt install iptables-persistent
-sudo dpkg-reconfigure iptables-persistent
 ```
 
 # screenカスタマイズ
