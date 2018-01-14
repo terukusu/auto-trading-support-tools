@@ -106,7 +106,7 @@ sudo apt-get install firefox
 ※ time4vpsは Lynxがわりとまともに動くのでそれでも良いかも
 
 ## 日本語入力
-(イマイチ使えないのでやらないほうがマシ)
+(イマイチ使えないのでやらないほうがマシ)  
 ダメ：`sudo apt-get install fcitx-mozc`  
 OK：`sudo apt-get install ibus-mozc`  
 
