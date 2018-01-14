@@ -56,7 +56,8 @@ $ timedatectl set-timezone Asia/Tokyo
 ```
 $ sudo apt-get install -f -y
 $ sudo apt-get update -y
-$ sudo apt-get upgrade -y```
+$ sudo apt-get upgrade -y
+```
 
 # デスクトップ環境  
 ウィンドウマネージャ、Xサーバー、フォント等等必要な真野をインストールする
@@ -100,7 +101,8 @@ VNC Server に接続確認
 ## Webブラウザのインストール
 (chromeは何かと面倒なので避ける)
 ```
-sudo apt-get install firefox```
+sudo apt-get install firefox
+```
 ※ time4vpsは Lynxがわりとまともに動くのでそれでも良いかも
 
 ## 日本語入力
@@ -113,7 +115,8 @@ OK：`sudo apt-get install ibus-mozc`
 export GTK_IM_MODULE=ibus
 export XMODIFIERS="@im=ibus"
 export QT_IM_MODULE=ibus
-/usr/bin/ibus-daemon -dxr```
+/usr/bin/ibus-daemon -dxr
+```
 
 ## Wineのインストール
 (詳しくはWineHQのホムペで)
@@ -124,25 +127,29 @@ $ sudo apt-get install -y software-properties-common
 $ sudo dpkg --add-architecture i386
 $ wget -nc https://dl.winehq.org/wine-builds/Release.key
 $ sudo apt-key add Release.key
-$ sudo apt-add-repository 'deb https://dl.winehq.org/wine-builds/ubuntu/ xenial main'```
+$ sudo apt-add-repository 'deb https://dl.winehq.org/wine-builds/ubuntu/ xenial main'
+```
 
 **Wintricks をインストール**  
 Wineの様々な設定に便利なツール
 ```
 $ wget  https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks
 $ chmod ugo+x winetricks
-$ sudo mv winetricks /usr/local/bin/```
+$ sudo mv winetricks /usr/local/bin/
+```
 
 **Wineをインストール**  
 ```
-sudo apt-get install --install-recommends winehq-devel```
+sudo apt-get install --install-recommends winehq-devel
+```
 
 **一旦wine起動**  
 ```
 export DISPLAY=:1
 export WINEARCH=win32
 winecfg
-(↑これはwineの設定ツール。ここでは自動で初期設定が行われるので見守るだけ。起動したら即終了でOK)```
+(↑これはwineの設定ツール。ここでは自動で初期設定が行われるので見守るだけ。起動したら即終了でOK)
+```
 
 **日本語フォントを設定する**  
 ~/.wine/user.reg の末尾に↓これを追記する
@@ -155,32 +162,36 @@ winecfg
 "MS UI Gothic"="VL PGothic"
 "Tahoma"="VL PGothic"
 "\xff2d\xff33 \x30b4\x30b7\x30c3\x30af"="VL Gothic"
-"\xff2d\xff33 \xff30\x30b4\x30b7\x30c3\x30af"="VL PGothic"```
+"\xff2d\xff33 \xff30\x30b4\x30b7\x30c3\x30af"="VL PGothic"
+```
 
 **モロモロのライブラリ導入**  
 ```
 (不要かも？)$ winetricks dotnet40
 (不要かも？)$ winetricks winhttp
-(不要かも？)$ winetricks wininet```
+(不要かも？)$ winetricks wininet
+```
 ↑インストーラーが途中で止まるときに適宜突っ込んで見ると突破できることも有る
 (2017/11/12 時点で、Ubuntu16.04にMT4を入れた時はインストールが途中で止まることもなく上記作業は不要だった)
 
 # MetaTrader4をインストール
 **インストーラをダウンロード**  
 ```
-wget https://download.mql5.com/cdn/web/metaquotes.software.corp/mt4/mt4setup.exe```
+wget https://download.mql5.com/cdn/web/metaquotes.software.corp/mt4/mt4setup.exe
+```
 (↑何故かMT5がインストールされるので、どこかのFXブローカー(XM等)からMT4をDLしてくるのが良さそう)
 
 **インストーラ起動**  
 ```
-wine mt4setup.exe```
+wine mt4setup.exe
+```
 
 セットアップ中のDLで止まる → インストールキャンセル → 再インストール を繰り返すとそのうち最後まで行ける
 
 **MetaTrader4の起動**  
 ```
-$ DISPALY=:1 WINARCH=win32 wine "/home/teru/.wine/drive_c/Program Files/MetaTrader 4/terminal.exe"```
-
+$ DISPALY=:1 WINARCH=win32 wine "/home/teru/.wine/drive_c/Program Files/MetaTrader 4/terminal.exe"
+```
 
 あとは普通に使うだけ。
 メモリ不足になるのでfirefoxは終了しておくこと
@@ -191,7 +202,8 @@ $ DISPALY=:1 WINARCH=win32 wine "/home/teru/.wine/drive_c/Program Files/MetaTrad
 /etc/rc.local にvncとmt4の自動起動設定に以下の内容を追記
 ```
 su -l teru -c "/usr/bin/vncserver :1 -geometry 1280x800 -depth 16"
-su -l teru -c "DISPLAY=:1 WINEARCH=win32 WINEDEBUG=-all WINEPREFIX=/home/teru/.wine /usr/bin/wine /home/teru/.wine/drive_c/Program\ Files/MetaTrader\ 4/terminal.exe" &```
+su -l teru -c "DISPLAY=:1 WINEARCH=win32 WINEDEBUG=-all WINEPREFIX=/home/teru/.wine /usr/bin/wine /home/teru/.wine/drive_c/Program\ Files/MetaTrader\ 4/terminal.exe" &
+```
 
 ↑teruの部分は適切なユーザー名で読み替え
 
@@ -199,16 +211,19 @@ su -l teru -c "DISPLAY=:1 WINEARCH=win32 WINEDEBUG=-all WINEPREFIX=/home/teru/.w
 xfce4はそれなりにメモリを使うので元祖なWMであるtwmを使う
 
 ```
-sudo apt-get install twm```
+sudo apt-get install twm
+```
 
 ~/.vnc/xstartup の最後を↓こう変える
 ```
 #startxfce4 &
-twm &```
+twm &
+```
 
 twmの設定を追加
 ```
-vi ~/.twmrc```
+vi ~/.twmrc
+```
 
 ↓これを書いておく
 ```
@@ -227,13 +242,15 @@ menu "Menu"
 "xterm" f.exec "xterm &"
 "mt4" f.exec "/home/teru/bin/mt4.sh &"
 "mt4_2nd" f.exec "/home/teru/bin/mt4_2nd.sh &"
-}```
+}
+```
 
 mt4.sh はこんな感じ
 ```
 teru@30194:~$ cat ~/bin/mt4.sh
 #/bin/bash
-DISPLAY=:1 WINEARCH=win32 WINEDEBUG=-all WINEPREFIX=/home/teru/.wine /usr/bin/wine start /d 'C:\Program Files\MetaTrader 4' /unix /home/teru/.wine/drive_c/Program\ Files/MetaTrader\ 4/terminal.exe```
+DISPLAY=:1 WINEARCH=win32 WINEDEBUG=-all WINEPREFIX=/home/teru/.wine /usr/bin/wine start /d 'C:\Program Files\MetaTrader 4' /unix /home/teru/.wine/drive_c/Program\ Files/MetaTrader\ 4/terminal.exe
+```
 
 # screenにSSHエージェントを効かせる設定
 ~/.bash_profile に以下を記述
@@ -255,7 +272,8 @@ else
     echo "no ssh-agent"
 fi
 
-export WINEARCH=win32```
+export WINEARCH=win32
+```
 
 # コマンドプロンプトに色を付ける
  ~/.bashrc 編集
@@ -270,7 +288,8 @@ function share_history {
 }
 PROMPT_COMMAND='share_history'
 shopt -u histappend
-export HISTSIZE=9999```
+export HISTSIZE=9999
+```
 
 # セキュリティ設定
 **IPv4用の iptables の設定**  
@@ -287,7 +306,8 @@ $ sudo iptables -A INPUT -p tcp -m state --state RELATED,ESTABLISHED -j ACCEPT
 $ sudo iptables -A INPUT -p udp -m udp --sport 53 -j ACCEPT
 $ sudo iptables -A INPUT -p tcp -m state --state NEW -m tcp --dport 22 --tcp-flags FIN,SYN,RST,ACK SYN -m hashlimit --hashlimit-upto 1/min --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-name t_sshd --hashlimit-htable-expire 120000 -j ACCEPT
 $ sudo iptables -A INPUT -p tcp -m tcp --dport 80 -j ACCEPT
-$ sudo iptables -A INPUT -p tcp -m tcp --dport 443 -j ACCEPT```
+$ sudo iptables -A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
+```
 
 **IPv6用の iptables の設定**  
 ```
@@ -303,15 +323,18 @@ $ sudo iptables -A INPUT -p tcp -m state --state RELATED,ESTABLISHED -j ACCEPT
 $ sudo iptables -A INPUT -p udp -m udp --sport 53 -j ACCEPT
 $ sudo iptables -A INPUT -p tcp -m state --state NEW -m tcp --dport 22 --tcp-flags FIN,SYN,RST,ACK SYN -m hashlimit --hashlimit-upto 1/min --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-name t_sshd --hashlimit-htable-expire 120000 -j ACCEPT
 $ sudo iptables -A INPUT -p tcp -m tcp --dport 80 -j ACCEPT
-$ sudo iptables -A INPUT -p tcp -m tcp --dport 443 -j ACCEPT```
+$ sudo iptables -A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
+```
 
 iptablesを永続化するためのパッケージ。インストールするタイミング注意。パッケージインストール時の iptables の設定が保存されるので iptables を設定してからインストールすること。
 ```
 sudo apt install iptables-persistent
-sudo dpkg-reconfigure iptables-persistent```
+sudo dpkg-reconfigure iptables-persistent
+```
 
 # screenカスタマイズ
 ↓Ctrl+Tでエスケープ
 ```
 # Escape key is C-t, literal is a.
-escape ^Ta```
+escape ^Ta
+```
