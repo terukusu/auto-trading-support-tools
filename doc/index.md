@@ -32,14 +32,16 @@ $ pkill xfconfd ; rm -rf ~/.config/xfce4/panel ~/.config/xfce4/xfconf/xfce-perch
 ```
 $ useradd teru -s /bin/bash -m
 $ passwd teru
-$ usermod -aG sudo teru```
+$ usermod -aG sudo teru
+```
 
 `~/.ssh/authorized_keys` に公開鍵入れておく
 
 **ロケールを日本語に変更**  
 ```
 $ sudo apt-get install language-pack-ja
-$ sudo update-locale LANG=ja_JP.UTF-8```
+$ sudo update-locale LANG=ja_JP.UTF-8
+```
 
 **タイムゾーンをJSTに**  
 ```
