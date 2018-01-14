@@ -14,7 +14,7 @@ Ubuntu 16(64bit)でMT4を運用する環境を構築するための手順
 
 # VPS準備
 1. [TIME4VPSのサイト](https://www.time4vps.eu)でVPSを契約してVPSを１台用意する
- * 最低スペックのXSタイプでMT4が4つ程度動作可能
+    * 最低スペックのXSタイプでMT4が4つ程度動作可能
 1. OS は Utbuntu 16.04 (64bit) をインストールする
 
 # Tips(必要になったら使う)
@@ -60,7 +60,7 @@ $ sudo apt-get upgrade -y
 ```
 
 # デスクトップ環境  
-ウィンドウマネージャ、Xサーバー、フォント等等必要な真野をインストールする
+ウィンドウマネージャ、Xサーバー、フォント等等必要な物をインストールする
 ```
 $ sudo apt-get install -y xfce4 xfce4-goodies vnc4server fonts-vlgothic
 ```
