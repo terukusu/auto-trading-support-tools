@@ -21,11 +21,13 @@ Ubuntu 16(64bit)でMT4を運用する環境を構築するための手順
 apt-get install の undo  
 ```
 $ awk '!/^Start|^Commandl|^End|^Upgrade:|^Error:/ { gsub( /\([^()]*\)/ ,"" );gsub(/ ,/," ");sub(/^Install:/,""); print}' /var/log/apt/history.log
-$ sudo apt-get remove [packages]```
+$ sudo apt-get remove [packages]
+```
 
 xfceの設定初期化  
 ```
-$ pkill xfconfd ; rm -rf ~/.config/xfce4/panel ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml```
+$ pkill xfconfd ; rm -rf ~/.config/xfce4/panel ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml
+```
 
 # もろもろ設定
 **作業ユーザー作成していい感じにする**  
@@ -45,7 +47,8 @@ $ sudo update-locale LANG=ja_JP.UTF-8
 
 **タイムゾーンをJSTに**  
 ```
-$ timedatectl set-timezone Asia/Tokyo```  
+$ timedatectl set-timezone Asia/Tokyo
+```  
 ↑ オプション無しで実行すると現在の設定が表示される
 
 **パッケージのアップグレード**  
@@ -58,7 +61,8 @@ $ sudo apt-get upgrade -y```
 # デスクトップ環境  
 ウィンドウマネージャ、Xサーバー、フォント等等必要な真野をインストールする
 ```
-$ sudo apt-get install -y xfce4 xfce4-goodies vnc4server fonts-vlgothic```
+$ sudo apt-get install -y xfce4 xfce4-goodies vnc4server fonts-vlgothic
+```
 
 ※ キーボードレイアウトを聞かれるので「日本語 - かな86」を選択(正しいかは知らん)
 
