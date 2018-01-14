@@ -151,7 +151,7 @@ sudo apt-get install firefox
 
 ## 日本語入力
 (イマイチ使えないのでやらないほうがマシ)  
-ダメ：`$ sudo apt-get install fcitx-mozc`  
+ダメ：`$ sudo apt-get install fcitx-mozc`     
 OK：`$ sudo apt-get install ibus-mozc`  
 
 ~/.vnc/xstartup に↓を追記
