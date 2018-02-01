@@ -6,6 +6,7 @@
 echo "稼働OK！`uptime`" | trd_send_to_line
 
 # check upgradable package
+sudo "$TRD_DIR/update_package.sh" > /dev/null 2>&1
 upgradable="`apt list --upgradable | grep / | cut -d'/' -f 1`"
 num_upgradable=`echo -n "$upgradable" | wc -l`
 
