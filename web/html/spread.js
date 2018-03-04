@@ -11,11 +11,12 @@ function csv2Array(str) {
 
 function drawChart(data) {
   // 3)chart.jsのdataset用の配列を用意
-  var tmpLabels = [], tmpData1 = [], tmpData2 = [];
+  var tmpLabels = [], tmpData1 = [], tmpData2 = [], tmpData3 = [];
   for (var row in data) {
     tmpLabels.push(data[row][0])
     tmpData1.push(data[row][1])
     tmpData2.push(data[row][2])
+    tmpData3.push(data[row][3])
   };
 
   // 4)chart.jsで描画
@@ -25,11 +26,14 @@ function drawChart(data) {
     data: {
       labels: tmpLabels,
       datasets: [
-        { label: "EUR/USD", data: tmpData1, borderColor: "red",
+        { label: "EUR/USD(BlackCat)", data: tmpData1, borderColor: "red",
           backgroundColor: "red", fill: false, lineTension: 0,
           borderWidth: 1, pointRadius: 0},
-        { label: "USD/JPY", data: tmpData2, borderColor: "blue",
+        { label: "EUR/USD(JARVIS-II-1K)", data: tmpData2, borderColor: "blue",
           backgroundColor: "blue", fill: false, lineTension: 0,
+          borderWidth: 1, pointRadius: 0},
+        { label: "EUR/USD(JARVIS-II-10K)", data: tmpData3, borderColor: "green",
+          backgroundColor: "green", fill: false, lineTension: 0,
           borderWidth: 1, pointRadius: 0}
       ]
     }
