@@ -26,15 +26,15 @@ function drawChart(data) {
     data: {
       labels: tmpLabels,
       datasets: [
-        { label: "EUR/USD(BlackCat)", data: tmpData1, borderColor: "red",
-          backgroundColor: "red", fill: false, lineTension: 0,
-          borderWidth: 1, pointRadius: 0},
-        { label: "EUR/USD(JARVIS-II-1K)", data: tmpData2, borderColor: "blue",
+        { label: "EUR/USD(FATE-II-1K)", data: tmpData2, borderColor: "blue",
           backgroundColor: "blue", fill: false, lineTension: 0,
           borderWidth: 1, pointRadius: 0},
-        { label: "EUR/USD(JARVIS-II-10K)", data: tmpData3, borderColor: "green",
+        { label: "EUR/USD(FATE-II-10K)", data: tmpData3, borderColor: "green",
           backgroundColor: "green", fill: false, lineTension: 0,
-          borderWidth: 1, pointRadius: 0}
+          borderWidth: 1, pointRadius: 0},
+        { label: "EUR/USD(FATE-II-1M)", data: tmpData1, borderColor: "red",
+          backgroundColor: "red", fill: false, lineTension: 0,
+          borderWidth: 1, pointRadius: 0},
       ]
     }
   });
