@@ -13,13 +13,14 @@ function csv2Array(str) {
 
 function drawChart(data) {
   // 3)chart.jsのdataset用の配列を用意
-  var tmpLabels = [], tmpData1 = [], tmpData2 = [], tmpData3 = [], tmpData4 = [];
+  var tmpLabels = [], tmpData1 = [], tmpData2 = [], tmpData3 = [], tmpData4 = [], tmpData5 = [];
   for (var row in data) {
     tmpLabels.push(data[row][0])
     tmpData1.push(data[row][1])
     tmpData2.push(data[row][2])
     tmpData3.push(data[row][3])
-//    tmpData4.push(data[row][4])
+    tmpData4.push(data[row][4])
+    tmpData5.push(data[row][5])
   };
 
   // 4)chart.jsで描画
@@ -30,18 +31,17 @@ function drawChart(data) {
     data: {
       labels: tmpLabels,
       datasets: [
+        { label: "PUT IV", data: tmpData2, borderColor: "blue", backgroundColor: "blue", fill: false, lineTension: 0,
+          borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-1"},
+        { label: "PUT取引時刻", data: tmpData5, borderColor: "purple",
+          backgroundColor: "purple", fill: false, lineTension: 0,
+          borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-2"},
         { label: "CALL IV", data: tmpData1, borderColor: "red",
           backgroundColor: "red", fill: false, lineTension: 0,
           borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-1"},
-        { label: "PUT IV", data: tmpData2, borderColor: "blue",
-          backgroundColor: "blue", fill: false, lineTension: 0,
-          borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-1"},
-//        { label: "ATM-PUTの値", data: tmpData3, borderColor: "green",
-//          backgroundColor: "green", fill: false, lineTension: 0,
-//          borderWidth: 1, pointRadius: 0, yAxisID: "y-axis-3"},
-//        { label: "EUR/USD(AveragingMaster)", data: tmpData4, borderColor: "purple",
-//          backgroundColor: "purple", fill: false, lineTension: 0,
-//          borderWidth: 1, pointRadius: 0},
+        { label: "CALL取引時刻", data: tmpData4, borderColor: "green",
+          backgroundColor: "green", fill: false, lineTension: 0,
+          borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-2"},
       ]
     },
     options: {
@@ -50,19 +50,13 @@ function drawChart(data) {
             display:true,
             text: "スマイルカーブ(" + tmpData3[0] + ")",
         },
-//                animation: {
-//                    duration: 2000,
-//                    onProgress: function(animation) {
-//                        progress.value = animation.currentStep / animation.numSteps;
-//                    },
-//                    onComplete: function(animation) {
-//                        window.setTimeout(function() {
-//                            progress.value = 0;
-//                        }, 2000);
-//                    }
-//                },
         scales: {
-                      yAxes: [{
+            xAxes: [{
+                ticks: {
+                    callback: function(value) { return (value%250 == 0) ? value : ''}
+                }
+            }],
+            yAxes: [{
                 id: "y-axis-1",
                 type: "linear", 
                 position: "left",
@@ -72,19 +66,21 @@ function drawChart(data) {
 //                    stepSize: 0.1
 //                },
             }, 
-//            {
-//                id: "y-axis-2",
-//                type: "linear", 
-//                position: "right",
-////                ticks: {
-////                    max: 1.5,
-////                    min: 0,
-////                    stepSize: .5
-////                },
-//                gridLines: {
-//                    drawOnChartArea: false, 
-//                },
-//            },
+            {
+                id: "y-axis-2",
+                type: "linear", 
+                position: "right",
+                ticks: {
+                      callback: function(v) {var d=new Date(v * 1000); return  ("0"+d.getDate()).slice(-2)+'日'
+                          +("0"+d.getHours()).slice(-2)+':'+("0"+d.getMinutes()).slice(-2)},
+//                    max: 1.5,
+//                    min: 0,
+//                    stepSize: .5
+                },
+                gridLines: {
+                    drawOnChartArea: false, 
+                },
+            },
 //            {
 //                id: "y-axis-3",
 //                type: "linear", 

@@ -45,6 +45,17 @@ function drawChart(data) {
     options: {
         responsive: true,
         scales: {
+            xAxes: [{
+                distribution: "linear",
+                ticks: {
+                    autoSkip: false,
+                    callback: function(value) { var m =  value.match(/ ([0-9]+):00/); return (m && m[1]%2 == 0) ? value.substr(5) : ""}
+                },
+                gridLines: {
+                    drawOnChartArea: false, 
+                    drawTicks: false,
+                },
+            }],
             yAxes: [{
                 id: "y-axis-1",
                 type: "linear", 

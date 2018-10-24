@@ -2,7 +2,7 @@
 function csv2Array(str) {
   var csvData = [];
   var lines = str.split("\n");
-  for (var i = 0; i < lines.length; ++i) {
+  for (var i = 0; i < lines.length; i++) {
     var cells = lines[i].split(",");
     csvData.push(cells);
   }
@@ -21,6 +21,7 @@ function drawChart(data) {
   };
 
   // 4)chart.jsで描画
+  document.getElementById("loading").style.display ="none";
   var ctx = document.getElementById("chartCanvas").getContext("2d");
   var myChart = new Chart(ctx, {
     type: 'line',
