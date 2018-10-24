@@ -71,7 +71,7 @@ function drawChart(data) {
                 type: "linear", 
                 position: "right",
                 ticks: {
-                      callback: function(v) {var d=new Date(v * 1000); return  ("0"+d.getDate()).slice(-2)+'日'
+                      callback: function(v) {var d=new Date((v - 3600*9) * 1000); return  ("0"+d.getDate()).slice(-2)+'日'
                           +("0"+d.getHours()).slice(-2)+':'+("0"+d.getMinutes()).slice(-2)},
 //                    max: 1.5,
 //                    min: 0,
