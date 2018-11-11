@@ -3,8 +3,10 @@ function csv2Array(str) {
   var csvData = [];
   var lines = str.split("\n");
   for (var i = 0; i < lines.length; i++) {
-    var cells = lines[i].split(",");
-    csvData.push(cells);
+    var cells = lines[i].split(",").map(x => x !== '' ? x : null);
+    if(cells.length > 1) {
+        csvData.push(cells);
+    }
   }
   return csvData;
 }
@@ -12,6 +14,10 @@ function csv2Array(str) {
 function drawChart(data) {
   // 3)chart.jsのdataset用の配列を用意
   var tmpLabels = [], tmpData1 = [], tmpData2 = [], tmpData3 = [], tmpData4 = [];
+
+  var meta = data.pop()
+  var updatedAt = new Date(meta[0] * 1000);
+
   for (var row in data) {
     tmpLabels.push(data[row][0])
     tmpData1.push(data[row][1])
@@ -30,13 +36,13 @@ function drawChart(data) {
       datasets: [
         { label: "ATM権利行使価格", data: tmpData1, borderColor: "red",
           backgroundColor: "red", fill: false, lineTension: 0,
-          borderWidth: 1, pointRadius: 0, yAxisID: "y-axis-1"},
+          borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-1"},
         { label: "ATM-PUTのIV", data: tmpData2, borderColor: "blue",
           backgroundColor: "blue", fill: false, lineTension: 0,
-          borderWidth: 1, pointRadius: 0, yAxisID: "y-axis-2"},
+          borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-2"},
         { label: "ATM-PUTの値", data: tmpData3, borderColor: "green",
           backgroundColor: "green", fill: false, lineTension: 0,
-          borderWidth: 1, pointRadius: 0, yAxisID: "y-axis-3"},
+          borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-3"},
 //        { label: "EUR/USD(AveragingMaster)", data: tmpData4, borderColor: "purple",
 //          backgroundColor: "purple", fill: false, lineTension: 0,
 //          borderWidth: 1, pointRadius: 0},
@@ -44,21 +50,32 @@ function drawChart(data) {
     },
     options: {
         responsive: true,
+        title:{
+            display:true,
+            text: "ATMオプションパラメータ推移 (" + (updatedAt.getMonth() + 1) + '/' + updatedAt.getDate()  +' '
+                          + updatedAt.getHours() + ':' + ("0"+updatedAt.getMinutes()).slice(-2) + " 更新)",
+        },
         scales: {
             xAxes: [{
                 distribution: "linear",
                 ticks: {
                     autoSkip: false,
-                    callback: function(value) { var m =  value.match(/ ([0-9]+):00/); return (m && m[1]%2 == 0) ? value.substr(5) : ""}
+                    callback: function(value) {
+                      var d=new Date(value * 1000);
+                      var xLabel = ("0" + (d.getMonth() + 1)).slice(-2) + '/' + ("0" + d.getDate()).slice(-2)+' '
+                          + ("0" + d.getHours()).slice(-2) + ':' + ("0" + d.getMinutes()).slice(-2);
+                      var m =  xLabel.match(/ ([0-9]+):00/);
+                      return (m && m[1]%2 == 0) ? xLabel : "";
+                    },
                 },
                 gridLines: {
-                    drawOnChartArea: false, 
+                    drawOnChartArea: false,
                     drawTicks: false,
                 },
             }],
             yAxes: [{
                 id: "y-axis-1",
-                type: "linear", 
+                type: "linear",
                 position: "left",
 //                ticks: {
 //                    max: 0.2,
@@ -67,7 +84,7 @@ function drawChart(data) {
 //                },
             }, {
                 id: "y-axis-2",
-                type: "linear", 
+                type: "linear",
                 position: "right",
 //                ticks: {
 //                    max: 1.5,
@@ -75,11 +92,11 @@ function drawChart(data) {
 //                    stepSize: .5
 //                },
                 gridLines: {
-                    drawOnChartArea: false, 
+                    drawOnChartArea: false,
                 },
             },{
                 id: "y-axis-3",
-                type: "linear", 
+                type: "linear",
                 position: "right",
 //                ticks: {
 //                    max: 1.5,
@@ -87,7 +104,7 @@ function drawChart(data) {
 //                    stepSize: .5
 //                },
                gridLines: {
-                   drawOnChartArea: false, 
+                   drawOnChartArea: false,
                },
             }],
         }

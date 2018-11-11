@@ -13,14 +13,24 @@ function csv2Array(str) {
 
 function drawChart(data) {
   // 3)chart.jsのdataset用の配列を用意
-  var tmpLabels = [], tmpData1 = [], tmpData2 = [], tmpData3 = [], tmpData4 = [], tmpData5 = [];
+  var tmpLabels = [], tmpData1 = [], tmpData2 = [], tmpData3 = [];
+  var tmpData4 = [], tmpData5 = [], tmpData6 = [], tmpData7 = [], tmpData8 = [];
+
+  var meta = data.shift()
+ 
+  var updatedAt = new Date(meta[0] * 1000);
+  var atm = meta[1]
+
   for (var row in data) {
-    tmpLabels.push(data[row][0])
-    tmpData1.push(data[row][1])
-    tmpData2.push(data[row][2])
-    tmpData3.push(data[row][3])
-    tmpData4.push(data[row][4])
-    tmpData5.push(data[row][5])
+    tmpLabels.push(data[row][0]); // target_price
+    tmpData1.push(data[row][1]); // o1.iv
+    tmpData2.push(data[row][2]); // o1.price_time
+    tmpData3.push(data[row][3]); // o2.iv
+    tmpData4.push(data[row][4]); // o2.price_time
+    tmpData5.push(data[row][5]); // o3.iv
+    tmpData6.push(data[row][6]); // o3.price_time
+    tmpData7.push(data[row][7]); // o4.iv
+    tmpData8.push(data[row][8]); // o4.price_time
   };
 
   // 4)chart.jsで描画
@@ -31,16 +41,29 @@ function drawChart(data) {
     data: {
       labels: tmpLabels,
       datasets: [
-        { label: "PUT IV", data: tmpData2, borderColor: "blue", backgroundColor: "blue", fill: false, lineTension: 0,
+        { label: "1限月PUT IV", data: tmpData3, borderColor: "blue",
+          backgroundColor: "blue", fill: false, lineTension: 0,
           borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-1"},
-        { label: "PUT取引時刻", data: tmpData5, borderColor: "purple",
-          backgroundColor: "purple", fill: false, lineTension: 0,
-          borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-2"},
-        { label: "CALL IV", data: tmpData1, borderColor: "red",
+        { label: "1限月CALL IV", data: tmpData1, borderColor: "red",
           backgroundColor: "red", fill: false, lineTension: 0,
           borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-1"},
-        { label: "CALL取引時刻", data: tmpData4, borderColor: "green",
+        { label: "2限月PUT IV", data: tmpData7, borderColor: "#87CEEB",
+          backgroundColor: "#87CEEB", fill: false, lineTension: 0,
+          borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-1"},
+        { label: "2限月CALL IV", data: tmpData5, borderColor: "#FFB6C1",
+          backgroundColor: "#FFB6C1", fill: false, lineTension: 0,
+          borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-1"},
+        { label: "1限月PUT取引時刻", data: tmpData4, borderColor: "purple",
+          backgroundColor: "purple", fill: false, lineTension: 0,
+          borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-2"},
+        { label: "1限月CALL取引時刻", data: tmpData2, borderColor: "green",
           backgroundColor: "green", fill: false, lineTension: 0,
+          borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-2"},
+        { label: "2限月PUT取引時刻", data: tmpData8, borderColor: "#D8BfD8",
+          backgroundColor: "#D8BfD8", fill: false, lineTension: 0,
+          borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-2"},
+        { label: "2限月CALL取引時刻", data: tmpData6, borderColor: "#9FCC9F",
+          backgroundColor: "#9FCC9F", fill: false, lineTension: 0,
           borderWidth: 1, pointRadius: 0, spanGaps: false, yAxisID: "y-axis-2"},
       ]
     },
@@ -48,7 +71,8 @@ function drawChart(data) {
         responsive: true,
         title:{
             display:true,
-            text: "スマイルカーブ(" + tmpData3[0] + ")",
+            text: "スマイルカーブ(" + (updatedAt.getMonth() + 1) + '/' + updatedAt.getDate()  +' '
+                          + updatedAt.getHours() + ':' + ("0"+updatedAt.getMinutes()).slice(-2) + ") ATM = " + atm,
         },
         scales: {
             xAxes: [{
@@ -58,42 +82,21 @@ function drawChart(data) {
             }],
             yAxes: [{
                 id: "y-axis-1",
-                type: "linear", 
+                type: "linear",
                 position: "left",
-//                ticks: {
-//                    max: 0.2,
-//                    min: 0,
-//                    stepSize: 0.1
-//                },
-            }, 
+            },
             {
                 id: "y-axis-2",
-                type: "linear", 
+                type: "linear",
                 position: "right",
                 ticks: {
-                      callback: function(v) {var d=new Date((v - 3600*9) * 1000); return  ("0"+d.getDate()).slice(-2)+'日'
+                      callback: function(v) {var d=new Date(v * 1000); return  ("0"+d.getDate()).slice(-2)+'日'
                           +("0"+d.getHours()).slice(-2)+':'+("0"+d.getMinutes()).slice(-2)},
-//                    max: 1.5,
-//                    min: 0,
-//                    stepSize: .5
                 },
                 gridLines: {
-                    drawOnChartArea: false, 
+                    drawOnChartArea: false,
                 },
             },
-//            {
-//                id: "y-axis-3",
-//                type: "linear", 
-//                position: "right",
-////                ticks: {
-////                    max: 1.5,
-////                    min: 0,
-////                    stepSize: .5
-////                },
-//               gridLines: {
-//                   drawOnChartArea: false, 
-//               },
-//            },
              ],
         }
     }
