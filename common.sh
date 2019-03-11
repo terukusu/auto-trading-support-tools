@@ -29,7 +29,7 @@ function trd_send_to_line() {
         "messages":[
           {
              "type":"text",
-             "text":"【SVR1】'"$msg"'"
+             "text":"【'`hostname -s`'】'"$msg"'"
            }
         ]
       }'
