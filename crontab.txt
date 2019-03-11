@@ -5,5 +5,4 @@ MAILTO=teru.kusu@gmail.com
 * * * * * /home/teru/trade/check_reboot.sh
 */10 * * * * /home/teru/trade/check_process.sh
 3-59/10 * * * * /home/teru/trade/check_heartbeat.sh
-5-59/10 * * * * /home/teru/trade/check_minerd.sh
 0 9 * * * /home/teru/trade/check_daily.sh > /dev/null 2>&1
