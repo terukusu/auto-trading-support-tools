@@ -1,8 +1,9 @@
-MAILTO=teru.kusu@gmail.com
-* * * * * /home/teru/trade/record_heart_beat.sh
-* * * * * /home/teru/trade/record_spread.sh
-* * * * * /home/teru/trade/check_order.sh
-* * * * * /home/teru/trade/check_reboot.sh
-*/10 * * * * /home/teru/trade/check_process.sh
-3-59/10 * * * * /home/teru/trade/check_heartbeat.sh
-0 9 * * * /home/teru/trade/check_daily.sh > /dev/null 2>&1
+#MAILTO=teru.kusu@gmail.com
+TRADE_DIR=/home/teru/trade
+* * * * * $TRADE_DIR/record_heart_beat.sh
+* * * * * $TRADE_DIR/record_spread.sh
+* * * * * $TRADE_DIR/check_order.sh
+* * * * * $TRADE_DIR/check_reboot.sh
+*/10 * * * * $TRADE_DIR/check_process.sh
+3-59/10 * * * * $TRADE_DIR/check_heartbeat.sh
+0 9 * * * $TRADE_DIR/check_daily.sh > /dev/null 2>&1
