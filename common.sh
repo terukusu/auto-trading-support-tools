@@ -3,6 +3,10 @@
 TRD_CONFIG_FILE=$(cd $(dirname $BASH_SOURCE); pwd)/config
 . $TRD_CONFIG_FILE
 
+if [ ! -e $TRD_DATA_DIR ];then
+    mkdir -p $TRD_DATA_DIR
+fi
+
 function trd_log() {
   echo "["`date "+%Y-%m-%d %H:%M:%S"`"] "$@
 }
