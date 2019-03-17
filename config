@@ -1,5 +1,5 @@
 WINEARCH=win32
-WINEPREFIX=/home/teru/.wine
+WINEPREFIX=$HOME/.wine
 TRD_DIR="$(cd $(dirname $BASH_SOURCE); pwd)"
 TRD_LINE_TOKEN=$(cat "$TRD_DIR/.line_token")
 TRD_RECIPIENTS=$(cat "$TRD_DIR/.line_recipients")
