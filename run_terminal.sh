@@ -1,28 +1,27 @@
 #!/bin/bash
 
-. `dirname $0`/common.sh
+. "$(cd "$(dirname $0)" && pwd)/common.sh"
 
-target=$1
-if [ -z "$target" ]; then
-  echo "target should be specified." 1>&2
+target_name="$1"
+if [ -z "$target_name" ]; then
+  echo "Usage: `basename $0` <MetaTrader Name>" 1>&2
+  echo -e "\t<MetaTrader Name>: folder name of MetaTrader 4. (ex: "'"MetaTrader 4")' 1>&2
   exit 1
 fi
 
-i=0;
-while [ $i -lt $TRD_NUM_TERMINALS ]; do
-  name=`eval echo '$'TRD_NAME_$i`
-  path=`eval echo '$'TRD_MT4_PATH_$i`
+target_path="$(trd_find_terminal "$target_name")"
+if [ -z "$target_path" ]; then
+  echo "起動対象のMetaTraderのインストール場所が見つかりませ。: $target_name" 1>&2
+  exit 1
+fi
 
-  if [ "${target^^}" = "${name^^}" ]; then
-    wine_log=$TRD_DATA_DIR/wine_log_${name,,}
-    work_dir=`winepath -w "$path"`
-    echo "===== START `date +'%Y-%m-%d %H:%M:%S'` =====" >> $wine_log
-    DISPLAY=:1 WINEARCH=win32 WINEDEBUG=-all WINEPREFIX=/home/teru/.wine /usr/bin/wine start /d "$work_dir" /unix "$path/terminal.exe" >> $wine_log 2>&1 &
-    exit 0
-  fi
+work_dir="$(winepath -w "$(dirname "$target_path")")"
 
-  i=`expr $i + 1`
-done
+if [ -z "$WINE" ]; then
+  WINE="$(which wine)"
+fi
 
-echo "MetaTrader Terminal not found: $target" 1>&2
-exit 1
+export WINEDEBUG WINEPREFIX WINEARCH
+"$WINE" start /d "$work_dir" /unix "$target_path"
+
+exit 0
