@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TRD_CONFIG_FILE=$(cd $(dirname $BASH_SOURCE); pwd)/config
+TRD_CONFIG_FILE="$(cd "$(dirname "$BASH_SOURCE")"; pwd)/config"
 . $TRD_CONFIG_FILE
 
 if [ ! -e $TRD_DATA_DIR ];then
@@ -32,7 +32,6 @@ function trd_read_file() {
 
 function trd_send_to_line() {
   msg="`cat - | trd_escape_text`"
-  echo msg=$msg
 
   for r in $TRD_RECIPIENTS; do
     curl 'https://api.line.me/v2/bot/message/push' \
