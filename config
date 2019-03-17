@@ -1,5 +1,6 @@
 WINEARCH=win32
 WINEPREFIX=$HOME/.wine
+WINEDEBUG=-all
 TRD_DIR="$(cd $(dirname $BASH_SOURCE); pwd)"
 TRD_LINE_TOKEN=$(cat "$TRD_DIR/.line_token")
 TRD_RECIPIENTS=$(cat "$TRD_DIR/.line_recipients")
