@@ -16,7 +16,13 @@ function trd_log() {
 }
 
 function trd_escape_text() {
-  sed -re 's/\r//g' | sed -re ':loop;N;$!b loop;s/\n/\\n/g' | sed -re 's/\"/\\"/g' | sed -re 's/\//\\\//g'
+  if [ "$OSTYPE" != "${OSTYPE#darwin}" ];then
+    # For Mac 改行付加。末尾に最低２個の改行がないと出力が空文字になるので。
+    cat - <(echo -en '\n\n') | sed -e 's/\r//g' | sed -e :loop -e 'N; $!b loop' -e 's/\n/\\n/g' | sed -e 's/\"/\\"/g' | sed -e 's/\//\\\//g'
+  else
+    # For linux (gnu sed)
+    cat - | sed -re 's/\r//g' | sed -re ':loop;N;$!b loop;s/\n/\\n/g' | sed -re 's/\"/\\"/g' | sed -re 's/\//\\\//g'
+  fi
 }
 
 function trd_read_file() {
@@ -26,6 +32,7 @@ function trd_read_file() {
 
 function trd_send_to_line() {
   msg="`cat - | trd_escape_text`"
+  echo msg=$msg
 
   for r in $TRD_RECIPIENTS; do
     curl 'https://api.line.me/v2/bot/message/push' \
@@ -93,11 +100,16 @@ function trd_gen_mt_list() {
 function trd_find_terminal() {
     target_mt_name=$1
 
-    eval $(trd_gen_mt_list)
+    if [ -z "$mt_name" ]; then
+        # MT4/5情報がまだ変数としてロードされていなければこの場でロード 
+        # パフォーマンスのためにはこの関数を呼ぶ前に
+        # 呼び出し元で↓を実行しておくことをお勧め
+        eval $(trd_gen_mt_list)
+    fi
 
     i=0
     while [ $i -lt ${#mt_dir[@]} ]; do
-        match=`echo ${mt_name[$i]} | grep -iOE "^$target_mt_name"`
+        match="$(echo ${mt_name[$i]} | grep -ioE "^$target_mt_name")"
         if [ -n "$match" ]; then
             echo "${mt_dir[$i]}/terminal.exe"
             break
