@@ -33,7 +33,7 @@ function trd_read_file() {
 function trd_send_to_line() {
   msg="`cat - | trd_escape_text`"
 
-  for r in $TRD_RECIPIENTS; do
+  for r in $TRD_LINE_RECIPIENTS; do
     curl 'https://api.line.me/v2/bot/message/push' \
       -s -o /dev/null \
       -H 'Content-Type:application/json; charset=utf-8' \
