@@ -29,8 +29,7 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
 ## Google Compute Engin の無料VMインスタンスでの例
 ### 前提
 * Google Cloud Platform (GCP) へのの登録(無料)は完了している
-* gcloud コマンドが使える状態になっている
-* なんでもいいので GCPプロジェクト作成済み
+* gcloud コマンドが[インストール済み](https://cloud.google.com/sdk/downloads?hl=JA)
 * gcloudコマンドが認証済で、そのプロジェクトがデフォルトプロジェクトになっている
 
 ### やってみよー
@@ -56,4 +55,9 @@ Your active configuration is: [default]
 VM 作成(ローカルマシンで実行)
 ```
 $ gcloud compute instances create tradevm --machine-type f1-micro --zone us-east1-b --image-project ubuntu-os-cloud --image-family ubuntu-minimal-1804-lts --boot-disk-type pd-standard --boot-disk-size 30
+
+.....
+
+NAME     ZONE        MACHINE_TYPE  PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP     STATUS
+tradevm  us-east1-b  f1-micro                   xx.xxx.x.x   xxx.xxx.xxx.xxx  RUNNING
 ```
