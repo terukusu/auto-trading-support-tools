@@ -2,14 +2,14 @@
 Ubuntu+Wine+MetaTrader4/5 の自動売買サーバーの監視をサポートするツール群です。
 Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16, 18でおこなっています。
 
-# このツール群でできること
+## このツール群でできること
 * まっさらな VPS に MetaTrader4(or 5) を動かすのに必要なもの一式のインストール
 * 起動時にMT4/5を自動起動
 * 以下のことを検知してLINEに通知
     * VPSの再起動
     * MT4/5 のクラッシュ
 
-# 備考
+## 備考
 * インストールされるもの
     * 既存パッケージの最新化
     * vncserver + wm2
@@ -26,4 +26,15 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
             * メッセージ送信先である自分のユーザーID
                 * LINE ID ではなくこういう感じの文字列 → Ucc4ba77baedb40a1603873976142c485
 
-# Google Compute Engin の無料VMインスタンスでの例
+## Google Compute Engin の無料VMインスタンスでの例
+### 前提
+* Google Cloud Platform (GCP) へのの登録(無料)は完了している
+* gcloud コマンドが使える状態になっている
+* なんでもいいので GCPプロジェクト作成済み
+* gcloudコマンドが認証済で、そのプロジェクトがデフォルトプロジェクトになっている
+
+### やってみよー
+VM 作成(ローカルマシンで実行)
+```
+$ gcloud compute instances create tradevm --machine-type f1-micro --zone us-east1-b --image-project ubuntu-os-cloud --image-family ubuntu-minimal-1804-lts --boot-disk-type pd-standard --boot-disk-size 30
+```
