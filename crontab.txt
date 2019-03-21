@@ -1,7 +1,12 @@
+MAILTO=""
 #* * * * * $HOME/auto-trading-support-tools/record_heart_beat.sh
 #* * * * * $HOME/auto-trading-support-tools/record_spread.sh
 #* * * * * $HOME/auto-trading-support-tools/check_order.sh
 #3-59/10 * * * * $HOME/auto-trading-support-tools/check_heartbeat.sh
 #0 9 * * * $HOME/auto-trading-support-tools/check_daily.sh > /dev/null 2>&1
+
+# start MetaTrader automatically at boot
+@reboot $HOME/auto-trading-support-tools/run_terminal.sh mt4_01 mt4_02 mt4_03
+
 * * * * * $HOME/auto-trading-support-tools/check_reboot.sh
 */10 * * * * $HOME/auto-trading-support-tools/check_process.sh mt4_01 mt4_02 mt4_03

@@ -12,3 +12,8 @@ fi
 if [ -z "$WINEDEBUG" ]; then
     WINEDEBUG=-all,err+all
 fi
+if [ -z "$DISPLAY" ]; then
+    DISPLAY=:1
+fi
+
+export WINEARCH WINEPREFIX WINEDEBUG DISPLAY
