@@ -68,7 +68,7 @@ apt upgrade -y
 # setting local and timezone.
 apt install -y dbus tzdata language-pack-ja
 locale-gen
-localectl set-locale LANG=ja_JP.UTF-8
+update-locale LANG=ja_JP.UTF-8
 
 timedatectl set-timezone Asia/Tokyo
 
@@ -83,6 +83,7 @@ apt install -y software-properties-common
 dpkg --add-architecture i386
 wget -nc https://dl.winehq.org/wine-builds/winehq.key
 apt-key add winehq.key
+rm winehq.key
 apt-add-repository "$WINE_REPOS"
 apt update
 apt install -y --install-recommends winehq-devel
