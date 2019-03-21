@@ -12,6 +12,7 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
 ## 備考
 * インストールされるもの
     * 既存パッケージの最新化
+    * 可能ならば swap 領域の作成
     * vncserver + wm2
         * 要するにGUI
     * wine
@@ -81,9 +82,28 @@ VMインスタンスへSSHログイン
 $ gcloud compute ssh <任意のユーザー名>@tradevm
 ```
 ※ 任意のユーザー名のところは英数字で。今後も同じものを使うのであまり投げやりな名前にしないように  
-※ 初回の場合は個々でSSHの暗号化鍵の生成が行われるが、よしなに肯定的に進めればOK
+※ 初回の場合はここでSSHの暗号化鍵の生成が行われるが、よしなに肯定的に進めればOK
+<br />
+
+
+圧縮展開ソフトのインストール
+```
+$ sudo apt update
+$ sudo apt install -y unzip
+```
 <br />
 
 auto-tradeing-support-tools をダウンロード＆展開
 ```
+$ wget https://github.com/terukusu/auto-trading-support-tools/archive/master.zip
+$ unzip master.zip
+$ mv auto-trading-support-tools-master auto-trading-support-tools
 ```
+
+MetaTraderに必要なもののインストール （と、ｓｗａｐ領域の作成と、環境変数の設定）
+```
+$ sudo auto-trading-support-tools/install_required_for_mt.sh
+```
+タイムゾーン聞かれるので 「Asia」 → 「Tokyo」 と選択する
+
+
