@@ -52,12 +52,30 @@ project = trade-00001 ← ここが作成したPJになっているか確認
 
 Your active configuration is: [default]
 ```
+
+作成したPJで課金を有効にする。(Web の GCPコンソールからでもOK)
+```
+$ gcloud alpha billing accounts list
+$ gcloud alpha billing projects link my-project \
+      --billing-account 0X0X0X-0X0X0X-0X0X0X ← ここは支払いアカウントにしたいアカウントIDに置き換えること
+```
+
 VM 作成(ローカルマシンで実行)
 ```
 $ gcloud compute instances create tradevm --machine-type f1-micro --zone us-east1-b --image-project ubuntu-os-cloud --image-family ubuntu-minimal-1804-lts --boot-disk-type pd-standard --boot-disk-size 30
 
 .....
+(ディスク容量が少なすぎてパフォーマンスが・・・のようなエラーメッセージが出るが気にせず進めてOK)
+.....
 
 NAME     ZONE        MACHINE_TYPE  PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP     STATUS
 tradevm  us-east1-b  f1-micro                   xx.xxx.x.x   xxx.xxx.xxx.xxx  RUNNING
 ```
+
+VMインスタンスへSSHログイン
+```
+$ gcloud compute ssh <任意のユーザー名>@tradevm
+```
+※ 任意のユーザー名のところは英数字で。今後も同じものを使うのであまり投げやりな名前にしないように  
+※ 初回の場合は個々でSSHの暗号化鍵の生成が行われるが、よしなに肯定的に進めればOK
+
