@@ -1,6 +1,7 @@
 #!/bin/bash
 
-. `dirname $0`/common.sh
+. "$(cd "$(dirname $0)" && pwd)/common.sh"
+
 
 function trd_check_process() {
   name="$1"

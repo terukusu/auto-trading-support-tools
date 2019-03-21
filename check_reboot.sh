@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. `dirname $0`/common.sh
+. "$(cd "$(dirname $0)" && pwd)/common.sh"
 
 uptime_file="$TRD_DATA_DIR/uptime"
 
