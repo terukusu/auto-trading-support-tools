@@ -34,6 +34,25 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
 * gcloudコマンドが認証済で、そのプロジェクトがデフォルトプロジェクトになっている
 
 ### やってみよー
+ログイン
+```
+$ gcloud auth login
+```
+プロジェクト作成(既存のプロジェクトを使うなら不要)
+```
+$ gcloud projects create trade-00001 --name=trade --set-as-default
+```
+作成したPJが捜査対象になっていることを確認
+
+```
+$ gcloud config list
+[core]
+account = <ログインしたアカウント>
+disable_usage_reporting = False
+project = trade-00001 ← ここが作成したPJになっているか確認
+
+Your active configuration is: [default]
+```
 VM 作成(ローカルマシンで実行)
 ```
 $ gcloud compute instances create tradevm --machine-type f1-micro --zone us-east1-b --image-project ubuntu-os-cloud --image-family ubuntu-minimal-1804-lts --boot-disk-type pd-standard --boot-disk-size 30
