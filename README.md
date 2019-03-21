@@ -84,3 +84,6 @@ $ gcloud compute ssh <任意のユーザー名>@tradevm
 ※ 初回の場合は個々でSSHの暗号化鍵の生成が行われるが、よしなに肯定的に進めればOK
 <br />
 
+auto-tradeing-support-tools をダウンロード＆展開
+```
+```
