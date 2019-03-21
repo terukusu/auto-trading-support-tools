@@ -1,0 +1,19 @@
+# Usage:
+#   edit the <user_name> to your username
+#   $ sudo cp "vncserver@:1.service" /etc/systemd/system/
+#   $ sudo systemctl enable "vncserver@:1.service"
+
+[Unit]
+Description=VNC
+After=syslog.target network.target
+
+[Service]
+Type=forking
+User=<user_name>
+
+ExecStartPre=/bin/sh -c '/usr/bin/vncserver -kill %i > /dev/null 2>&1 || :'
+ExecStart=/usr/bin/vncserver -geometry 1024x640 -depth 16 -alwaysshared -localhost -nolisten tcp %i
+ExecStop=/usr/bin/vncserver -kill %i
+
+[Install]
+WantedBy=multi-user.target
