@@ -1,3 +1,4 @@
+*.exe
 .line_recipients
 .line_token
 winehq.key
