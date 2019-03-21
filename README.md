@@ -86,7 +86,7 @@ $ gcloud compute ssh <任意のユーザー名>@tradevm
 <br />
 
 
-圧縮展開ソフトのインストール
+圧縮展開ソフトのインストール （ここからVM上での作業）
 ```
 $ sudo apt update
 $ sudo apt install -y unzip
