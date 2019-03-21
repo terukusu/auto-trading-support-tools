@@ -107,7 +107,7 @@ $ sudo auto-trading-support-tools/install_required_for_mt.sh
 $ ｅｘｉｔ ← 言語設定を反映させるために一度切断
 ```
 ※ タイムゾーン聞かれるので 「Asia」 → 「Tokyo」 と選択する
-※ 変更を加えるファイルは ~/.bashrc と root の ｃｒｏｎｔａｂ 。それぞれ必要な環境変数追加と念の為の起動時の /var/run/sshd の作成。
+※ 変更を加えるファイルは ~/.bashrc, rootのcrontab。必要な環境変数追加と念の為の起動時の /var/run/sshd の作成を設定。
 
 再度ログイン。GUIの設定を行う
 ```
