@@ -1,25 +1,31 @@
 #!/bin/bash
 
-MT4_TERMINAL="`find ~/.wine/drive_c -type f -name terminal.exe | head -n 1`"
-if [ -z "$MT4_TERMINAL" ];then
-    echo "MT4 not found. exitting..." 1>&2
-    exit 1
-fi
+. "$(cd "$(dirname $0)" && pwd)/common.sh"
 
-echo MT4 found at "'$MT4_TERMINAL'"
+eval $(trd_gen_mt_list)
 
-MT4_HOME=$(dirname "$MT4_TERMINAL")
-mails=$(ls "$MT4_HOME/history/mailbox")
+num_mt=${#mt_dir[@]}
 
-echo "delete needless files.."
+echo $num_mt MetaTraders are found.
 
-if [ -n "$mails" ]; then
-    rm "$MT4_HOME/history/mailbox/"*
-fi
+i=0
+while [ $i -lt $num_mt ]; do
+    mt_home="${mt_dir[$i]}"
+    echo "processing: [$i/$num_mt] type=${mt_type[$i]}  path='$mt_home'"
+    echo "delete needless files.."
 
-find "$MT4_HOME" -name '*.hst' -exec rm {} \;
-find "$MT4_HOME" -name 'news.dat' -exec rm {} \;
+    mails=$(ls "$mt_home/history/mailbox")
+    
+    if [ -n "$mails" ]; then
+        rm "$mt_home/history/mailbox/"*
+    fi
+    
+    find "$mt_home" -name '*.hst' -exec rm {} \;
+    find "$mt_home" -name 'news.dat' -exec rm {} \;
+    
+    echo done
 
-echo done
+    let i++
+done
 
 exit 0
