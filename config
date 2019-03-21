@@ -12,7 +12,3 @@ fi
 if [ -z "$WINEDEBUG" ]; then
     WINEDEBUG=-all,err+all
 fi
-if [ -e "$TRD_DIR/.line_token" ]; then
-    TRD_LINE_TOKEN=$(cat "$TRD_DIR")
-fi
-

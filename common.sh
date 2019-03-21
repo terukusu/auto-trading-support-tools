@@ -7,10 +7,6 @@ if [ ! -e $TRD_DATA_DIR ];then
     mkdir -p $TRD_DATA_DIR
 fi
 
-if [ -z "$WINEDIR" ];then
-    WINEDIR="$HOME/.wine"
-fi
-
 function trd_log() {
   echo "["`date "+%Y-%m-%d %H:%M:%S"`"] "$@
 }
@@ -77,7 +73,7 @@ function trd_abs_path() {
 #
 function trd_gen_mt_list() {
     i=0
-    find "$WINEDIR" -type f -name terminal.exe | while read line; do
+    find "$WINEPREFIX" -type f -name terminal.exe | while read line; do
         line=$(trd_abs_path "$line")
         mt_dir=$(dirname "$line")
         mt_name=$(basename "$mt_dir" | trd_to_upper)
