@@ -111,7 +111,10 @@ $ ｅｘｉｔ ← 言語設定を反映させるために一度切断
 
 再度ログイン。GUIの設定を行う
 ```
-$ vncserver -geometry 1280x800 -localhost -nolisten tcp
+$ gcloud compute ssh --ssh-flag="-L5901:localhost:5901" teru@tradevm ← これはローカルマシンで実行
+
+↓ ここからVPS上の作業
+$ vncserver -geometry 1280x800 -localhost -nolisten tcp 
 
 Password: ← リモートからGUIに接続する際のパスワードをここで決めて入れる
 Verify:
