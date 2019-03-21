@@ -100,10 +100,15 @@ $ unzip master.zip
 $ mv auto-trading-support-tools-master auto-trading-support-tools
 ```
 
-MetaTraderに必要なもののインストール （と、ｓｗａｐ領域の作成と、環境変数の設定）
+MetaTraderに必要なもののインストール （と、ｓｗａｐ領域の作成と、環境変数の設定と、日本語設定）
 ```
 $ sudo auto-trading-support-tools/install_required_for_mt.sh
+.....
+$ ｅｘｉｔ ← 言語設定を反映させるために一度切断
 ```
-タイムゾーン聞かれるので 「Asia」 → 「Tokyo」 と選択する
+※ タイムゾーン聞かれるので 「Asia」 → 「Tokyo」 と選択する
+※ 変更を加えるファイルは ~/.bashrc と ｒｏｏｔ の ｃｒｏｎｔａｂ。それぞれ必要な環境変数追加と念の為の起動時の /var/run/sshd の作成。
 
-
+再度ログイン。GUIの設定を行う
+```
+```
