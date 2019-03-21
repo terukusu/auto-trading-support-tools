@@ -29,7 +29,7 @@ while [ "$i" -lt "$target_num" ]; do
  echo executing: "$target_path"
 
   work_dir="$(winepath -w "$(dirname "$target_path")")"
-  wine_log="$TRD_DATA_DIR/wine_$(echo $target_name | trd_to_lower)"
+  wine_log="$TRD_DATA_DIR/wine_$(echo $target_name | trd_to_lower).log"
   
   if [ -z "$WINE" ]; then
     WINE="$(which wine)"
