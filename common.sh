@@ -94,6 +94,30 @@ function trd_gen_mt_list() {
     done
 }
 
+# return the index of MetaTrader which folder has specified prefix
+# return empty when it's not found.
+#
+function trd_find_mt_index() {
+    target_mt_name="$1"
+
+    if [ -z "$mt_name" ]; then
+        # MT4/5情報がまだ変数としてロードされていなければこの場でロード 
+        # パフォーマンス向上のためにはこの関数を呼ぶ前に
+        # 呼び出し元で↓を実行しておくことをお勧め
+        eval $(trd_gen_mt_list)
+    fi
+
+    i=0
+    while [ $i -lt ${#mt_dir[@]} ]; do
+        match="$(echo ${mt_name[$i]} | grep -ioE "^$target_mt_name")"
+        if [ -n "$match" ]; then
+            echo $i
+            break
+        fi
+        let i++
+    done
+}
+
 # return absolute path of the terminal.exe
 # Returns the path of the termina.exe with a case-insensitive
 # prefix match between argument 1 and the folder name.
@@ -108,13 +132,10 @@ function trd_find_terminal() {
         eval $(trd_gen_mt_list)
     fi
 
-    i=0
-    while [ $i -lt ${#mt_dir[@]} ]; do
-        match="$(echo ${mt_name[$i]} | grep -ioE "^$target_mt_name")"
-        if [ -n "$match" ]; then
-            echo "${mt_dir[$i]}/terminal.exe"
-            break
-        fi
-        let i++
-    done
+    target_mt_index=$(trd_find_mt_index "$target_mt_name")
+
+    if [ -n "$target_mt_index" ]; then
+        echo "${mt_dir[$target_mt_index]}/terminal.exe"
+        break
+    fi
 }
