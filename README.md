@@ -107,8 +107,16 @@ $ sudo auto-trading-support-tools/install_required_for_mt.sh
 $ ｅｘｉｔ ← 言語設定を反映させるために一度切断
 ```
 ※ タイムゾーン聞かれるので 「Asia」 → 「Tokyo」 と選択する
-※ 変更を加えるファイルは ~/.bashrc と ｒｏｏｔ の ｃｒｏｎｔａｂ。それぞれ必要な環境変数追加と念の為の起動時の /var/run/sshd の作成。
+※ 変更を加えるファイルは ~/.bashrc と root の ｃｒｏｎｔａｂ 。それぞれ必要な環境変数追加と念の為の起動時の /var/run/sshd の作成。
 
 再度ログイン。GUIの設定を行う
 ```
+$ vncserver -geometry 1280x800 -localhost -nolisten tcp
+
+Password: ← リモートからGUIに接続する際のパスワードをここで決めて入れる
+Verify:
 ```
+
+Wineの設定
+
+$ vncserver -geometry 1280x800 -localhost -nolisten tcp
