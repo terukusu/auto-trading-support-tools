@@ -16,6 +16,7 @@ if [ -z "$target_path" ]; then
 fi
 
 work_dir="$(winepath -w "$(dirname "$target_path")")"
+wine_log="$TRD_DATA_DIR/wine_$(echo $target_name | trd_to_lower)"
 
 if [ -z "$WINE" ]; then
   WINE="$(which wine)"
@@ -23,6 +24,7 @@ fi
 
 echo -e "\n===== START `date +'%Y-%m-%d %H:%M:%S'` =====" >> "$wine_log"
 
+export WINEPREFIX WINEARCH WINEDEBUG
 nohup "$WINE" start /b /d "$work_dir" /unix "$target_path" &>> "$wine_log"
 
 exit 0

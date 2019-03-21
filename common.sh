@@ -96,8 +96,6 @@ function trd_gen_mt_list() {
 
         i=`expr $i + 1`
     done
-
-    exit 0
 }
 
 # return absolute path of the terminal.exe
