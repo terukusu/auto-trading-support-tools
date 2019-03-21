@@ -15,6 +15,14 @@ function trd_log() {
   echo "["`date "+%Y-%m-%d %H:%M:%S"`"] "$@
 }
 
+function trd_to_upper() {
+  cat - | tr '[a-z]' '[A-Z]'
+}
+
+function trd_to_lower() {
+  cat - | tr '[A-Z]' '[a-z]'
+}
+
 function trd_escape_text() {
   if [ "$OSTYPE" != "${OSTYPE#darwin}" ];then
     # For Mac 改行付加。末尾に最低２個の改行がないと出力が空文字になるので。
@@ -72,7 +80,7 @@ function trd_gen_mt_list() {
     find "$WINEDIR" -type f -name terminal.exe | while read line; do
         line=$(trd_abs_path "$line")
         mt_dir=$(dirname "$line")
-        mt_name=$(basename "$mt_dir" | tr '[a-z]' '[A-Z]')
+        mt_name=$(basename "$mt_dir" | trd_to_upper)
 
         if [ -d "$mt_dir/MQL4" ]; then
             mt_type=MT4
@@ -101,7 +109,7 @@ function trd_find_terminal() {
 
     if [ -z "$mt_name" ]; then
         # MT4/5情報がまだ変数としてロードされていなければこの場でロード 
-        # パフォーマンスのためにはこの関数を呼ぶ前に
+        # パフォーマンス向上のためにはこの関数を呼ぶ前に
         # 呼び出し元で↓を実行しておくことをお勧め
         eval $(trd_gen_mt_list)
     fi

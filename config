@@ -1,7 +1,18 @@
-WINEARCH=win32
-WINEPREFIX=$HOME/.wine
-WINEDEBUG=-all
 TRD_DIR="$(cd $(dirname $BASH_SOURCE); pwd)"
 TRD_LINE_TOKEN=$(f="$TRD_DIR/.line_token"; if [ -e "$f" ]; then cat "$f"; fi)
 TRD_LINE_RECIPIENTS=$(f="$TRD_DIR/.line_recipients"; if [ -e "$f" ]; then cat "$f"; fi)
 TRD_DATA_DIR="$TRD_DIR/data"
+
+if [ -z "$WINEARCH" ]; then
+    WINEARCH=win32
+fi
+if [ -z "$WINEPREFIX" ]; then
+    WINEPREFIX=$HOME/.wine
+fi
+if [ -z "$WINEDEBUG" ]; then
+    WINEDEBUG=-all,err+all
+fi
+if [ -e "$TRD_DIR/.line_token" ]; then
+    TRD_LINE_TOKEN=$(cat "$TRD_DIR")
+fi
+

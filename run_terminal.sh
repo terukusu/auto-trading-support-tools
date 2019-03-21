@@ -21,7 +21,8 @@ if [ -z "$WINE" ]; then
   WINE="$(which wine)"
 fi
 
-export WINEDEBUG WINEPREFIX WINEARCH
-"$WINE" start /d "$work_dir" /unix "$target_path"
+echo -e "\n===== START `date +'%Y-%m-%d %H:%M:%S'` =====" >> "$wine_log"
+
+nohup "$WINE" start /b /d "$work_dir" /unix "$target_path" &>> "$wine_log"
 
 exit 0
