@@ -136,6 +136,5 @@ function trd_find_terminal() {
 
     if [ -n "$target_mt_index" ]; then
         echo "${mt_dir[$target_mt_index]}/terminal.exe"
-        break
     fi
 }
