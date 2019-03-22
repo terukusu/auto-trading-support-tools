@@ -3,7 +3,7 @@ Ubuntu+Wine+MetaTrader4/5 の自動売買サーバーの監視をサポートす
 Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16, 18でおこなっています。
 
 ## このツール群でできること
-* まっさらな VPS に MetaTrader4(or 5) を動かすのに必要なもの一式のインストール
+* まっさらな VPS に MetaTrader4(or 5) を動かすのに必要なもの一式をインストール
 * 起動時にMT4/5を自動起動
 * 以下のことを検知してLINEに通知
     * VPSの再起動
@@ -14,7 +14,7 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
     * 既存パッケージの最新化
     * 可能ならば swap 領域の作成
     * vncserver + wm2
-        * 要するにGUI
+        * 要するに最小構成のGUI
     * wine
         * Linux 上で Windows 用アプリを動かすソフト
     * 注意： MT4/5本体は GUI で操作しながらインストールする必要が有るため手動でインストールする必要有リ
@@ -30,42 +30,12 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
 ## Google Compute Engin の無料VMインスタンスでの例
 ### 前提
 * Google Cloud Platform (GCP) へのの登録(無料)は完了している
-* gcloud コマンドが[インストール済み](https://cloud.google.com/sdk/downloads?hl=JA)
-* gcloudコマンドが認証済で、そのプロジェクトがデフォルトプロジェクトになっている
+    * GCP プロジェクトが作成済みでそのプロジェクトで課金が有効になっている
+        * 無料枠を利用するだけでも課金の設定が必要
+* [gcloud コマンド](https://cloud.google.com/sdk/downloads?hl=JA)がインストール済み
+* gcloudコマンドが認証済で、使用するGCPプロジェクトがデフォルトプロジェクトになっている
 
 ### やってみよー
-ログイン
-```
-$ gcloud auth login
-```
-<br />
-
-プロジェクト作成(既存のプロジェクトを使うなら不要)
-```
-$ gcloud projects create trade-00001 --name=trade --set-as-default
-```
-<br />
-
-作成したPJが捜査対象になっていることを確認
-```
-$ gcloud config list
-[core]
-account = <ログインしたアカウント>
-disable_usage_reporting = False
-project = trade-00001 ← ここが作成したPJになっているか確認
-
-Your active configuration is: [default]
-```
-<br />
-
-作成したPJで課金を有効にする。(Web の GCPコンソールからでもOK)
-```
-$ gcloud alpha billing accounts list
-$ gcloud alpha billing projects link my-project \
-      --billing-account 0X0X0X-0X0X0X-0X0X0X ← ここは支払いアカウントにしたいアカウントIDに置き換えること
-```
-<br />
-
 VM 作成(ローカルマシンで実行)
 ```
 $ gcloud compute instances create tradevm --machine-type f1-micro --zone us-east1-b --image-project ubuntu-os-cloud --image-family ubuntu-minimal-1804-lts --boot-disk-type pd-standard --boot-disk-size 30
