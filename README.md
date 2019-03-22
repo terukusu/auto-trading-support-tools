@@ -9,7 +9,7 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
     * VPSの再起動
     * MT4/5 のクラッシュ
 
-<img src="./docs/images/mt4_on_linux_vps.png" width="320px">
+<img src="./doc/images/mt4_on_linux_vps.png" width="320px">
 
 ## 備考
 * インストールされるもの
