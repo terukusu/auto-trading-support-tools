@@ -9,6 +9,8 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
     * VPSの再起動
     * MT4/5 のクラッシュ
 
+<img src="./docs/images/mt4_on_linux_vps.png" width="320px">
+
 ## 備考
 * インストールされるもの
     * 既存パッケージの最新化
@@ -84,7 +86,7 @@ $ ｅｘｉｔ ← 言語設定を反映させるために一度切断
 $ gcloud compute ssh --ssh-flag="-L5901:localhost:5901" teru@tradevm ← これはローカルマシンで実行
 
 ↓ ここからVPS上の作業
-$ vncserver -geometry 1280x800 -localhost -nolisten tcp 
+$ vncserver -geometry 1280x800 -localhost -nolisten tcp
 
 Password: ← リモートからGUIに接続する際のパスワードをここで決めて入れる
 Verify:
