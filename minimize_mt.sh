@@ -2,8 +2,6 @@
 
 . "$(cd "$(dirname $0)" && pwd)/common.sh"
 
-eval $(trd_gen_mt_list)
-
 num_mt=${#mt_home[@]}
 
 echo $num_mt MetaTraders are found.
