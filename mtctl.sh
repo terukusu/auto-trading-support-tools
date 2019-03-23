@@ -11,9 +11,10 @@ FLAG_STATUS=0
 
 function print_usage_exit() {
   echo "Usage: `basename $0` [-qsh] <start|stop|list> <MetaTrader Name1> [<MetaTrader Name2> ...]" 1>&2
-  echo -e "\tstart: start MetaTrader" 1>&2
-  echo -e "\tstop: stop MetaTrader" 1>&2
   echo -e "\tlist: list MetaTrader installed" 1>&2
+  echo -e "\tstart: start MetaTrader" 1>&2
+  echo -e "\tstatus: print status of specified MetaTrader" 1>&2
+  echo -e "\tstop: stop MetaTrader" 1>&2
   echo -e "\t<MetaTrader Name>: folder name of MetaTrader 4. (ex: "'"MetaTrader 4")' 1>&2
   echo -e "\t-q: quiet mode. print nothing." 1>&2
   echo -e "\t-s: when list, show running status.(slow)" 1>&2
@@ -103,6 +104,26 @@ function list_mt() {
   done
 }
 
+function status_mt() {
+  target_names=("$@")
+  target_num=${#target_names[@]}
+
+  i=0;
+  while [ "$i" -lt "$target_num" ]; do
+    target_name=${target_names[$i]}
+
+    target_pid=$(trd_find_pid "$target_name")
+
+    if [ -n "$target_pid" ]; then
+      echo "status=running, pid=$target_pid, name=$target_name"
+    else
+      echo "status=stopped, pid= -, name=$target_name"
+    fi
+
+    let i++
+  done
+}
+
 while getopts qsh OPT
 do
   case $OPT in
@@ -125,11 +146,11 @@ ope=$(echo "$1" | trd_to_upper)
 shift
 
 target_list=("$@")
-if [ "$ope" != "START" -a "$ope" != "STOP"  -a "$ope" != "LIST" ]; then
+if [ "$ope" != "START" -a "$ope" != "STOP"  -a "$ope" != "LIST" -a "$ope" != "STATUS" ]; then
   print_usage_exit
 fi
 
-if [ "$ope" == "START" -o "$ope" == "STOP" ] && [ "${#target_list[@]}" -eq "0" ]; then
+if [ "$ope" != "LIST" ] && [ "${#target_list[@]}" -eq "0" ]; then
   print_usage_exit
 fi
 
@@ -139,4 +160,6 @@ elif [ "$ope" == "STOP" ]; then
   stop_mt "$@"
 elif [ "$ope" == "LIST" ]; then
   list_mt "$@"
+elif [ "$ope" == "STATUS" ]; then
+  status_mt "$@"
 fi
