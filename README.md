@@ -51,10 +51,11 @@ $ gcloud compute instances create tradevm --machine-type f1-micro --zone us-east
 
 NAME     ZONE        MACHINE_TYPE  PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP     STATUS
 tradevm  us-east1-b  f1-micro                   xx.xxx.x.x   xxx.xxx.xxx.xxx  RUNNING
-```
-    * ディスク容量が少なすぎてパフォーマンスが・・・のようなエラーメッセージが出るが気にせず進めてOK
+```  
 
-1. VMインスタンスへSSHログイン
+ディスク容量が少なすぎてパフォーマンスが・・・のようなエラーメッセージが出るが気にせず進めてOK
+
+２. VMインスタンスへSSHログイン
 ```
 $ gcloud compute ssh <任意のユーザー名>@tradevm
 ```
