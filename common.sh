@@ -138,7 +138,7 @@ function trd_find_pid() {
 
   if [ -n "$target_mt_path" ]; then
     target_win_path=$(winepath -w "$target_mt_path" | sed -e 's/\\/\\\\/g')
-    target_pid=$(ps axw | grep "$target_win_path" | grep -v grep | tr -s " " | cut -d " " -f1)
+    target_pid=$(ps axw | grep "$target_win_path" | grep -v grep | tr -s " " | sed -e 's/^ *//g' | cut -d " " -f1)
     if [ -n "$target_pid" ]; then
       echo $target_pid
     fi
