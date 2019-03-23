@@ -6,14 +6,17 @@
 
 FLAG_QUIET=0
 
+# list 時に実行ステータスを表示するかどうか。1なら表示。
+FLAG_STATUS=0
+
 function print_usage_exit() {
-  echo "Usage: `basename $0` [-qh] <start|stop|list> <MetaTrader Name1> [<MetaTrader Name2> ...]" 1>&2
+  echo "Usage: `basename $0` [-qsh] <start|stop|list> <MetaTrader Name1> [<MetaTrader Name2> ...]" 1>&2
   echo -e "\tstart: start MetaTrader" 1>&2
   echo -e "\tstop: stop MetaTrader" 1>&2
   echo -e "\tlist: list MetaTrader installed" 1>&2
   echo -e "\t<MetaTrader Name>: folder name of MetaTrader 4. (ex: "'"MetaTrader 4")' 1>&2
-  echo -e "\t<MetaTrader Name>: folder name of MetaTrader 4. (ex: "'"MetaTrader 4")' 1>&2
   echo -e "\t-q: quiet mode. print nothing." 1>&2
+  echo -e "\t-s: when list, show running status.(slow)" 1>&2
   echo -e "\t-h: help. print this message." 1>&2
   exit 1
 }
@@ -87,21 +90,25 @@ function list_mt() {
   i=0
   while [ "$i" -lt ${#mt_home[@]} ]; do
 
-    mt_pid=$(trd_find_pid "${mt_name[$i]}")
-    mt_status=stopped
-    if [ -n "$mt_pid" ]; then
-      mt_status=running
+    if [ "$FLAG_STATUS" -eq 1 ]; then
+      mt_pid=$(trd_find_pid "${mt_name[$i]}")
+      mt_status=" (stopped)"
+      if [ -n "$mt_pid" ]; then
+        mt_status=" (running)"
+      fi
     fi
 
-    echo [$(($i + 1))/$num_mt]: \($mt_status\) type=${mt_type[$i]}, name=${mt_name[$i]}, home=${mt_home[$i]}
+    echo [$(($i + 1))/$num_mt]:$mt_status type=${mt_type[$i]}, name=${mt_name[$i]}, home=${mt_home[$i]}
     let i++
   done
 }
 
-while getopts qh OPT
+while getopts qsh OPT
 do
   case $OPT in
     q)  FLAG_QUIET=1
+    ;;
+    s)  FLAG_STATUS=1
     ;;
     h)  print_usage_exit
     ;;

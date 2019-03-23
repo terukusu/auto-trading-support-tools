@@ -74,9 +74,9 @@ function trd_abs_path() {
 function trd_gen_mt_list() {
   i=0
   # Windowsの各ドライブのプログラムフォルダ内からtemrinal.exeを検索する
-  cat <(find "$WINEPREFIX" -type d -name drive_* -maxdepth 1 | sort | while read drive; do
-    find "$drive" -type d -name Program* -maxdepth 1 | sort | while read program_folder; do
-      find "$program_folder" -name terminal.exe
+  cat <(find "$WINEPREFIX" -maxdepth 1 -type d -name drive_* | sort | while read drive; do
+    find "$drive" -maxdepth 1 -type d -name Program* -maxdepth 1 | sort | while read program_folder; do
+      find "$program_folder" -maxdepth 2 -name terminal.exe
     done
   done) | sort | while read line; do
     line=$(trd_abs_path "$line")
