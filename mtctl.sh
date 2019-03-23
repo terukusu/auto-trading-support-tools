@@ -8,6 +8,10 @@ FLAG_QUIET=0
 
 function print_usage_exit() {
   echo "Usage: `basename $0` [-qh] <start|stop|list> <MetaTrader Name1> [<MetaTrader Name2> ...]" 1>&2
+  echo -e "\tstart: start MetaTrader" 1>&2
+  echo -e "\tstop: stop MetaTrader" 1>&2
+  echo -e "\tlist: list MetaTrader installed" 1>&2
+  echo -e "\t<MetaTrader Name>: folder name of MetaTrader 4. (ex: "'"MetaTrader 4")' 1>&2
   echo -e "\t<MetaTrader Name>: folder name of MetaTrader 4. (ex: "'"MetaTrader 4")' 1>&2
   echo -e "\t-q: quiet mode. print nothing." 1>&2
   echo -e "\t-h: help. print this message." 1>&2
@@ -21,9 +25,6 @@ function pm () {
 }
 
 function start_mt() {
-  # load MT4/5 list
-  eval $(trd_gen_mt_list)
-
   target_names=("$@")
   target_num=${#target_names[@]}
 
@@ -56,33 +57,22 @@ function start_mt() {
 }
 
 function stop_mt() {
-  # load MT4/5 list
-  eval $(trd_gen_mt_list)
-
   target_names=("$@")
   target_num=${#target_names[@]}
 
   i=0;
   while [ "$i" -lt "$target_num" ]; do
     target_name=${target_names[$i]}
-    target_path=$(trd_find_terminal "$target_name")
 
-    if [ -z "$target_path" ]; then
-      pm "終了対象のMetaTraderのインストール場所が見つかりませ。終了をスキップします。: $target_name" 1>&2
-      let i++
-      continue
-    fi
-
-    target_win_path=$(winepath -w "$target_path" | sed -e 's/\\/\\\\/g')
-    target_pid=$(ps ax | grep "$target_win_path" | grep -v grep | tr -s " " | cut -d " " -f1)
+    target_pid=$(trd_find_pid "$target_name")
 
     if [ -z "$target_pid" ]; then
-      pm "終了対象のMetaTraderは起動していません。終了をスキップします。: $target_name" 1>&2
+      pm "指定されたMetaTraderは起動していません。: $target_name" 1>&2
       let i++
       continue
     fi
 
-    pm stopping: pid=$target_pid, $target_path
+    pm stopping: pid=$target_pid, $target_name
     kill $target_pid
 
     let i++
@@ -90,15 +80,20 @@ function stop_mt() {
 }
 
 function list_mt() {
-  eval $(trd_gen_mt_list)
-
   num_mt=${#mt_home[@]}
 
   echo $num_mt MetaTrader found.
 
   i=0
   while [ "$i" -lt ${#mt_home[@]} ]; do
-    echo [$(($i + 1))/$num_mt]: name=${mt_name[$i]}, home=${mt_home[$i]}
+
+    mt_pid=$(trd_find_pid "${mt_name[$i]}")
+    mt_status=stopped
+    if [ -n "$mt_pid" ]; then
+      mt_status=running
+    fi
+
+    echo [$(($i + 1))/$num_mt]: \($mt_status\) type=${mt_type[$i]}, name=${mt_name[$i]}, home=${mt_home[$i]}
     let i++
   done
 }

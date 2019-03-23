@@ -106,13 +106,6 @@ function trd_gen_mt_list() {
 function trd_find_mt_index() {
   target_mt_name="$1"
 
-  if [ -z "$mt_name" ]; then
-    # MT4/5情報がまだ変数としてロードされていなければこの場でロード
-    # パフォーマンス向上のためにはこの関数を呼ぶ前に
-    # 呼び出し元で↓を実行しておくことをお勧め
-    eval $(trd_gen_mt_list)
-  fi
-
   i=0
   while [ $i -lt ${#mt_home[@]} ]; do
     match="$(echo ${mt_name[$i]} | grep -ioE "^$target_mt_name")"
@@ -131,16 +124,25 @@ function trd_find_mt_index() {
 function trd_find_terminal() {
   target_mt_name=$1
 
-  if [ -z "$mt_name" ]; then
-    # MT4/5情報がまだ変数としてロードされていなければこの場でロード
-    # パフォーマンス向上のためにはこの関数を呼ぶ前に
-    # 呼び出し元で↓を実行しておくことをお勧め
-    eval $(trd_gen_mt_list)
-  fi
-
   target_mt_index=$(trd_find_mt_index "$target_mt_name")
 
   if [ -n "$target_mt_index" ]; then
     echo "${mt_home[$target_mt_index]}/terminal.exe"
   fi
 }
+
+function trd_find_pid() {
+  target_mt_name=$1
+
+  target_mt_path=$(trd_find_terminal "$target_mt_name")
+
+  if [ -n "$target_mt_path" ]; then
+    target_win_path=$(winepath -w "$target_mt_path" | sed -e 's/\\/\\\\/g')
+    target_pid=$(ps ax | grep "$target_win_path" | grep -v grep | tr -s " " | cut -d " " -f1)
+    if [ -n "$target_pid" ]; then
+      echo $target_pid
+    fi
+  fi
+}
+
+eval $(trd_gen_mt_list)
