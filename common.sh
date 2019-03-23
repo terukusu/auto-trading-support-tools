@@ -61,10 +61,10 @@ function trd_abs_path() {
 
 # scan wine drive and find terminal.exe. and output lines like below.
 #
-#    mt_dir[0]='/Users/teru/.wine/drive_c/Program Files/MetaTrader 4'
+#    mt_home[0]='/Users/teru/.wine/drive_c/Program Files/MetaTrader 4'
 #    mt_name[0]='METATRADER 4'
 #    mt_type[0]='MT4'
-#    mt_dir[1]....
+#    mt_home[1]....
 #    mt_name[1]....
 #    mt_type[1]....
 #
@@ -73,24 +73,30 @@ function trd_abs_path() {
 #
 function trd_gen_mt_list() {
     i=0
-    find "$WINEPREFIX" -type f -name terminal.exe | while read line; do
-        line=$(trd_abs_path "$line")
-        mt_dir=$(dirname "$line")
-        mt_name=$(basename "$mt_dir" | trd_to_upper)
+    # Windowsの各ドライブのプログラムフォルダ内からtemrinal.exeを検索する
+    cat <(find "$WINEPREFIX" -type d -name drive_* -maxdepth 1 | sort | while read drive; do
+      find "$drive" -type d -name Program* -maxdepth 1 | sort | while read program_folder; do
+        find "$program_folder" -name terminal.exe
+      done
+    done) | sort | while read line; do
+      line=$(trd_abs_path "$line")
+      mt_home=$(dirname "$line")
+      mt_name=$(basename "$mt_home" | trd_to_upper)
 
-        if [ -d "$mt_dir/MQL4" ]; then
-            mt_type=MT4
-        elif [ -d "$mt_dir/MQL5" ]; then
-            mt_type=MT5
-        else
-            continue
-        fi
+      if [ -d "$mt_home/MQL4" ]; then
+          mt_type=MT4
+      elif [ -d "$mt_home/MQL5" ]; then
+          mt_type=MT5
+      else
+          echo "cannot determine MT4/MT5. bcause it don't have MQL4/ML5 folder: '$mt_home'" 1>&2
+          continue
+      fi
 
-        echo mt_dir[$i]="'$mt_dir'"
-        echo mt_name[$i]="'$mt_name'"
-        echo mt_type[$i]="'$mt_type'"
+      echo mt_home[$i]="'$mt_home'"
+      echo mt_name[$i]="'$mt_name'"
+      echo mt_type[$i]="'$mt_type'"
 
-        i=`expr $i + 1`
+      i=`expr $i + 1`
     done
 }
 
@@ -101,14 +107,14 @@ function trd_find_mt_index() {
     target_mt_name="$1"
 
     if [ -z "$mt_name" ]; then
-        # MT4/5情報がまだ変数としてロードされていなければこの場でロード 
+        # MT4/5情報がまだ変数としてロードされていなければこの場でロード
         # パフォーマンス向上のためにはこの関数を呼ぶ前に
         # 呼び出し元で↓を実行しておくことをお勧め
         eval $(trd_gen_mt_list)
     fi
 
     i=0
-    while [ $i -lt ${#mt_dir[@]} ]; do
+    while [ $i -lt ${#mt_home[@]} ]; do
         match="$(echo ${mt_name[$i]} | grep -ioE "^$target_mt_name")"
         if [ -n "$match" ]; then
             echo $i
@@ -126,7 +132,7 @@ function trd_find_terminal() {
     target_mt_name=$1
 
     if [ -z "$mt_name" ]; then
-        # MT4/5情報がまだ変数としてロードされていなければこの場でロード 
+        # MT4/5情報がまだ変数としてロードされていなければこの場でロード
         # パフォーマンス向上のためにはこの関数を呼ぶ前に
         # 呼び出し元で↓を実行しておくことをお勧め
         eval $(trd_gen_mt_list)
@@ -135,6 +141,6 @@ function trd_find_terminal() {
     target_mt_index=$(trd_find_mt_index "$target_mt_name")
 
     if [ -n "$target_mt_index" ]; then
-        echo "${mt_dir[$target_mt_index]}/terminal.exe"
+        echo "${mt_home[$target_mt_index]}/terminal.exe"
     fi
 }

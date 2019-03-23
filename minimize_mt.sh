@@ -4,13 +4,13 @@
 
 eval $(trd_gen_mt_list)
 
-num_mt=${#mt_dir[@]}
+num_mt=${#mt_home[@]}
 
 echo $num_mt MetaTraders are found.
 
 i=0
 while [ $i -lt $num_mt ]; do
-    mt_home="${mt_dir[$i]}"
+    mt_home="${mt_home[$i]}"
     echo "processing: [$i/$num_mt] type=${mt_type[$i]}  path='$mt_home'"
     echo "delete needless files.."
 
