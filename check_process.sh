@@ -21,9 +21,9 @@ eval $(trd_gen_mt_list)
 num_target=$#
 
 if [ "$num_target" -le 0 ]; then
-    echo "Usage: `basename $0` <MetaTrader Name1> <MetaTrader Name2> ..." 1>&2
-    echo -e "\t<MetaTrader Name>: folder name of MetaTrader 4. (ex: "'"MetaTrader 4")'
-    exit 1
+  echo "Usage: `basename $0` <MetaTrader Name1> <MetaTrader Name2> ..." 1>&2
+  echo -e "\t<MetaTrader Name>: folder name of MetaTrader 4. (ex: "'"MetaTrader 4")'
+  exit 1
 fi
 
 target_names=("$@")

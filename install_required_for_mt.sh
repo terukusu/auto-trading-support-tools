@@ -2,14 +2,14 @@
 
 # ensure excuted with sudo
 if [ "$(id -u)" -ne "0" ]; then
-    echo please execute with sudo. 1>&2
-    exit 1
+  echo please execute with sudo. 1>&2
+  exit 1
 fi
 
 . /etc/os-release
 
 if [ -z "$VERSION_CODENAME" ]; then
-    VERSION_CODENAME=`echo -n $VERSION | tr '[A-Z]' '[a-z]' | grep -Eo 'artful|bionic|cosmic|precise|trusty|xenial|yakkety|zesty'`
+  VERSION_CODENAME=`echo -n $VERSION | tr '[A-Z]' '[a-z]' | grep -Eo 'artful|bionic|cosmic|precise|trusty|xenial|yakkety|zesty'`
 fi
 
 DEBIAN_FRONTEND=noninteractive
@@ -20,24 +20,24 @@ WINE_REPOS="deb https://dl.winehq.org/wine-builds/ubuntu/ $VERSION_CODENAME main
 cron_line=`crontab -l 2>/dev/null | grep -o "mkdir -p -m0755 /var/run/sshd"`
 
 if [ -z "$cron_line" ]; then
-    cat <(crontab -l) <(echo '@reboot if [ ! -e /var/run/sshd  ]; then mkdir -p -m0755 /var/run/sshd; fi') | crontab
+  cat <(crontab -l) <(echo '@reboot if [ ! -e /var/run/sshd  ]; then mkdir -p -m0755 /var/run/sshd; fi') | crontab
 fi
 
 BASH_PROFILE=$HOME/.bash_profile
 if [ ! -f $BASH_PROFILE ] || [ -z "`cat $BASH_PROFILE | grep -o WINEARCH`" ]; then
 
-# write WINE param to the .bash_profile
-cat << EOS >> $BASH_PROFILE
+  # write WINE param to the .bash_profile
+  cat << EOS >> $BASH_PROFILE
 
 export WINEARCH=win32
 export WINEDEBUG=-all,err+all
 export DISPLAY=:1
 
 if [ -e \$HOME/.bashrc ]; then
-    . \$HOME/.bashrc
+  . \$HOME/.bashrc
 fi
 EOS
-    chown $ORG_USER:$ORG_USER $BASH_PROFILE
+  chown $ORG_USER:$ORG_USER $BASH_PROFILE
 fi
 
 # For vps which don't have swap such as GCE f1-micro.
@@ -46,18 +46,18 @@ fi
 swap_total=`cat /proc/meminfo | grep -i swaptotal | tr -s " " | cut -d' ' -f'2'`
 
 if [ ! -e /proc/user_beancounters ] && [ "$swap_total" == "0" ]; then
-    echo make 1024 MB swap file. please wait for few minutes.
-    dd if=/dev/zero of=/swapfile bs=1M count=1024
-    chmod 600 /swapfile
-    mkswap -f /swapfile
-    swapon /swapfile
+  echo make 1024 MB swap file. please wait for few minutes.
+  dd if=/dev/zero of=/swapfile bs=1M count=1024
+  chmod 600 /swapfile
+  mkswap -f /swapfile
+  swapon /swapfile
 
-    if [ $? -ne 0 ] ;then
-        echo swapon faild. continue without swap.
-        rm /swapfile
-    else
-        echo -e "/swapfile\tswap\tswap\tdefaults\t0\t0" >> /etc/fstab
-    fi
+  if [ $? -ne 0 ] ;then
+    echo swapon faild. continue without swap.
+    rm /swapfile
+  else
+    echo -e "/swapfile\tswap\tswap\tdefaults\t0\t0" >> /etc/fstab
+  fi
 fi
 
 # upgrade packages.

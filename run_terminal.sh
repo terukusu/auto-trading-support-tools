@@ -26,17 +26,17 @@ while [ "$i" -lt "$target_num" ]; do
     continue
   fi
 
- echo executing: "$target_path"
+  echo executing: "$target_path"
 
   work_dir="$(winepath -w "$(dirname "$target_path")")"
   wine_log="$TRD_DATA_DIR/wine_$(echo $target_name | trd_to_lower).log"
-  
+
   if [ -z "$WINE" ]; then
-    WINE="$(which wine)"
+    WINE="$(which gitwine)"
   fi
-  
+
   echo -e "\n===== START `date +'%Y-%m-%d %H:%M:%S'` =====" >> "$wine_log"
-  
+
   nohup "$WINE" start /b /d "$work_dir" /unix "$target_path" &>> "$wine_log"
 
   let i++
