@@ -52,7 +52,7 @@ $ gcloud compute instances create tradevm --machine-type f1-micro --zone us-east
 NAME     ZONE        MACHINE_TYPE  PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP     STATUS
 tradevm  us-east1-b  f1-micro                   xx.xxx.x.x   xxx.xxx.xxx.xxx  RUNNING
 ```
-* ディスク容量が少なすぎてパフォーマンスが・・・のようなエラーメッセージが出るが気にせず進めてOK
+    * ディスク容量が少なすぎてパフォーマンスが・・・のようなエラーメッセージが出るが気にせず進めてOK
 
 1. VMインスタンスへSSHログイン
 ```
@@ -254,7 +254,7 @@ MetaTrader4 は起動済みという前提で。
     * 1分足が一番変化が早く自動売買の注文も多いので、ここではそうする
 
 1. 画面左中段の「ナビゲーター」→「エキスパートアドバイザ」→「MACD Sample」をダブルクリックする
-  * エキスパートアドバイザ(略してEA)とは自動売買プログラムのこと。
+    * エキスパートアドバイザ(略してEA)とは自動売買プログラムのこと。
 
 1. EAの設定ダイアログが開くので「全般」タブで「自動売買を許可する」にチェックを入れて「OK」
 
