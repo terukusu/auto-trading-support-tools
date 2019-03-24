@@ -56,7 +56,7 @@ Usage: mtctl.sh [-qsh] <list|start|status|stop> <MetaTrader Name1> [<MetaTrader 
 	start: start MetaTrader
 	status: print status of specified MetaTrader
 	stop: stop MetaTrader
-	<MetaTrader Name>: folder name MetaTrader  installed. It's searched in a forward match. (ex: "MetaTrader 4")
+	<MetaTrader Name>: folder name MetaTrader installed. It's searched in a forward match. (ex: "MetaTrader 4")
 	-s: when list, show running status.(slow)
 	-q: quiet mode. print nothing.
 	-h: help. print this message.
