@@ -4,11 +4,4 @@
 1. [GUI の設定](setup_gui.md)
 1. [Wine の設定](setup_wine.md)
 1. [MetaTrader をインストール・設定](install_mt.md)
-
-# LINE への通知設定
-
-VMインスタンスにSSHログインしたターミナルで以下を実行
-```
-$ cat > ~/auto-trading-support-tools/.line_token
-```
-入力画面になるので L
+1. [LINE への通知設定](setup_line.md)
