@@ -5,6 +5,9 @@ auto-tradeing-support-tools は LINE で通知を受け取るように作られ�
 LINE へのメッセージ送信には LINE の WebAPI へアクセスするためのトークンと、送信先である自分の LINEユーザーIDが必要です。
 それらの情報は取得済という前提で、ここではその情報をどの様に auto-trading-support-tools に設定するのかを説明します。
 
+
+(取得方法は[こちら](create_line_channel.md)を参考に)
+
 ## 準備
 * LINE Developers でLINEボットを作成し、そのボットとフレンドになっておく
 * そのボット用の API アクセストークンを発行しておく
