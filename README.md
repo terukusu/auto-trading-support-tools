@@ -1,5 +1,6 @@
 # auto-trading-support-tools
-Ubuntu+Wine+MetaTrader4/5 の自動売買サーバーの監視をサポートするツール群です。
+Ubuntu+Wine+MetaTrader4/5 (MT4/5) の自動売買サーバーの監視をサポートするツール群です。
+とくに複数の MT4/5 を扱う手間を軽減するためのものです。  
 Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16, 18でおこなっています。
 
 ## このツール群でできること
@@ -12,15 +13,14 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
 <img src="./doc/images/mt4_on_linux_vps.png" width="480px">  
 ↑ こうなる。そしてこの状態を保っていることを監視するためのもの。
 
-## 備考
-* インストール・設定されるもの
-    * 既存パッケージの最新化
-    * 可能ならば swap 領域の作成
-    * vncserver + wm2
-        * 要するに最小構成のGUI
-    * wine
-        * Linux 上で Windows 用アプリを動かすソフト
-    * 注意： MT4/5本体は GUI で操作しながらインストールする必要が有るため手動でインストールする必要有リ
+## インストール・設定されるもの
+* 既存パッケージの最新化
+* 可能ならば swap 領域の作成
+* vncserver + wm2
+    * 要するに最小構成のGUI
+* wine
+    * Linux 上で Windows 用アプリを動かすソフト
+* 注意： MT4/5本体は GUI で操作しながらインストールする必要が有るため手動でインストールする必要有リ
 
 
 ## Google Compute Engin の無料VMインスタンスでの例
@@ -47,17 +47,17 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
 ```
 
 こんな感じで設定しておけば、再起動時とMT4/5プロセスが落ちたときにLINEへ通知を飛ばしてくれます。
+@reboot の行は再起動時のMT4の自動起動設定です。
 
-
-mtctl.sh は 複数の MT4/5 の一覧・起動・終了・状態確認ができるスクリプト。
+mtctl.sh は 複数の MT4/5 の一覧・起動・終了・状態確認ができるスクリプトです。使い方は↓こん感じ。
 ```
 Usage: mtctl.sh [-qsh] <list|start|status|stop> <MetaTrader Name1> [<MetaTrader Name2> ...]
 	list: list MetaTrader installed
 	start: start MetaTrader
 	status: print status of specified MetaTrader
 	stop: stop MetaTrader
-	<MetaTrader Name>: folder name of MetaTrader 4. (ex: "MetaTrader 4")
-	-q: quiet mode. print nothing.
+	<MetaTrader Name>: folder name MetaTrader  installed. It's searched in a forward match. (ex: "MetaTrader 4")
 	-s: when list, show running status.(slow)
+	-q: quiet mode. print nothing.
 	-h: help. print this message.
 ```
