@@ -115,8 +115,8 @@ Verify:
 
 
 Mac なら画面右上の「虫めがねアイコン」→「画面共有.app」と入力し画面共有を起動。  
-<img src="./doc/images/remote1.png" width="480px">
-    * Mac以外なら[VNC Viewer](https://www.realvnc.com/en/connect/download/viewer/)をインストールしてそれを起動)
+<img src="./doc/images/remote1.png" width="480px">  
+* Mac以外なら[VNC Viewer](https://www.realvnc.com/en/connect/download/viewer/)をインストールしてそれを起動)
 
 
 接続先に `localhost:5901` と入力して、「接続」をクリック  
@@ -140,11 +140,11 @@ Wineの設定 (SSHログインしたターミナルで以下を実行)
 ```
 $ wineboot
 ```
-<img src="./doc/images/remote5.png" width="480px">
-    * エラーメッセージが表示されるが、クラッシュしない限り問題ないので気にしなくてOK  
+<img src="./doc/images/remote5.png" width="480px">  
+* エラーメッセージが表示されるが、クラッシュしない限り問題ないので気にしなくてOK  
 
 
-wine-mono と Gecko のインストールを求められるので、「インストール」を選んでインストールする。終わったらウィンドウが自動的に消えるが、それでOK
+wine-mono と Gecko のインストールを求められるので、「インストール」を選んでインストールする。終わったらウィンドウが自動的に消えるが、それでOK  
 <img src="./doc/images/remote6.png" width="480px">
 
 
@@ -165,7 +165,7 @@ $ cat >> .wine/user.reg
 "\xff2d\xff33 \x30b4\x30b7\x30c3\x30af"="VL Gothic"
 "\xff2d\xff33 \xff30\x30b4\x30b7\x30c3\x30af"="VL PGothic"
 ```
-↓はこうなっているはず。
+↓はこうなっているはず。  
 <img src="./doc/images/remote7.png" width="480px">
 
 
@@ -195,7 +195,7 @@ $ wine landfx4setup.exe
 
 
 「次へ」や「完了」をクリックして進めてインストールを完了する  
-<img src="./doc/images/remote10.png" width="480px" />
+<img src="./doc/images/remote10.png" width="480px" />  
 * インストールダイアログが消えたあとしばらくすると自動的にMetaTraderが立ち上がり、このような画面になる
 
 
@@ -227,23 +227,28 @@ $ wine landfx4setup.exe
 
 
 これでデモ口座での取引が可能になった。作成と同時にデモ口座にログインした状態になる
-<img src="./doc/images/remote14.png" width="480px" />
-    * 平日の市場が動いている時間帯ならばチカチカと値が動いている様子が確認できるはず
+<img src="./doc/images/remote14.png" width="480px" />  
+* 平日の市場が動いている時間帯ならばチカチカと値が動いている様子が確認できるはず
 
 
 #### MetaTrader の使用メモリを削減する
+
 通貨ペアを絞らないと説明しづらいので、ここではドル円(USD/JPY)を取引対象にすが、自分が取引したい通貨ペアに読み替えても良い。
+
 
 1. チャート(グラフ)は一旦全部消す
 
-1. 左上の「気配値表示」から取引したい通貨ペア(USDJPY)を右クリック → 「チャートに表示」を選ぶ
 
-1. 左上の「気配値表示」を右クリック → 「全て非表示」を選ぶ。これで「気配値表示」が USDJPY だけになる
+2. 左上の「気配値表示」から取引したい通貨ペア(USDJPY)を右クリック → 「チャートに表示」を選ぶ
+
+
+3. 左上の「気配値表示」を右クリック → 「全て非表示」を選ぶ。これで「気配値表示」が USDJPY だけになる
 <img src="./doc/images/remote15.png" width="480px" />
     * こういう表示になるはず
     * 他の通貨はメニューバーの「表示」→「通貨ペアリスト」からいつでも追加可能
 
-1. メニューバーの「ツール」→「オプション」で設定を開く
+
+4. メニューバーの「ツール」→「オプション」で設定を開く
     * 「サーバー」タブ
         * 「ニュースを有効にする」→ チェック外す
     * 「チャート」タブ
@@ -252,24 +257,29 @@ $ wine landfx4setup.exe
     * 「音声」タブ
         * 「有効にする」→ チェック外す
 
-1. メニューバーの「ファイル」→「プログラムの終了」で終了。(Mac なら Cmd+F4 でもOK。winなら Alt+F4)
 
-1. SSHログインしているターミナルから以下を実行
+5. メニューバーの「ファイル」→「プログラムの終了」で終了。(Mac なら Cmd+F4 でもOK。winなら Alt+F4)
+
+
+6. SSHログインしているターミナルから以下を実行
 ```
 $ ~/auto-trading-support-tools/minimize_mt.sh
 ```
-<img src="./doc/images/remote16.png" width="480px" />
-    * こういう表示になるはず
-    * これは、無駄なニュースやメッセージや値動きの履歴を削除しています
+<img src="./doc/images/remote16.png" width="480px" />  
+* こういう表示になるはず
+* これは、無駄なニュースやメッセージや値動きの履歴を削除しています
 
-1. SSHログインしているターミナルから以下を実行して MetaTrader を起動
+
+7. SSHログインしているターミナルから以下を実行して MetaTrader を起動
 ```
 $ ~/auto-trading-support-tools/mtctl.sh start land-fx
 ```
-<img src="./doc/images/remote17.png" width="480px" />
-    * こんなふうに余計なメッセージがスッキリ無くなっているかと思います
+<img src="./doc/images/remote17.png" width="480px" />  
+* こんなふうに余計なメッセージがスッキリ無くなっているかと思います
+
 
 これで可能な限り使用メモリを削減できている状態
+
 
 #### MetaTrader で自動売買する
 MetaTrader4 は起動済みという前提で。
