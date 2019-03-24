@@ -26,14 +26,14 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
 ## Google Compute Engin の無料VMインスタンスでの例
 まっさらな Linux VPS → 自動売買開始 → 監視 → LINE通知 までを一通りやってみましょうヽ(=´▽`=)ﾉ
 
-1. [VMインスタンス作成](./create_vm_gce.md)
-1. [自動売買に必要なものをインストール](install_misc.md)
-1. [GUI を設定](setup_gui.md)
-1. [Wine を設定 (WindowsアプリをLinuxで動かす設定)](setup_wine.md)
-1. [MetaTrader をインストール・設定](install_mt.md)
-1. [LINE への通知設定(LINE側)](create_line_channel.md)
-1. [LINE への通知設定(VM側)](setup_line.md)
-1. [再起動検知やMT4/5クラッシュ検知を設定](setup_monitoring.md)
+1. [VMインスタンス作成](./doc/create_vm_gce.md)
+1. [自動売買に必要なものをインストール](./doc/install_misc.md)
+1. [GUI を設定](./doc/setup_gui.md)
+1. [Wine を設定 (WindowsアプリをLinuxで動かす設定)](./doc/setup_wine.md)
+1. [MetaTrader をインストール・設定](./doc/install_mt.md)
+1. [LINE への通知設定(LINE側)](./doc/create_line_channel.md)
+1. [LINE への通知設定(VM側)](./doc/setup_line.md)
+1. [再起動検知やMT4/5クラッシュ検知を設定](./doc/setup_monitoring.md)
 
 ## 既にLinux + Wine + MetaTrader4/5 で自動売買をしている人向けの紹介
 
