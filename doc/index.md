@@ -8,4 +8,4 @@
 1. [MetaTrader をインストール・設定](install_mt.md)
 1. [LINE への通知設定(LINE側)](create_line_channel.md)
 1. [LINE への通知設定(VM側)](setup_line.md)
-1. [再起動やMT4/5の監視を設定](setup_monitoring.md)
+1. [再起動検知やMT4/5クラッシュ検知を設定](setup_monitoring.md)
