@@ -98,7 +98,6 @@ $ wine landfx4setup.exe
 ```
 $ ~/auto-trading-support-tools/minimize_mt.sh
 ```
-
 <img src="./images/remote16.png" width="480px" />  
 
 
