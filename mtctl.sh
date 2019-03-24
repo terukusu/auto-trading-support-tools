@@ -10,14 +10,14 @@ FLAG_QUIET=0
 FLAG_STATUS=0
 
 function print_usage_exit() {
-  echo "Usage: `basename $0` [-qsh] <start|stop|list> <MetaTrader Name1> [<MetaTrader Name2> ...]" 1>&2
+  echo "Usage: `basename $0` [-qsh] <list|start|status|stop> <MetaTrader Name1> [<MetaTrader Name2> ...]" 1>&2
   echo -e "\tlist: list MetaTrader installed" 1>&2
   echo -e "\tstart: start MetaTrader" 1>&2
   echo -e "\tstatus: print status of specified MetaTrader" 1>&2
   echo -e "\tstop: stop MetaTrader" 1>&2
-  echo -e "\t<MetaTrader Name>: folder name of MetaTrader 4. (ex: "'"MetaTrader 4")' 1>&2
-  echo -e "\t-q: quiet mode. print nothing." 1>&2
+  echo -e "\t<MetaTrader Name>: folder name MetaTrader  installed. It's searched in a forward match. (ex: "'"MetaTrader 4")' 1>&2
   echo -e "\t-s: when list, show running status.(slow)" 1>&2
+  echo -e "\t-q: quiet mode. print nothing." 1>&2
   echo -e "\t-h: help. print this message." 1>&2
   exit 1
 }
