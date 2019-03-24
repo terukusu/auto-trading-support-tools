@@ -131,17 +131,14 @@ Mac なら画面右上の「虫めがねアイコン」→「画面共有.app」
 
 
 接続先に `localhost:5901` と入力して、「接続」をクリック  
-
 <img src="./doc/images/remote2.png" width="480px">
 
 
 パスワードに vncserver に設定したパスワード入力して、「接続」をクリック  
-
 <img src="./doc/images/remote3.png" width="480px">
 
 
 接続がうまくいけばこのようにVMインスタンスの画面が表示される。  
-
 <img src="./doc/images/remote4.png" width="480px">
 
 
@@ -161,17 +158,16 @@ $ wineboot
 
 
 wine-mono と Gecko のインストールを求められるので、「インストール」を選んでインストールする。終わったらウィンドウが自動的に消えるが、それでOK  
-
 <img src="./doc/images/remote6.png" width="480px">
 
 
-Wineの日本語フォントの設定
+Wineの日本語フォントの設定  
+SSH ログインしたターミナル上で以下を入力しエンターキー。
 
 ```
-$ cat >> .wine/user.reg
+$ cat >>  ~/.wine/user.reg
 ```
 
-と入力しエンターキー。
 続けて以下を入力してから 「Ctrl + d」
 
 ```
@@ -187,7 +183,6 @@ $ cat >> .wine/user.reg
 ```
 
 ターミナルは↓はこうなっているはず。  
-
 <img src="./doc/images/remote7.png" width="480px">
 
 
@@ -212,12 +207,14 @@ $ wget 'https://download.mql5.com/cdn/web/land.prime.ltd/mt4/landfx4setup.exe'
 $ wine landfx4setup.exe
 ```
 <img src="./doc/images/remote9.png" width="480px">  
+
 * MetaTrader の開発元が MetaTrader4 の配布をやめているためFXブローカー(LandFX)からダウンロードする
 * 他の任意のFXブローカーの口座を扱えるので問題ない
 
 
 「次へ」や「完了」をクリックして進めてインストールを完了する  
 <img src="./doc/images/remote10.png" width="480px" />  
+
 * インストールダイアログが消えたあとしばらくすると自動的にMetaTraderが立ち上がり、このような画面になる
 
 
@@ -228,8 +225,9 @@ $ wine landfx4setup.exe
 リアルマネー口座を使いたい場合は予めFXブローカーで開いた口座情報をここで入れることもできる。
 
 
-「取引サーバー」ダイアログで、「新しいサーバーを追加」をクリックして、「metaq」と入力してエンター
+「取引サーバー」ダイアログで、「新しいサーバーを追加」をクリックして、「metaq」と入力してエンター  
 <img src="./doc/images/remote11.png" width="480px" />  
+
 * すると「MetaQuotes-Demo」というサーバーが現れるので、それを選んで「次へ」
 * MetaQuotes-Demo は MetaTrader の開発元である MetaQuotes社が運営する由緒正しいデモサーバー
 
@@ -237,18 +235,20 @@ $ wine landfx4setup.exe
 「新しいデモ口座」を選んで「次へ」
 
 
-テキトーに入力して「次へ」
+テキトーに入力して「次へ」  
 <img src="./doc/images/remote12.png" width="480px" />  
+
 * 連絡が来たりするわけではないのでテキトーでOK
 * 口座タイプは日本円(forex-JPY)の方が扱いやすいかも
 
 
-この画面で表示されている「ログインID」「パスワード」が新たに作成されたアカウントの情報。確認したら「次へ」
+この画面で表示されている「ログインID」「パスワード」が新たに作成されたアカウントの情報。確認したら「次へ」  
 <img src="./doc/images/remote13.png" width="480px" />  
+
 * 他のPCやスマホのMetaTraderからログインするには必要。このVMインスタンスでしかこのデモ口座を使わないならば忘れてOK
 
 
-これでデモ口座での取引が可能になった。作成と同時にデモ口座にログインした状態になる
+これでデモ口座での取引が可能になった。作成と同時にデモ口座にログインした状態になる  
 <img src="./doc/images/remote14.png" width="480px" />  
 * 平日の市場が動いている時間帯ならばチカチカと値が動いている様子が確認できるはず
 
@@ -288,6 +288,7 @@ $ wine landfx4setup.exe
 $ ~/auto-trading-support-tools/minimize_mt.sh
 ```
 <img src="./doc/images/remote16.png" width="480px" />  
+
 * こういう表示になるはず
 * これは、無駄なニュースやメッセージや値動きの履歴を削除しています
 
@@ -297,6 +298,7 @@ $ ~/auto-trading-support-tools/minimize_mt.sh
 $ ~/auto-trading-support-tools/mtctl.sh start land-fx
 ```
 <img src="./doc/images/remote17.png" width="480px" />  
+
 * こんなふうに余計なメッセージがスッキリ無くなっているかと思います
 
 
@@ -304,17 +306,25 @@ $ ~/auto-trading-support-tools/mtctl.sh start land-fx
 
 
 #### MetaTrader で自動売買する
+
 MetaTrader4 は起動済みという前提で。
+
+
 1. 時間足を1分間に変更。ツールバーの「M1」をクリックすることで変更できる。
     * 1分足が一番変化が早く自動売買の注文も多いので、ここではそうする
 
-1. 画面左中段の「ナビゲーター」→「エキスパートアドバイザ」→「MACD Sample」をダブルクリックする
+
+2. 画面左中段の「ナビゲーター」→「エキスパートアドバイザ」→「MACD Sample」をダブルクリックする
     * エキスパートアドバイザ(略してEA)とは自動売買プログラムのこと。
 
-1. EAの設定ダイアログが開くので「全般」タブで「自動売買を許可する」にチェックを入れて「OK」
 
-1. チャート右上にEA名(MACD Sample)が表示さていることを確認する
+3. EAの設定ダイアログが開くので「全般」タブで「自動売買を許可する」にチェックを入れて「OK」
 
-1. ツールバーの「自動売買」もクリックしてONにしておく
+
+4. チャート右上にEA名(MACD Sample)が表示さていることを確認する
+
+
+5. ツールバーの「自動売買」もクリックしてONにしておく
+
 
 <img src="./doc/images/remote18.png" width="480px" />
