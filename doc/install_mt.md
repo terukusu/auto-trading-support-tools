@@ -75,7 +75,7 @@ $ wine landfx4setup.exe
 
 
 3. 左上の「気配値表示」を右クリック → 「全て非表示」を選ぶ。これで「気配値表示」が USDJPY だけになる
-<img src="./doc/images/remote15.png" width="480px" />
+<img src="./images/remote15.png" width="480px" />
     * こういう表示になるはず
     * 他の通貨はメニューバーの「表示」→「通貨ペアリスト」からいつでも追加可能
 

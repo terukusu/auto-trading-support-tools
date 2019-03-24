@@ -7,14 +7,14 @@
 
 ### VMインスタンス側のGUI起動
 
-ターミナルでSSHログイン
+ターミナルでVMインスタンスへSSHログイン
 
 ```
 $ gcloud compute ssh --ssh-flag="-L5901:localhost:5901" <ユーザー名>@tradevm ← これはローカルマシンで実行
 ```
 
 
-SSHログインしたターミナルで以下を実行
+VMインスタンスへSSHログインしたターミナル上で以下を実行
 ```
 $ vncserver -geometry 1280x800 -localhost -nolisten tcp
 
