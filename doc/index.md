@@ -1,6 +1,6 @@
 
-[](create_vm_gce.md)
-[](install_misc.md)
-[](setup_gui.md)
-[](setup_wine.md)
-[](insatll_mt.md)
+[vm](./create_vm_gce.md)
+[misc](install_misc.md)
+[gui](setup_gui.md)
+[wine](setup_wine.md)
+[mt](insatll_mt.md)
