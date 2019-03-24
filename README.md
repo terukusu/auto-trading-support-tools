@@ -126,6 +126,7 @@ Verify:
 Mac なら画面右上の「虫めがねアイコン」→「画面共有.app」と入力し画面共有を起動。  
 <img src="./doc/images/remote1.png" width="480px">  
 
+* もしくは Mac の Fainder のメニューバーから 「移動」 → 「サーバーへ接続」 で、 `vnc://localhost:5901` と入力する
 * Mac以外なら[VNC Viewer](https://www.realvnc.com/en/connect/download/viewer/)をインストールしてそれを起動)
 
 
