@@ -127,8 +127,8 @@ Mac なら画面右上の「虫めがねアイコン」→「画面共有.app」
 <img src="./doc/images/remote1.png" width="480px">  
 
 * もしくは Mac の Fainder のメニューバーから 「移動」 → 「サーバーへ接続」 で、 `vnc://localhost:5901` と入力する
-* Mac以外なら[VNC Viewer](https://www.realvnc.com/en/connect/download/viewer/)をインストールしてそれを起動)
-    * 私はMacですが VNC Viewer を使っています。 画面共有.app よりも使いやすいので
+* もしくは [VNC Viewer](https://www.realvnc.com/en/connect/download/viewer/)をインストールしてそれを起動
+    * VNCViewer は Mac 以外版もある
 
 
 接続先に `localhost:5901` と入力して、「接続」をクリック  
