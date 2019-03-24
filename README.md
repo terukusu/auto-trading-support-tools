@@ -21,7 +21,6 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
     * wine
         * Linux 上で Windows 用アプリを動かすソフト
     * 注意： MT4/5本体は GUI で操作しながらインストールする必要が有るため手動でインストールする必要有リ
-<br /><br >
 
 * line 通知機能を使うには以下の準備が必要です
     * [LINE Developers](https://developers.line.biz/ja/services/messaging-api/)(登録無料) に登録
@@ -44,7 +43,7 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
 
 #### VM 作成
 
-1. ローカルマシンのターミナルで以下を実行
+ローカルマシンのターミナルで以下を実行
 ```
 $ gcloud compute instances create tradevm --machine-type f1-micro --zone us-east1-b --image-project ubuntu-os-cloud --image-family ubuntu-minimal-1804-lts --boot-disk-type pd-standard --boot-disk-size 30
 .....
@@ -52,32 +51,35 @@ $ gcloud compute instances create tradevm --machine-type f1-micro --zone us-east
 NAME     ZONE        MACHINE_TYPE  PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP     STATUS
 tradevm  us-east1-b  f1-micro                   xx.xxx.x.x   xxx.xxx.xxx.xxx  RUNNING
 ```  
-
 ディスク容量が少なすぎてパフォーマンスが・・・のようなエラーメッセージが出るが気にせず進めてOK
 
-２. VMインスタンスへSSHログイン
+
+VMインスタンスへSSHログイン
 ```
 $ gcloud compute ssh <任意のユーザー名>@tradevm
 ```
 * 任意のユーザー名のところは英数字で。今後も同じものを使うのであまり投げやりな名前にしないように  
 * 初回の場合はここでSSHの暗号化鍵の生成が行われるが、よしなに肯定的に進めればOK
 
+
 #### 必要なものをインストール
-1. 圧縮展開ソフトのインストール  
+圧縮展開ソフトのインストール  
 (ここからはSSHログインしたターミナル上での作業）
 ```
 $ sudo apt update
 $ sudo apt install -y unzip
 ```
 
-1. auto-tradeing-support-tools をダウンロード＆展開
+
+auto-tradeing-support-tools をダウンロード＆展開
 ```
 $ wget https://github.com/terukusu/auto-trading-support-tools/archive/master.zip
 $ unzip master.zip
 $ mv auto-trading-support-tools-master auto-trading-support-tools
 ```
 
-1. MetaTraderに必要なものをインストール
+
+MetaTraderに必要なものをインストール
 ```
 $ sudo ~/auto-trading-support-tools/install_required_for_mt.sh
 .....
@@ -91,14 +93,16 @@ $ exit ← 言語設定を反映させるために一度切断
         * root の crontab
             * 念の為の起動時の /var/run/sshd の作成を設定(sshdの起動に必要)
 
+
 #### GUI の設定を行う
 
-1. 再度ターミナルでSSHログイン
+再度ターミナルでSSHログイン
 ```
 $ gcloud compute ssh --ssh-flag="-L5901:localhost:5901" teru@tradevm ← これはローカルマシンで実行
 ```
 
-1. SSHログインしたターミナルで以下を実行
+
+SSHログインしたターミナルで以下を実行
 ```
 $ vncserver -geometry 1280x800 -localhost -nolisten tcp
 
@@ -106,45 +110,50 @@ Password: ← リモートからGUIに接続する際のパスワードをここ
 Verify:
 ```
 
+
 この段階でVMインスタンスのGUIに接続できるようになっているので接続する。(↑のSSH接続はキープしたままで)
 
-1. Mac なら画面右上の「虫めがねアイコン」→「画面共有.app」と入力し画面共有を起動。  
+
+Mac なら画面右上の「虫めがねアイコン」→「画面共有.app」と入力し画面共有を起動。  
 <img src="./doc/images/remote1.png" width="480px">
     * Mac以外なら[VNC Viewer](https://www.realvnc.com/en/connect/download/viewer/)をインストールしてそれを起動)
-<br /><br />
 
-1. 接続先に `localhost:5901` と入力して、「接続」をクリック  
+
+接続先に `localhost:5901` と入力して、「接続」をクリック  
 <img src="./doc/images/remote2.png" width="480px">
-<br /><br />
 
-1. パスワードに vncserver に設定したパスワード入力して、「接続」をクリック  
+
+パスワードに vncserver に設定したパスワード入力して、「接続」をクリック  
 <img src="./doc/images/remote3.png" width="480px">
-<br /><br />
 
-1. 接続がうまくいけばこのようにVMインスタンスの画面が表示される。  
+
+接続がうまくいけばこのようにVMインスタンスの画面が表示される。  
 <img src="./doc/images/remote4.png" width="480px">
+
 
 #### Wine の設定を行う
 
 Windows アプリを Linux 上で動かすために Wine の設定を行う。
 
-1. Wineの設定 (SSHログインしたターミナルで以下を実行)
+
+Wineの設定 (SSHログインしたターミナルで以下を実行)
 ```
 $ wineboot
 ```
 <img src="./doc/images/remote5.png" width="480px">
     * エラーメッセージが表示されるが、クラッシュしない限り問題ないので気にしなくてOK  
-    <br /><br />
 
-1. wine-mono と Gecko のインストールを求められるので、「インストール」を選んでインストールする。終わったらウィンドウが自動的に消えるが、それでOK
+
+wine-mono と Gecko のインストールを求められるので、「インストール」を選んでインストールする。終わったらウィンドウが自動的に消えるが、それでOK
 <img src="./doc/images/remote6.png" width="480px">
 
-1. Wineの日本語フォントの設定
+
+Wineの日本語フォントの設定
 ```
 $ cat >> .wine/user.reg
 ```
 と入力しエンターキー。
-続けて以下を入力してから「Ctrl + d」
+続けて以下を入力してから 「Ctrl + d」
 ```
 [Software\\Wine\\Fonts\\Replacements]
 "MS Gothic"="VL Gothic"
@@ -159,7 +168,8 @@ $ cat >> .wine/user.reg
 ↓はこうなっているはず。
 <img src="./doc/images/remote7.png" width="480px">
 
-1. Wineの日本語表示を確認  
+
+Wineの日本語表示を確認  
 ターミナル上で以下を実行
 ```
 $ winecfg
@@ -168,46 +178,58 @@ $ winecfg
 <img src="./doc/images/remote8.png" width="480px">  
 確認できたら、「OK」をクリックして終了する。
 
+
 ここまでで GUI の設定は完了。Windowsアプリを動かす準備ができた。
 
+
 #### MetaTrader をインストールする
-1. SSHログインしたターミナルで以下を実行する。  
+
+SSHログインしたターミナルで以下を実行する。  
 ```
 $ wget 'https://download.mql5.com/cdn/web/land.prime.ltd/mt4/landfx4setup.exe'
 $ wine landfx4setup.exe
 ```
 <img src="./doc/images/remote9.png" width="480px">  
-    * MetaTrader の開発元が MetaTrader4 の配布をやめているためFXブローカー(LandFX)からダウンロードする
-    * 他の任意のFXブローカーの口座を扱えるので問題ない
+* MetaTrader の開発元が MetaTrader4 の配布をやめているためFXブローカー(LandFX)からダウンロードする
+* 他の任意のFXブローカーの口座を扱えるので問題ない
 
-1. 「次へ」や「完了」をクリックして進めてインストールを完了する  
+
+「次へ」や「完了」をクリックして進めてインストールを完了する  
 <img src="./doc/images/remote10.png" width="480px" />
-    * インストールダイアログが消えたあとしばらくすると自動的にMetaTraderが立ち上がり、このような画面になる
+* インストールダイアログが消えたあとしばらくすると自動的にMetaTraderが立ち上がり、このような画面になる
+
 
 #### MetaTrader にデモ口座を設定する
+
 
 リアルマネーではなく架空の資金を使ってFXのデモ取引ができるデモ口座を作成する。  
 リアルマネー口座を使いたい場合は予めFXブローカーで開いた口座情報をここで入れることもできる。
 
-1. 「取引サーバー」ダイアログで、「新しいサーバーを追加」をクリックして、「metaq」と入力してエンター
-<img src="./doc/images/remote11.png" width="480px" />
-    * すると「MetaQuotes-Demo」というサーバーが現れるので、それを選んで「次へ」
-    * MetaQuotes-Demo は MetaTrader の開発元である MetaQuotes社が運営する由緒正しいデモサーバー
 
-1. 「新しいデモ口座」を選んで「次へ」
+「取引サーバー」ダイアログで、「新しいサーバーを追加」をクリックして、「metaq」と入力してエンター
+<img src="./doc/images/remote11.png" width="480px" />  
+* すると「MetaQuotes-Demo」というサーバーが現れるので、それを選んで「次へ」
+* MetaQuotes-Demo は MetaTrader の開発元である MetaQuotes社が運営する由緒正しいデモサーバー
 
-1. テキトーに入力して「次へ」
-<img src="./doc/images/remote12.png" width="480px" />
-    * 連絡が来たりするわけではないのでテキトーでOK
-    * 口座タイプは日本円(forex-JPY)の方が扱いやすいかも
 
-1. この画面で表示されている「ログインID」「パスワード」が新たに作成されたアカウントの情報。確認したら「次へ」
-<img src="./doc/images/remote13.png" width="480px" />
-    * 他のPCやスマホのMetaTraderからログインするには必要。このVMインスタンスでしかこのデモ口座を使わないならば忘れてOK
+「新しいデモ口座」を選んで「次へ」
 
-1. これでデモ口座での取引が可能になった。作成と同時にデモ口座にログインした状態になる
+
+テキトーに入力して「次へ」
+<img src="./doc/images/remote12.png" width="480px" />  
+* 連絡が来たりするわけではないのでテキトーでOK
+* 口座タイプは日本円(forex-JPY)の方が扱いやすいかも
+
+
+この画面で表示されている「ログインID」「パスワード」が新たに作成されたアカウントの情報。確認したら「次へ」
+<img src="./doc/images/remote13.png" width="480px" />  
+* 他のPCやスマホのMetaTraderからログインするには必要。このVMインスタンスでしかこのデモ口座を使わないならば忘れてOK
+
+
+これでデモ口座での取引が可能になった。作成と同時にデモ口座にログインした状態になる
 <img src="./doc/images/remote14.png" width="480px" />
     * 平日の市場が動いている時間帯ならばチカチカと値が動いている様子が確認できるはず
+
 
 #### MetaTrader の使用メモリを削減する
 通貨ペアを絞らないと説明しづらいので、ここではドル円(USD/JPY)を取引対象にすが、自分が取引したい通貨ペアに読み替えても良い。
