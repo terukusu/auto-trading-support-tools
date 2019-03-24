@@ -1,5 +1,4 @@
-
-# LINE への通知設定
+# LINE への通知設定(VM 側)
 
 ## 概要
 auto-tradeing-support-tools は LINE で通知を受け取るように作られています。  

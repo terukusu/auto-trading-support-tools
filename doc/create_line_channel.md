@@ -1,4 +1,4 @@
-# LINE Messaging API を使う準備
+# LINE への通知設定(LINE 側)
 
 ## 概要
 auto-tradeing-support-tools は LINE で通知を受け取るように作られています。  
@@ -9,6 +9,7 @@ LINE へのメッセージ送信には LINE の Messaging API という機能を
 ## 手順
 ### チャンネルを作成する
 1. 基本的には [LINE Developers の 公式サイトに有るマニュアル](https://developers.line.biz/ja/docs/messaging-api/getting-started/) の通りにチャンネルを作成する。所要時間は３分程度。
+
 
 2. 途中で気をつけるべきところは、プランを選ぶ箇所が有るので 「Developer Trial」を選ぶこと。これが無料かつ通知を送れるプランなので。
 
@@ -26,3 +27,8 @@ LINE へのメッセージ送信には LINE の Messaging API という機能を
 
 ページの最下部に自分の LINE ユーザーID が表示されているので、ここに有ることを覚えておく。  
 <img src="./images/remote23.png" width="380px" />  
+
+
+### チャンネルと友だちになる
+
+ページの下から二番目に「LINEアプリへのQRコード」が表示されているので、つうじょうの友だち登録と同じ様に友だち登録をする。
