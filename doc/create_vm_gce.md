@@ -1,5 +1,7 @@
 # VMインスタンス作成
 ## 概要
+Ubuntu14〜18 あたりの Ubuntu の VPS ならばなんでもOK.  
+ですがここでは例として、試しやすい Google Cloud Platform (GCP) に Ubuntu18.04 Minimal の無料VMインスタンスを作成します。
 
 ## 前提
 * Google Cloud Platform (GCP) へのの登録(無料)は完了している
