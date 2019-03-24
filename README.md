@@ -51,20 +51,25 @@ $ gcloud compute instances create tradevm --machine-type f1-micro --zone us-east
 NAME     ZONE        MACHINE_TYPE  PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP     STATUS
 tradevm  us-east1-b  f1-micro                   xx.xxx.x.x   xxx.xxx.xxx.xxx  RUNNING
 ```  
+
 ディスク容量が少なすぎてパフォーマンスが・・・のようなエラーメッセージが出るが気にせず進めてOK
 
 
 VMインスタンスへSSHログイン
+
 ```
 $ gcloud compute ssh <任意のユーザー名>@tradevm
 ```
+
 * 任意のユーザー名のところは英数字で。今後も同じものを使うのであまり投げやりな名前にしないように  
 * 初回の場合はここでSSHの暗号化鍵の生成が行われるが、よしなに肯定的に進めればOK
 
 
 #### 必要なものをインストール
+
 圧縮展開ソフトのインストール  
 (ここからはSSHログインしたターミナル上での作業）
+
 ```
 $ sudo apt update
 $ sudo apt install -y unzip
@@ -72,6 +77,7 @@ $ sudo apt install -y unzip
 
 
 auto-tradeing-support-tools をダウンロード＆展開
+
 ```
 $ wget https://github.com/terukusu/auto-trading-support-tools/archive/master.zip
 $ unzip master.zip
@@ -80,11 +86,13 @@ $ mv auto-trading-support-tools-master auto-trading-support-tools
 
 
 MetaTraderに必要なものをインストール
+
 ```
 $ sudo ~/auto-trading-support-tools/install_required_for_mt.sh
 .....
 $ exit ← 言語設定を反映させるために一度切断
 ```
+
 * タイムゾーンを聞かれるので 「Asia」 → 「Tokyo」 と選択する
 * このスクリプトは swap領域の作成と、日本語設定と、環境変数の設定も行います
     * 自動的に変更を加えるファイル
@@ -97,6 +105,7 @@ $ exit ← 言語設定を反映させるために一度切断
 #### GUI の設定を行う
 
 再度ターミナルでSSHログイン
+
 ```
 $ gcloud compute ssh --ssh-flag="-L5901:localhost:5901" teru@tradevm ← これはローカルマシンで実行
 ```
@@ -114,20 +123,25 @@ Verify:
 この段階でVMインスタンスのGUIに接続できるようになっているので接続する。(↑のSSH接続はキープしたままで)
 
 
-Mac なら画面右上の「虫めがねアイコン」→「画面共有.app」と入力し画面共有を起動。  
+Mac なら画面右上の「虫めがねアイコン」→「画面共有.app」と入力し画面共有を起動。 
+
 <img src="./doc/images/remote1.png" width="480px">  
+
 * Mac以外なら[VNC Viewer](https://www.realvnc.com/en/connect/download/viewer/)をインストールしてそれを起動)
 
 
 接続先に `localhost:5901` と入力して、「接続」をクリック  
+
 <img src="./doc/images/remote2.png" width="480px">
 
 
 パスワードに vncserver に設定したパスワード入力して、「接続」をクリック  
+
 <img src="./doc/images/remote3.png" width="480px">
 
 
 接続がうまくいけばこのようにVMインスタンスの画面が表示される。  
+
 <img src="./doc/images/remote4.png" width="480px">
 
 
@@ -140,20 +154,26 @@ Wineの設定 (SSHログインしたターミナルで以下を実行)
 ```
 $ wineboot
 ```
-<img src="./doc/images/remote5.png" width="480px">  
+
+<img src="./doc/images/remote5.png" width="480px">
+
 * エラーメッセージが表示されるが、クラッシュしない限り問題ないので気にしなくてOK  
 
 
 wine-mono と Gecko のインストールを求められるので、「インストール」を選んでインストールする。終わったらウィンドウが自動的に消えるが、それでOK  
+
 <img src="./doc/images/remote6.png" width="480px">
 
 
 Wineの日本語フォントの設定
+
 ```
 $ cat >> .wine/user.reg
 ```
+
 と入力しエンターキー。
 続けて以下を入力してから 「Ctrl + d」
+
 ```
 [Software\\Wine\\Fonts\\Replacements]
 "MS Gothic"="VL Gothic"
@@ -165,7 +185,9 @@ $ cat >> .wine/user.reg
 "\xff2d\xff33 \x30b4\x30b7\x30c3\x30af"="VL Gothic"
 "\xff2d\xff33 \xff30\x30b4\x30b7\x30c3\x30af"="VL PGothic"
 ```
-↓はこうなっているはず。  
+
+ターミナルは↓はこうなっているはず。  
+
 <img src="./doc/images/remote7.png" width="480px">
 
 
