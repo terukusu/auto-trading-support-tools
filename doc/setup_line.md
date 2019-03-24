@@ -50,5 +50,5 @@ $ echo hello | ~/auto-trading-support-tools/send_to_line.sh
 ```
 
 
-ほぼリアルタイムで以下のように LINE メッセージがとどく  
+ほぼリアルタイムで以下のように LINE メッセージが届く 
 <img src="./images/remote20.png" width="320px" />  

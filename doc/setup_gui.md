@@ -45,3 +45,37 @@ Mac なら画面右上の「虫めがねアイコン」→「画面共有.app」
 
 接続がうまくいけばこのようにVMインスタンスの画面が表示される。  
 <img src="./images/remote4.png" width="480px">
+
+
+### 再起動時にもVMインスタンス側GUIを自動起動する設定
+VMインスタンスへSSHログインしたターミナル上で以下を実行
+```
+$ sudo cp ~/auto-trading-support-tools/vncserver\@\:1.service /etc/systemd/system/
+```
+
+```
+$ sudo nano /etc/systemd/system/vncserver\@\:1.service
+```
+
+↑この操作でテキストエディタが起動するので、<ユーザー名> の部分を VMインスタンスへログインしている自分のユーザー名に変更する。その後、保存＆終了(Ctral + x → エンターキー)
+
+
+GUI自動起動設定の有効化
+```
+$ sudo systemctl enable vncserver\@\:1.service
+```
+
+
+再起動して正しくGUIが起動するか確認する  
+```
+$ sudo reboot
+```
+
+再起動後、もういちどVMインスタンスへSSHログインして以下を実行
+```
+$ ps -C Xvnc4
+
+↓ 実行結果。Xvnc4 がこのように一覧に表示されていればOK
+  PID TTY          TIME CMD
+  848 ?        00:00:00 Xvnc4
+```
