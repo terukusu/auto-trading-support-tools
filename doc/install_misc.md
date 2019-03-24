@@ -2,7 +2,7 @@
 
 ## 概要
 
-まっさらな Google Compute Engine(GCP) に、自動売買ソフト MetaTrader4/5 を動作させるのに必要なパッケージのインストールと、設定を行います。
+まっさらな Google Compute Engine(GCP) の VMインスタンスに、自動売買ソフト MetaTrader4/5 を動作させるのに必要なパッケージのインストールと、設定を行います。
 
 ### この手順でインストール・設定されるもの
 
