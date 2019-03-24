@@ -57,7 +57,7 @@ $ sudo cp ~/auto-trading-support-tools/vncserver\@\:1.service /etc/systemd/syste
 $ sudo nano /etc/systemd/system/vncserver\@\:1.service
 ```
 
-↑この操作でテキストエディタが起動するので、<ユーザー名> の部分を VMインスタンスへログインしている自分のユーザー名に変更する。その後、保存＆終了(Ctral + x → エンターキー)
+↑この操作でテキストエディタが起動するので、<ユーザー名> の部分を VMインスタンスへログインしている自分のユーザー名に変更する。その後、保存＆終了(Ctral + x → y → エンターキー)
 
 
 GUI自動起動設定の有効化
