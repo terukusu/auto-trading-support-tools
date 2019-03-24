@@ -1,7 +1,7 @@
 MAILTO=""
 
 # start MetaTrader automatically at boot
-@reboot $HOME/auto-trading-support-tools/mtctl.sh start mt4_01 mt4_02 mt4_03
+@reboot $HOME/auto-trading-support-tools/mtctl.sh start  land-fx
 
 * * * * * $HOME/auto-trading-support-tools/check_reboot.sh
-*/10 * * * * $HOME/auto-trading-support-tools/check_process.sh mt4_01 mt4_02 mt4_03
+*/10 * * * * $HOME/auto-trading-support-tools/check_process.sh land-fx

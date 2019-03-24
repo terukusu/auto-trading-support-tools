@@ -30,9 +30,9 @@ $ sudo apt install -y unzip
 auto-tradeing-support-tools をダウンロード＆展開
 
 ```
-$ wget https://github.com/terukusu/auto-trading-support-tools/archive/master.zip
+$ wget https://github.com/terukusu/auto-trading-support-tools/archive/v1.0.zip
 $ unzip master.zip
-$ mv auto-trading-support-tools-master auto-trading-support-tools
+$ mv auto-trading-support-tools-1.0 auto-trading-support-tools
 ```
 
 
