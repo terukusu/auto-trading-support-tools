@@ -1,6 +1,14 @@
+# このツールの使用例
+1. [VMインスタンス作成](./create_vm_gce.md)
+1. [自動売買に必要なものをインストール](install_misc.md)
+1. [GUI の設定](setup_gui.md)
+1. [Wine の設定](setup_wine.md)
+1. [MetaTrader をインストール・設定](install_mt.md)
 
-[vm](./create_vm_gce.md)
-[misc](install_misc.md)
-[gui](setup_gui.md)
-[wine](setup_wine.md)
-[mt](install_mt.md)
+# LINE への通知設定
+
+VMインスタンスにSSHログインしたターミナルで以下を実行
+```
+$ cat > ~/auto-trading-support-tools/.line_token
+```
+入力画面になるので L

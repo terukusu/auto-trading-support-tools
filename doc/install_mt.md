@@ -1,4 +1,4 @@
-# MetaTrader をインストール・設定する
+# MetaTrader をインストール・設定
 
 ## 概要
 自動売買に使用する MetaTrader というソフトをインストールして、自動売買に最適な設定を行います。  
@@ -100,6 +100,7 @@ $ ~/auto-trading-support-tools/minimize_mt.sh
 ```
 
 <img src="./images/remote16.png" width="480px" />  
+
 
 * こういう表示になるはず
 * これは、無駄なニュースやメッセージや値動きの履歴を削除しています
