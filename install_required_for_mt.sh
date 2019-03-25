@@ -9,12 +9,12 @@ fi
 . /etc/os-release
 
 if [ -z "$VERSION_CODENAME" ]; then
-  VERSION_CODENAME=`echo -n $VERSION | tr '[A-Z]' '[a-z]' | grep -Eo 'artful|bionic|cosmic|precise|trusty|xenial|yakkety|zesty'`
+  VERSION_CODENAME=`echo -n $VERSION | tr '[A-Z]' '[a-z]' | grep -Eo 'artful|bionic|cosmic|precise|trusty|xenial|yakkety|zesty|jessie|stretch|buster'`
 fi
 
 DEBIAN_FRONTEND=noninteractive
 ORG_USER=${SUDO_USER:-$USER}
-WINE_REPOS="deb https://dl.winehq.org/wine-builds/ubuntu/ $VERSION_CODENAME main"
+WINE_REPOS="deb https://dl.winehq.org/wine-builds/$ID/ $VERSION_CODENAME main"
 
 # For old OpenVZ kernel. SSHD doesn't start after updating systemd without this.
 cron_line=`crontab -l 2>/dev/null | grep -o "mkdir -p -m0755 /var/run/sshd"`
@@ -66,10 +66,18 @@ apt install -f -y
 apt upgrade -y
 
 # setting local and timezone.
-apt install -y dbus tzdata language-pack-ja
+apt install -y dbus tzdata
+
+if [ "$ID" == "debian" ]; then
+  # for debian
+  apt install -y task-japanese locales
+  echo "ja_JP.UTF-8 UTF-8" > /etc/locale.gen
+else
+  apt install -y language-pack-ja
+fi
+
 locale-gen
 update-locale LANG=ja_JP.UTF-8
-
 timedatectl set-timezone Asia/Tokyo
 
 # install misc

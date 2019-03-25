@@ -27,7 +27,7 @@ $ sudo apt install -y unzip
 ```
 
 
-auto-tradeing-support-tools をダウンロード＆展開
+auto-trading-support-tools をダウンロード＆展開
 
 ```
 $ wget https://github.com/terukusu/auto-trading-support-tools/archive/v1.0.zip
@@ -39,7 +39,7 @@ $ mv auto-trading-support-tools-1.0 auto-trading-support-tools
 MetaTraderに必要なものをインストール
 
 ```
-$ sudo ~/auto-trading-support-tools/install_required_for_mt.sh
+$ sudo -E ~/auto-trading-support-tools/install_required_for_mt.sh
 .....
 $ exit ← 言語設定を反映させるために一度切断
 ```
