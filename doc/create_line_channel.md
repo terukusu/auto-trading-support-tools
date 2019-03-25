@@ -1,7 +1,7 @@
 # LINE への通知設定(LINE 側)
 
 ## 概要
-auto-tradeing-support-tools は LINE で通知を受け取るように作られています。  
+auto-trading-support-tools は LINE で通知を受け取るように作られています。  
 LINE へのメッセージ送信には LINE の Messaging API という機能を利用します。 (無料。LINE ボットで使われる機能です。) その機能へアクセスするためのトークンと、送信先である自分の LINE ユーザーID が必要です。
 ここではそれらを取得する手順を記載しています。
 
