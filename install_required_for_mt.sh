@@ -95,3 +95,7 @@ rm winehq.key
 apt-add-repository "$WINE_REPOS"
 apt update
 apt install -y --install-recommends winehq-devel
+
+apt-get autoremove -y
+apt-get clean -y
+apt-get autoclean -y
