@@ -10,7 +10,7 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
     * VPSの再起動
     * MT4/5 のクラッシュ
 
-<img src="images/mt4_on_linux_vps.png" width="480px">  
+<img src="./images/mt4_on_linux_vps.png" width="480px">  
 ↑ こうなる。そしてこの状態を保っていることを監視するためのもの。
 
 ## インストール・設定されるもの
