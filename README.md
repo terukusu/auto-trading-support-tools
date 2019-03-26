@@ -11,6 +11,7 @@ Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16,
     * MT4/5 のクラッシュ
 
 <img src="images/mt4_on_linux_vps.png" width="480px">  
+
 ![image](images/mt4_on_linux_vps.png "タイトル")
 
 ↑ こうなる。そしてこの状態を保っていることを監視するためのもの。
