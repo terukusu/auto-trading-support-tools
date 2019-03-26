@@ -86,6 +86,14 @@ apt-get install -y apt-transport-https psmisc vim nano less tmux curl net-tools 
 # install gui
 apt-get install -y vnc4server fonts-vlgothic xterm wm2
 
+# add vncserver service to systemd
+if [ ! -f "/etc/systemd/system/vncserver@:1.service" ]; then
+  cat "$(cd "$(dirname "$BASH_SOURCE")"; pwd))/vncserver@:1.service" \
+    | sed -e 's/%%USER_NAME%%/'$ORG_USER'/g' \
+    > "/etc/systemd/system/vncserver@:1.service"
+  systemctl enable "vncserver@:1.service"
+fi
+
 # install wine
 apt install -y software-properties-common
 dpkg --add-architecture i386
