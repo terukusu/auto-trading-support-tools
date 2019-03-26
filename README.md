@@ -1,10 +1,20 @@
 # auto-trading-support-tools
-Ubuntu + Wine + MetaTrader4/5 の自動売買サーバーの監視をサポートするツール群です。
+Linux + Wine + MetaTrader4/5 の自動売買サーバーの構築と監視をサポートするツール群です。
 とくに複数の MT4/5 を扱う手間を軽減するためのものです。  
-Ubuntu14〜18 くらいまではおそらく大丈夫。動作確認は主に16, 18でおこなっています。
+
+
+* 対応している Linux のディストリビューション
+    * Ubuntu
+    * Debian
+
+
+* 動作確認環境は以下のディストリビューションの minimal 版
+    * Debian8
+    * Ubuntu16.04, 18.04
+
 
 ## このツール群でできること
-* まっさらな VPS に MetaTrader4/5 (以下MT4/5) を動かすのに必要なもの一式をインストール
+* まっさらな Linux VPS に MetaTrader4/5 (以下MT4/5) を動かすのに必要なもの一式をインストール
 * 起動時にMT4/5を自動起動
 * 以下のことを検知してLINEに通知
     * VPSの再起動
