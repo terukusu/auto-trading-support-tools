@@ -37,7 +37,7 @@ Linux + Wine + MetaTrader4/5 の自動売買サーバーの構築と監視をサ
 ## Google Compute Engin の無料VMインスタンスでの例
 まっさらな Linux VPS → 自動売買開始 → 監視 → LINE通知 までを一通りやってみましょうヽ(=´▽`=)ﾉ
 
-1. [VMインスタンス作成](./create_vm_gce.md)
+1. [VMインスタンス作成](../../wiki/create_vm_gce.md)
 1. [自動売買に必要なものをインストール](./doc/install_misc.md)
 1. [GUI を設定](./doc/setup_gui.md)
 1. [Wine を設定 (WindowsアプリをLinuxで動かす設定)](./doc/setup_wine.md)
