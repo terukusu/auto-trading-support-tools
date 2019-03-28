@@ -3,6 +3,7 @@
 ABS_PWD=$(cd $(dirname "${BASH_SOURCE:-$0}"); pwd)
 
 echo "LINEへの通知を行うための設定をします。"
+echo ""
 
 while [ 1 ]; do
     echo "LINE Messaging API へのアクセス用トークンを入力してください。 このような形式の文字列です => : n3DganilkwSjpi.......w1cDnyilFU="
