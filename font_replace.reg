@@ -1,0 +1,10 @@
+
+[Software\\Wine\\Fonts\\Replacements]
+"MS Gothic"="VL Gothic"
+"MS PGothic"="VL PGothic"
+"MS Sans Serif"="VL PGothic"
+"MS Shell Dlg"="VL Gothic"
+"MS UI Gothic"="VL PGothic"
+"Tahoma"="VL PGothic"
+"\xff2d\xff33 \x30b4\x30b7\x30c3\x30af"="VL Gothic"
+"\xff2d\xff33 \xff30\x30b4\x30b7\x30c3\x30af"="VL PGothic"
