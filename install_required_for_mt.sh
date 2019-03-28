@@ -78,7 +78,7 @@ swap_total=`cat /proc/meminfo | grep -i swaptotal | tr -s " " | cut -d' ' -f'2'`
 if [ ! -e /proc/user_beancounters ] && [ "$swap_total" == "0" ]; then
   echo make 1024 MB swap file. please wait for few minutes.
   sudo dd if=/dev/zero of=/swapfile bs=1M count=1024
-  chmod 600 /swapfile
+  sudo chmod 600 /swapfile
   sudo mkswap -f /swapfile
   sudo swapon /swapfile
 
@@ -111,7 +111,7 @@ sudo apt -y install tzdata
 if [ "$ID" == "debian" ]; then
   # for debian
   sudo apt -y install task-japanese locales
-  echo "ja_JP.UTF-8 UTF-8" > /etc/locale.gen
+  sudo bash -c 'echo "ja_JP.UTF-8 UTF-8" > /etc/locale.gen'
 else
   sudo apt -y install language-pack-ja
 fi
@@ -146,14 +146,14 @@ sudo apt -y install --install-recommends winehq-devel
 #####################################################
 
 if [ -n "$IS_SYSTEMD" ]; then
-    # for systemd 
+    # for systemd
     echo Registering VNC Server as systemd service.
 
     if [ ! -f "/etc/systemd/system/vncserver@:1.service" ]; then
       sudo install -o root -g root -m 644 -D "$ABS_PWD/vncserver@:1.service" "/etc/systemd/system/vncserver@:1.service"
       sudo sed -i -e 's/%%USER_NAME%%/'$ORG_USER'/g' "/etc/systemd/system/vncserver@:1.service"
     fi
-    
+
     sudo systemctl enable "vncserver@:1.service"
 else
     # for upstart
@@ -164,7 +164,7 @@ else
       sudo sed -i -e 's/%%USER_NAME%%/'$ORG_USER'/g' "/etc/init.d/vncserver"
       sudo chmod +x /etc/init.d/vncserver
     fi
-    
+
     sudo update-rc.d vncserver defaults
 fi
 
@@ -254,10 +254,10 @@ fi
 
 sudo apt-get -y autoremove
 sudo apt-get -y clean
-sudo apt-get -y autoclean
 rm "$DIR_WINECACHE/$MSI_MONO"
 rm "$DIR_WINECACHE/$MSI_GECKO"
 rm "$DIR_WINECACHE/winehq.key"
+"$ABS_PWD/minimize_wine.sh"
 
 #####################################################
 # Download MT4 and start installer
