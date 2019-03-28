@@ -2,7 +2,7 @@
 
 ABS_PWD=$(cd $(dirname "${BASH_SOURCE:-$0}"); pwd)
 
-echo "LINEへの通知を行うための設定をします。"
+echo "LINEへの通知を送るための設定をします。"
 echo ""
 
 while [ 1 ]; do
