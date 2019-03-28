@@ -6,8 +6,26 @@ fi
 
 echo deleting needless files for wine.
 
-rm -rf $HOME/.cache/wine/*
-rm -rf $WINEPREFIX/drive_c/users/$USER/Local\ Settings/Temporary\ Internet\ Files/*
-rm -rf $WINEPREFIX/drive_c/users/$USER/Application\ Data/MetaQuotes/WebInstall/*
+# find .msi and del them all!
+cat <(find "$WINEPREFIX" -maxdepth 1 -type d -name drive_* | while read drive; do
+  find "$drive" -type f -name *.msi
+done) | sort | while read line; do
+  echo $line
+  rm "$line"
+done
+
+# find WibInstall folder and del them all!
+cat <(find "$WINEPREFIX" -maxdepth 1 -type d -name drive_* | while read drive; do
+  find "$drive" -type d -name WebInstall
+done) | sort | while read line; do
+  rm -rf "$line"/*
+done
+
+# find Temporary Internet Files folder and del them all!
+cat <(find "$WINEPREFIX" -maxdepth 1 -type d -name drive_* | while read drive; do
+  find "$drive" -type d -name "Temporary Internet Files"
+done) | sort | while read line; do
+  rm -rf "$line"/*
+done
 
 echo done.
