@@ -6,6 +6,7 @@
 
 VNC_PASSWORD=123123
 
+IS_SYSTEMD=$(which systemctl)
 ABS_PWD=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
 ORG_USER=${SUDO_USER:-$USER}
 DIR_WINECACHE=$HOME/.cache/wine
@@ -144,13 +145,28 @@ sudo apt -y install --install-recommends winehq-devel
 # Setup VNC server (seup only. not start service here)
 #####################################################
 
-echo Registering VNC Server as systemd service.
-if [ ! -f "/etc/systemd/system/vncserver@:1.service" ]; then
-  sudo install -o root -g root -m 644 -D "$ABS_PWD/vncserver@:1.service" "/etc/systemd/system/vncserver@:1.service"
-  sudo sed -i -e 's/%%USER_NAME%%/'$ORG_USER'/g' "/etc/systemd/system/vncserver@:1.service"
-fi
+if [ -n "$IS_SYSTEMD" ]; then
+    # for systemd 
+    echo Registering VNC Server as systemd service.
 
-sudo systemctl enable "vncserver@:1.service"
+    if [ ! -f "/etc/systemd/system/vncserver@:1.service" ]; then
+      sudo install -o root -g root -m 644 -D "$ABS_PWD/vncserver@:1.service" "/etc/systemd/system/vncserver@:1.service"
+      sudo sed -i -e 's/%%USER_NAME%%/'$ORG_USER'/g' "/etc/systemd/system/vncserver@:1.service"
+    fi
+    
+    sudo systemctl enable "vncserver@:1.service"
+else
+    # for upstart
+    echo Registering VNC Server as upstart service.
+
+    if [ ! -f "/etc/init.d/vncserver" ]; then
+      sudo install -o root -g root -m 644 -D "$ABS_PWD/vncserver_for_upstart" "/etc/init.d/vncserver"
+      sudo sed -i -e 's/%%USER_NAME%%/'$ORG_USER'/g' "/etc/init.d/vncserver"
+      sudo chmod +x /etc/init.d/vncserver
+    fi
+    
+    sudo update-rc.d vncserver defaults
+fi
 
 # setting default password for vncserver
 echo 'Setting default VNC password "123123". Please change this yourself later :-)'
@@ -220,7 +236,12 @@ wine msiexec /i "$DIR_WINECACHE/$MSI_GECKO"
 #####################################################
 
 echo -n Starting VNC Server ...
-sudo systemctl start "vncserver@:1"
+if [ -n "$IS_SYSTEMD" ]; then
+    sudo systemctl start "vncserver@:1"
+else
+    sudo service vncserver start
+fi
+
 if [ $? == "0" ]; then
     echo stared!
 else

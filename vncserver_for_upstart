@@ -1,0 +1,33 @@
+#!/bin/sh -e
+### BEGIN INIT INFO
+# Provides:          vncserver
+# Required-Start:    networking
+# Default-Start:     S
+# Default-Stop:      0 6
+### END INIT INFO
+
+PATH="$PATH:/usr/X11R6/bin/"
+
+USER=%%USER_NAME%%
+DISPLAY=1
+
+. /lib/lsb/init-functions
+
+case "$1" in
+start)
+log_action_begin_msg "Starting vncserver for user '${USER}' on localhost:1"
+su ${USER} -c "/usr/bin/vncserver -geometry 1024x640 -depth 16 -alwaysshared -localhost -nolisten tcp :${DISPLAY}"
+;;
+
+stop)
+log_action_begin_msg "Stoping vncserver for user '${USER}' on localhost:${DISPLAY}"
+su ${USER} -c "/usr/bin/vncserver -kill :${DISPLAY}"
+;;
+
+restart)
+$0 stop
+$0 start
+;;
+esac
+
+exit 0
