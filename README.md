@@ -13,9 +13,9 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
     * Debian
 
 
-* 動作確認環境は以下のディストリビューションの minimal 版
+* 動作確認環境は以下のディストリビューション
+    * Ubuntu14.04, 16.04, 18.04
     * Debian8
-    * Ubuntu16.04, 18.04
 
 
 ## このツール群でできること
@@ -50,6 +50,12 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 1. [LINE への通知設定(LINE側)](../../wiki/create_line_channel)
 1. [LINE への通知設定(VM側)](../../wiki/setup_line)
 1. [再起動検知やMT4/5クラッシュ検知を設定](../../wiki/setup_monitoring)
+
+
+### おまけ
+1. [外側からの監視の設定](../../wiki/setup_stackdriver)
+    * サーバーそのものやネットワークのダウンを検知する
+
 
 ## 既にLinux + Wine + MetaTrader4/5 で自動売買をしている人向けの紹介
 
