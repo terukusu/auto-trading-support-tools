@@ -37,9 +37,9 @@ function trd_read_file() {
 function trd_send_to_line() {
   msg="`cat - | trd_escape_text`"
 
-  for r in $TRD_LINE_RECIPIENTS; do
+  result=$(for r in $TRD_LINE_RECIPIENTS; do
     curl 'https://api.line.me/v2/bot/message/push' \
-    -s -o /dev/null \
+    -s -o /dev/null -w '%{http_code}\n' \
     -H 'Content-Type:application/json; charset=utf-8' \
     -H 'Authorization: Bearer {'$TRD_LINE_TOKEN'}' \
     -d '{
@@ -50,8 +50,14 @@ function trd_send_to_line() {
         "text":"【'`hostname -s`'】'"$msg"'"
       }
       ]
-    }'
-  done
+    }' | grep -v 200
+  done)
+
+  if [ -z "$result" ]; then
+    return 0
+  else
+    return 1
+  fi
 }
 
 function trd_abs_path() {
@@ -72,6 +78,10 @@ function trd_abs_path() {
 #    eval $(trd_gen_mt_list)
 #
 function trd_gen_mt_list() {
+  if [ ! -d "$WINEPREFIX" ]; then
+    return 0
+  fi
+
   i=0
   # Windowsの各ドライブのプログラムフォルダ内からtemrinal.exeを検索する
   cat <(find "$WINEPREFIX" -maxdepth 1 -type d -name drive_* | sort | while read drive; do
