@@ -6,7 +6,9 @@ echo "LINEへの通知を送るための設定をします。"
 echo ""
 
 while [ 1 ]; do
-    echo "LINE Messaging API へのアクセス用トークンを入力してください。 このような形式の文字列です => : n3DganilkwSjpi.......w1cDnyilFU="
+    echo "LINE トークンを入力してください。172文字の文字列です。例：n3DganilkwSjpi...."
+    echo ""
+    echo -n "> "
     read line_token
 
     data_len=$(echo $line_token | fold -64 | openssl enc -d -base64 | wc -c)
@@ -22,7 +24,9 @@ done
 echo ""
 
 while [ 1 ]; do
-    echo "通知先であるあなたの LINE ユーザーIDを入力してください。 このような形式の文字列です => : Ucc4ba77baedb40a1603873976142c485"
+    echo "LINE ユーザーIDを入力してください。 33文字の文字列です。例: Ucc4ba77b......"
+    echo ""
+    echo -n "> "
     read line_id
 
     data_len=$(echo ${line_id:1} | fold -64 | openssl enc -d -base64 | wc -c)
@@ -39,12 +43,18 @@ echo ""
 
 if [ -f "$ABS_PWD/.line_token" -a -f "$ABS_PWD/.line_recipients" ]; then
     echo "LINE通知の設定が完了しました。テストメッセージを送信しますか？[Y/n]"
+    echo ""
+    echo -n "> "
     read answer
 
     if [ "$(echo $answer | tr N n)" != "n" ]; then
         echo "LINE へメッセージを送信中...."
         echo Hello! | "$ABS_PWD/send_to_line.sh"
-        echo "LINE へメッセージを送信しました。LINEを確認してください。"
+        if [ "$?" == "0" ]; then
+            echo "送信しました。LINEを確認してください。"
+        else
+            echo "失敗しました。設定をやり直してください。"
+        fi
     fi
 else
     echo "LINE通知の設定は失敗しました。もう一度やり直してください。"
