@@ -146,12 +146,20 @@ function trd_find_pid() {
 
   target_mt_path=$(trd_find_terminal "$target_mt_name")
 
-  if [ -n "$target_mt_path" ]; then
-    target_win_path=$(winepath -w "$target_mt_path" | sed -e 's/\\/\\\\/g')
-    target_pid=$(ps axw | grep "$target_win_path" | grep -v grep | tr -s " " | sed -e 's/^ *//g' | cut -d " " -f1)
-    if [ -n "$target_pid" ]; then
-      echo $target_pid
-    fi
+  if [ -z "$target_mt_path" ]; then
+    return 0
+  fi
+
+  target_win_path=$(winepath -w "$target_mt_path" | sed -e 's/\\/\\\\/g')
+
+  if [ -z "$target_win_path" ]; then
+    return 0
+  fi
+
+  target_pid=$(ps haxww -o pid,args | grep -v grep | grep "$target_win_path" | head -n 1 | awk '{print $1}')
+
+  if [ -n "$target_pid" ]; then
+    echo $target_pid
   fi
 }
 
