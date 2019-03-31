@@ -10,7 +10,6 @@ echo deleting needless files for wine.
 cat <(find "$WINEPREFIX" -maxdepth 1 -type d -name drive_* | while read drive; do
   find "$drive" -type f -name *.msi
 done) | sort | while read line; do
-  echo $line
   rm "$line"
 done
 
