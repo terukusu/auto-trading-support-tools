@@ -139,7 +139,7 @@ wget -q -nc -P "$DIR_WINECACHE" https://dl.winehq.org/wine-builds/winehq.key
 sudo apt-key add "$DIR_WINECACHE/winehq.key"
 sudo apt-add-repository "$WINE_REPOS"
 sudo apt -y update
-sudo apt -y install --install-recommends winehq-devel
+sudo apt -y install --install-recommends winehq-stable
 
 #####################################################
 # Setup VNC server (seup only. not start service here)
