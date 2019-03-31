@@ -60,6 +60,10 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 1. [再起動検知やMT4/5クラッシュ検知を設定](../../wiki/setup_monitoring)
 
 
+を、一通り行っている作業動画がこちら↓  
+[<img src="./images/install_thumb.png" width="280px">](http://www.youtube.com/watch?v=hZAae5cX4QU)
+
+
 ### おまけ
 1. [外側からの監視の設定](../../wiki/setup_stackdriver)
     * サーバーそのものやネットワークのダウンを検知する
