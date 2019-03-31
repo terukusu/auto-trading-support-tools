@@ -61,7 +61,7 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 
 
 を、一通り行っている作業動画がこちら↓  
-[<img src="./images/install_thumb.png" width="280px">](http://www.youtube.com/watch?v=h3-sCCXt8hY)
+[<img src="../../wiki/images/install_thumb.png" width="280px">](http://www.youtube.com/watch?v=h3-sCCXt8hY)
 
 
 ### おまけ
