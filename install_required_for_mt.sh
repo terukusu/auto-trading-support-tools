@@ -11,14 +11,14 @@ IS_SYSTEMD=$(which systemctl)
 ABS_PWD=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
 ORG_USER=${SUDO_USER:-$USER}
 DIR_WINECACHE=$HOME/.cache/wine
+APT_OPT='-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'
 
+export DEBIAN_FRONTEND=noninteractive
 export WINEARCH=win32
 export WINEDEBUG=-all,err+all
 export WINEPREFIX=$HOME/.wine
 export DISPLAY=:1
 
-export DEBIAN_FRONTEND=noninteractive
-export APT_OPT='-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'
 
 . /etc/os-release
 
@@ -226,31 +226,38 @@ EOS
 #####################################################
 function setup_vncserver {
   if [ -n "$IS_SYSTEMD" ]; then
-      # for systemd
-      echo Registering VNC Server as systemd service.
+    # for systemd
+    echo Registering VNC Server as systemd service.
 
-      if [ ! -f "/etc/systemd/system/vncserver@:1.service" ]; then
-        sudo install -o root -g root -m 644 -D "$ABS_PWD/vncserver@:1.service" "/etc/systemd/system/vncserver@:1.service"
-        sudo sed -i -e 's/%%USER_NAME%%/'$ORG_USER'/g' "/etc/systemd/system/vncserver@:1.service"
-      fi
+    if [ ! -f "/etc/systemd/system/vncserver@:1.service" ]; then
+      sudo install -o root -g root -m 644 -D "$ABS_PWD/vncserver@:1.service" "/etc/systemd/system/vncserver@:1.service"
+      sudo sed -i -e 's/%%USER_NAME%%/'$ORG_USER'/g' "/etc/systemd/system/vncserver@:1.service"
+    fi
 
-      sudo systemctl enable "vncserver@:1.service"
+    sudo systemctl enable "vncserver@:1.service"
   else
-      # for upstart
-      echo Registering VNC Server as upstart service.
+    # for upstart
+    echo Registering VNC Server as upstart service.
 
-      if [ ! -f "/etc/init.d/vncserver" ]; then
-        sudo install -o root -g root -m 644 -D "$ABS_PWD/vncserver_for_upstart" "/etc/init.d/vncserver"
-        sudo sed -i -e 's/%%USER_NAME%%/'$ORG_USER'/g' "/etc/init.d/vncserver"
-        sudo chmod +x /etc/init.d/vncserver
-      fi
+    if [ ! -f "/etc/init.d/vncserver" ]; then
+      sudo install -o root -g root -m 644 -D "$ABS_PWD/vncserver_for_upstart" "/etc/init.d/vncserver"
+      sudo sed -i -e 's/%%USER_NAME%%/'$ORG_USER'/g' "/etc/init.d/vncserver"
+      sudo chmod +x /etc/init.d/vncserver
+    fi
 
-      sudo update-rc.d vncserver defaults
+    sudo update-rc.d vncserver defaults
   fi
 
   # setting default password for vncserver
-  echo 'Setting default VNC password "123123". Please change this yourself later :-)'
-  echo -e "$VNC_PASSWORD\n$VNC_PASSWORD" | vncpasswd &>/dev/null
+  if [ ! -e "$HOME/.vnc/passwd" ]; then
+    echo 'Setting default VNC password "123123". Please change this yourself later :-)'
+    echo -e "$VNC_PASSWORD\n$VNC_PASSWORD" | vncpasswd &>/dev/null
+  fi
+
+  if [ ! -e "$HOME/.vnc/xstartup" ]; then
+    # install xstartup
+    install -m 755 -D "$ABS_PWD/xstartup" "$HOME/.vnc/xstartup"
+  fi
 }
 
 #####################################################
@@ -259,15 +266,17 @@ function setup_vncserver {
 function start_vncserver_service() {
   echo -n Starting VNC Server ...
   if [ -n "$IS_SYSTEMD" ]; then
-      sudo systemctl start "vncserver@:1"
+    sudo systemctl stop "vncserver@:1"
+    sudo systemctl start "vncserver@:1"
   else
-      sudo service vncserver start
+    sudo service vncserver stop
+    sudo service vncserver start
   fi
 
   if [ $? == "0" ]; then
-      echo stared!
+    echo stared!
   else
-      echo failed!
+    echo failed!
   fi
 }
 
@@ -281,7 +290,7 @@ function setup_wine {
   msi_arch=x86
 
   if [ "win64" == "$WINEARCH" ]; then
-      msi_arch=x86_64
+    msi_arch=x86_64
   fi
 
   msi_mono=wine-mono-$latest_mono.msi
@@ -291,18 +300,18 @@ function setup_wine {
   wget -q -N -P "$DIR_WINECACHE" "http://dl.winehq.org/wine/wine-mono/$latest_mono/$msi_mono"
 
   if [ $? == 0 ]; then
-      echo done.
+    echo done.
   else
-      echo failed.
+    echo failed.
   fi
 
   echo -n Downlaoding gecko: $latest_gecko ...
   wget -q -N -P "$DIR_WINECACHE" "http://dl.winehq.org/wine/wine-gecko/$latest_gecko/$msi_gecko"
 
   if [ $? == 0 ]; then
-      echo done.
+    echo done.
   else
-      echo failed.
+    echo failed.
   fi
 
   #####################################################
@@ -335,7 +344,7 @@ function setup_wine {
   # setting japanese fonts
   font_replace_exist=$(cat "$WINEPREFIX/user.reg" | tr -d '\r' | grep -o '\[Software\\\\Wine\\\\Fonts\\\\Replacements\]')
   if [ -z "$font_replace_exist" ]; then
-      cat "$ABS_PWD/font_replace.reg" >> "$WINEPREFIX/user.reg"
+    cat "$ABS_PWD/font_replace.reg" >> "$WINEPREFIX/user.reg"
   fi
 
   # install wine-mono and wine-gecko
@@ -367,7 +376,7 @@ function clean_needless_files {
 function download_and_start_mt4_installer() {
   echo Downloading MetaTrader4 ...
   if [ -f "$DIR_WINECACHE/landfx4setup.exe" ]; then
-      rm "$DIR_WINECACHE/landfx4setup.exe"
+    rm "$DIR_WINECACHE/landfx4setup.exe"
   fi
 
   wget -q -N -P "$DIR_WINECACHE" 'https://download.mql5.com/cdn/web/land.prime.ltd/mt4/landfx4setup.exe'
