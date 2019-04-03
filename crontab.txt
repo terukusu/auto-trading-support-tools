@@ -5,3 +5,4 @@ MAILTO=""
 
 * * * * * $HOME/auto-trading-support-tools/check_reboot.sh
 */10 * * * * $HOME/auto-trading-support-tools/check_process.sh land-fx
+0 9 * * * $HOME/auto-trading-support-tools/check_daily.sh
