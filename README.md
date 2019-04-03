@@ -75,10 +75,11 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 まずは crontab.
 ```
 # start MetaTrader automatically at boot
-@reboot $HOME/auto-trading-support-tools/mtctl.sh start  land-fx
+@reboot $HOME/auto-trading-support-tools/mtctl.sh start land-fx
 
-* * * * * $HOME/auto-trading-support-tools/check_reboot.sh
+0 9 * * * $HOME/auto-trading-support-tools/check_daily.sh
 */10 * * * * $HOME/auto-trading-support-tools/check_process.sh land-fx
+* * * * * $HOME/auto-trading-support-tools/check_reboot.sh
 ```
 
 こんな感じで設定しておけば、再起動時とMT4/5プロセスが落ちたときにLINEへ通知を飛ばしてくれます。  
