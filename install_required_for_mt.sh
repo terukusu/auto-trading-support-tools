@@ -36,7 +36,7 @@ mkdir -p "$DIR_WINECACHE"
 ########################################
 # Setup root crontab
 ########################################
-fnction setup_root_crontab() {
+function setup_root_crontab() {
   # For old OpenVZ kernel. SSHD doesn't start after updating systemd without this.
 
   cron_line=$(sudo bash -c "crontab -l 2>/dev/null" | grep -o "mkdir -p -m0755 /var/run/sshd")
