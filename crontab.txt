@@ -3,6 +3,6 @@ MAILTO=""
 # start MetaTrader automatically at boot
 @reboot $HOME/auto-trading-support-tools/mtctl.sh start land-fx
 
-* * * * * $HOME/auto-trading-support-tools/check_reboot.sh
-*/10 * * * * $HOME/auto-trading-support-tools/check_process.sh land-fx
 0 9 * * * $HOME/auto-trading-support-tools/check_daily.sh
+*/10 * * * * $HOME/auto-trading-support-tools/check_process.sh land-fx
+* * * * * $HOME/auto-trading-support-tools/check_reboot.sh
