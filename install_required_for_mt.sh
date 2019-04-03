@@ -18,7 +18,7 @@ export WINEPREFIX=$HOME/.wine
 export DISPLAY=:1
 
 export DEBIAN_FRONTEND=noninteractive
-export APT_OPT='-y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"'
+export APT_OPT='-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'
 
 . /etc/os-release
 
