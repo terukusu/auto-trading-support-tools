@@ -18,6 +18,7 @@ export WINEPREFIX=$HOME/.wine
 export DISPLAY=:1
 
 export DEBIAN_FRONTEND=noninteractive
+export APT_OPT='-y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"'
 
 . /etc/os-release
 
@@ -103,25 +104,25 @@ function create_swap_space_if_needed() {
 function upgrade_existing_packages {
   # upgrade packages.
   sudo apt update
-  sudo apt -y -f install
-  sudo apt -y upgrade
+  sudo -E apt $APT_OPT -f install
+  sudo -E apt $APT_OPT upgrade
 }
 
 ########################################
 # Install and setup Japanese locale, Timezone
 ########################################
 function set_up_locale_and_timezone() {
-  sudo apt -y install dbus
+  sudo -E apt $APT_OPT install dbus
 
   # setting local and timezone.
-  sudo apt -y install tzdata
+  sudo -E apt $APT_OPT install tzdata
 
   if [ "$ID" == "debian" ]; then
     # for debian
-    sudo apt -y install task-japanese locales
+    sudo -E apt $APT_OPT install task-japanese locales
     sudo bash -c 'echo "'$TARGET_LOCALE' UTF-8" > /etc/locale.gen'
   else
-    sudo apt -y install language-pack-ja
+    sudo -E apt $APT_OPT install language-pack-ja
   fi
 
   sudo locale-gen
@@ -134,19 +135,19 @@ function set_up_locale_and_timezone() {
 #####################################################
 function install_packages_misc_and_needed_by_mt4() {
   # install misc
-  sudo apt -y install unattended-upgrades apt-transport-https psmisc vim nano less tmux curl net-tools lsof
+  sudo -E apt $APT_OPT install unattended-upgrades apt-transport-https psmisc vim nano less tmux curl net-tools lsof
 
   # install gui
-  sudo apt -y install vnc4server fonts-vlgothic xterm wm2
+  sudo -E apt $APT_OPT install vnc4server fonts-vlgothic xterm wm2
 
   # install wine
-  sudo apt -y install software-properties-common
+  sudo -E apt $APT_OPT install software-properties-common
   sudo dpkg --add-architecture i386
   wget -q -nc -P "$DIR_WINECACHE" https://dl.winehq.org/wine-builds/winehq.key
   sudo apt-key add "$DIR_WINECACHE/winehq.key"
   sudo apt-add-repository "$WINE_REPOS"
-  sudo apt -y update
-  sudo apt -y install --install-recommends winehq-stable
+  sudo -E apt $APT_OPT update
+  sudo -E apt $APT_OPT install --install-recommends winehq-stable
 }
 
 #####################################################
