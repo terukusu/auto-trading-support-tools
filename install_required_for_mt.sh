@@ -163,20 +163,52 @@ function setup_auto_update_package_list() {
     cat - << EOS | sudo bash -c "cat - > '$upgrades_conf'"
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "0";
+APT::Periodic::AutocleanInterval "1";
 EOS
   else
-    sudo sed -i -e 's/APT::Periodic::Update-Package-Lists "[0-9][0-9]*"/APT::Periodic::Update-Package-Lists "1"/g'  "$upgrades_conf"
-    sudo sed -i -e 's/APT::Periodic::Unattended-Upgrade "[0-9][0-9]*"/APT::Periodic::Unattended-Upgrade "0"/g'  "$upgrades_conf"
+    # Update-Package-List
+    if [ -z "$(grep -io 'APT::Periodic::Update-Package-Lists' "$upgrades_conf")" ]; then
+      echo 'APT::Periodic::Update-Package-Lists "1";' | sudo bash -c 'cat - >> "'$upgrades_conf'"'
+    else
+      sudo sed -i -e 's/APT::Periodic::Update-Package-Lists "[0-9][0-9]*"/APT::Periodic::Update-Package-Lists "1"/g'  "$upgrades_conf"
+    fi
+
+    # Unattended-Upgrade
+    if [ -z "$(grep -io 'APT::Periodic::Unattended-Upgrade' "$upgrades_conf")" ]; then
+      echo 'APT::Periodic::Unattended-Upgrade "0";' | sudo bash -c 'cat - >> "'$upgrades_conf'"'
+    else
+      sudo sed -i -e 's/APT::Periodic::Unattended-Upgrade "[0-9][0-9]*"/APT::Periodic::Unattended-Upgrade "0"/g'  "$upgrades_conf"
+    fi
+    # AutocleanInterval
+    if [ -z "$(grep -io 'APT::Periodic::AutocleanInterval' "$upgrades_conf")" ]; then
+      echo 'APT::Periodic::AutocleanInterval "1";' | sudo bash -c 'cat - >> "'$upgrades_conf'"'
+    else
+      sudo sed -i -e 's/APT::Periodic::AutocleanInterval "[0-9][0-9]*"/APT::Periodic::AutocleanInterval "1"/g'  "$upgrades_conf"
+    fi
   fi
 
-  is_enabled=$(systemctl list-unit-files | grep apt-daily.timer | awk '{print $2}')
+  is_apt_daily_timer_exists=$(systemctl list-unit-files | grep apt-daily.timer)
 
-  if [ -n "$is_enabled" ]; then
+  if [ -n "$is_apt_daily_timer_exists" ]; then
     # for systemd
+
+    # daily update
+    is_enabled=$(systemctl list-unit-files | grep apt-daily.timer | awk '{print $2}')
+
     if [ "$is_enabled" == "disabled" ]; then
       sudo systemctl enable apt-daily.timer
-      sudo systemctl start apt-daily.timer
     fi
+
+    sudo systemctl start apt-daily.timer
+
+    # daily upgrade
+    is_enabled=$(systemctl list-unit-files | grep apt-daily-upgrade.timer | awk '{print $2}')
+
+    if [ "$is_enabled" == "disabled" ]; then
+      sudo systemctl enable apt-daily-upgrade.timer
+    fi
+
+    sudo systemctl start apt-daily-upgrade.timer
   elif [ -f /etc/cron.daily/apt-compat.disabled ]; then
     # for systemd + cron
     if [ ! -f /etc/cron.daily/apt-compat ]; then
