@@ -147,8 +147,6 @@ function install_packages_misc_and_needed_by_mt4() {
   sudo apt-add-repository "$WINE_REPOS"
   sudo apt -y update
   sudo apt -y install --install-recommends winehq-stable
-
-  sudo apt -y install unattended-upgrades
 }
 
 #####################################################
