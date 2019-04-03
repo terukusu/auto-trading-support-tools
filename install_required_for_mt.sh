@@ -305,20 +305,35 @@ function setup_wine {
   fi
 
   #####################################################
-  # Setup Wine
+  # Setup Wine (it must be exec without GUI.)
   #####################################################
 
+  DISPLAY_OLD=$DISPLAY
+  WINEDEBUG_OLD=$WINEDEBUG
+
   export WINEDEBUG=-all
+  export DISPLAY=""
 
   # initialize wineprefix
+  if [ -d "$WINEPREFIX" ]; then
+    echo "WINEPREFIX directory already exists. Delete and reinitialize it?(Y/n)"
+    echo -n "> "
+    read line
+    if [ "n" != "${line,,}" ]; then
+      echo -n "Deleteing WINEPREFIX ... "
+      rm -rf "$WINEPREFIX"
+      echo "Done"
+    fi
+  fi
+
   echo Initializing wine.. this takes few minutes.
   wineserver -kw
   wineboot -i
   wineserver -w
 
   # setting japanese fonts
-  fot_replace_exist=$(cat $WINEPREFIX/user.reg | tr -d '\r' | grep -o '\[Software\\\\Wine\\\\Fonts\\\\Replacements\]')
-  if [ -z "$fot_replace_exist" ]; then
+  font_replace_exist=$(cat "$WINEPREFIX/user.reg" | tr -d '\r' | grep -o '\[Software\\\\Wine\\\\Fonts\\\\Replacements\]')
+  if [ -z "$font_replace_exist" ]; then
       cat "$ABS_PWD/font_replace.reg" >> "$WINEPREFIX/user.reg"
   fi
 
@@ -328,6 +343,9 @@ function setup_wine {
 
   echo Installing Wine-Gecko
   wine msiexec /i "$DIR_WINECACHE/$msi_gecko"
+
+  export WINEDEBUG=$WINEDEBUG_OLD
+  export DISPLAY=$DISPLAY_OLD
 }
 
 #####################################################
