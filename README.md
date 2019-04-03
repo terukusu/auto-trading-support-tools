@@ -32,8 +32,9 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 * 以下のことを検知してLINEに通知
     * VPSの再起動
     * MT4/5 のクラッシュ
+    * ソフトウェア更新が利用可能(自動更新はしない)
 
-<img src="https://raw.githubusercontent.com/wiki/terukusu/auto-trading-support-tools/images/mt4_on_linux_vps.png" width="480px">  
+<img src="../../wiki/images/mt4_on_linux_vps.png" width="480px">  
 
 ↑ こうなる。そしてこの状態を保っていることを監視するためのもの。
 
