@@ -34,8 +34,8 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 * まっさらな Linux VPS に MetaTrader4/5 (以下MT4/5) を動かすのに必要なもの一式をインストール
 * 起動時にMT4/5を自動起動
 * 以下のことを検知してLINEに通知
-    * VPSの再起動検知
-    * MT4/5 のクラッシュ検知
+    * VPSの再起動
+    * MT4/5 のクラッシュ
     * ソフトウェア更新有無(自動更新はしない)
 
 <img src="../../wiki/images/mt4_on_linux_vps.png" width="480px">  
