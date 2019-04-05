@@ -54,7 +54,7 @@ function trd_send_to_line() {
   result=$(curl "https://notify-api.line.me/api/notify" \
     -s -o /dev/null -w "%{http_code}\n" \
     -H "Authorization: Bearer $TRD_LINE_TOKEN" \
-    -F "message=$(echo -e "\n")【$(hostname -s)】$msg" $image_form)
+    -F "message=【$(hostname -s)】$msg" $image_form)
 
   if [ -n "$result" -a "$result" == "200" ]; then
     return 0
