@@ -10,7 +10,7 @@ TARGET_LOCALE=ja_JP.UTF-8
 ORG_USER=${SUDO_USER:-$USER}
 IS_SYSTEMD=$(which systemctl)
 ABS_PWD=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
-DIR_TEMPLATES="$ABS_PWD/templtes"
+DIR_TEMPLATES="$ABS_PWD/templates"
 DIR_WINECACHE=$HOME/.cache/wine
 APT_OPT='-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'
 
