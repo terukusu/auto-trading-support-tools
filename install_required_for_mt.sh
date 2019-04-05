@@ -7,9 +7,10 @@
 VNC_PASSWORD=123123
 TARGET_LOCALE=ja_JP.UTF-8
 
+ORG_USER=${SUDO_USER:-$USER}
 IS_SYSTEMD=$(which systemctl)
 ABS_PWD=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
-ORG_USER=${SUDO_USER:-$USER}
+DIR_TEMPLATES="$ABS_PWD/templtes"
 DIR_WINECACHE=$HOME/.cache/wine
 APT_OPT='-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'
 
@@ -120,10 +121,12 @@ function set_up_locale_and_timezone() {
   if [ "$ID" == "debian" ]; then
     # for debian
     sudo -E apt $APT_OPT install task-japanese locales
-    sudo bash -c 'echo "'$TARGET_LOCALE' UTF-8" > /etc/locale.gen'
   else
     sudo -E apt $APT_OPT install language-pack-ja
   fi
+
+  # 1 locale only
+  sudo bash -c 'echo "'$TARGET_LOCALE' UTF-8" > /etc/locale.gen'
 
   sudo locale-gen
   sudo update-locale LANG=$TARGET_LOCALE
@@ -230,7 +233,7 @@ function setup_vncserver {
     echo Registering VNC Server as systemd service.
 
     if [ ! -f "/etc/systemd/system/vncserver@:1.service" ]; then
-      sudo install -o root -g root -m 644 -D "$ABS_PWD/vncserver@:1.service" "/etc/systemd/system/vncserver@:1.service"
+      sudo install -o root -g root -m 644 -D "$DIR_TEMPLATES/vncserver@:1.service" "/etc/systemd/system/vncserver@:1.service"
       sudo sed -i -e 's/%%USER_NAME%%/'$ORG_USER'/g' "/etc/systemd/system/vncserver@:1.service"
     fi
 
@@ -240,7 +243,7 @@ function setup_vncserver {
     echo Registering VNC Server as upstart service.
 
     if [ ! -f "/etc/init.d/vncserver" ]; then
-      sudo install -o root -g root -m 644 -D "$ABS_PWD/vncserver_for_upstart" "/etc/init.d/vncserver"
+      sudo install -o root -g root -m 644 -D "$DIR_TEMPLATES/vncserver" "/etc/init.d/vncserver"
       sudo sed -i -e 's/%%USER_NAME%%/'$ORG_USER'/g' "/etc/init.d/vncserver"
       sudo chmod +x /etc/init.d/vncserver
     fi
@@ -256,7 +259,7 @@ function setup_vncserver {
 
   if [ ! -e "$HOME/.vnc/xstartup" ]; then
     # install xstartup
-    install -m 755 -D "$ABS_PWD/xstartup" "$HOME/.vnc/xstartup"
+    install -m 755 -D "$DIR_TEMPLATES/xstartup" "$HOME/.vnc/xstartup"
   fi
 }
 
@@ -344,7 +347,7 @@ function setup_wine {
   # setting japanese fonts
   font_replace_exist=$(cat "$WINEPREFIX/user.reg" | tr -d '\r' | grep -o '\[Software\\\\Wine\\\\Fonts\\\\Replacements\]')
   if [ -z "$font_replace_exist" ]; then
-    cat "$ABS_PWD/font_replace.reg" >> "$WINEPREFIX/user.reg"
+    cat "$DIR_TEMPLATES/font_replace.reg" >> "$WINEPREFIX/user.reg"
   fi
 
   # install wine-mono and wine-gecko
