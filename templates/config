@@ -1,8 +1,8 @@
 TRD_DIR="%%TRD_DIR%%"
+TRD_DATA_DIR="$TRD_DIR/data"
 TRD_CONFIG_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
 TRD_LINE_TOKEN=$(f="$TRD_CONFIG_DIR/.line_token"; if [ -e "$f" ]; then cat "$f"; fi)
 TRD_LINE_RECIPIENTS=$(f="$TRD_CONFIG_DIR/.line_recipients"; if [ -e "$f" ]; then cat "$f"; fi)
-TRD_DATA_DIR="$TRD_DIR/data"
 
 if [ -z "$WINEARCH" ]; then
     WINEARCH=win32

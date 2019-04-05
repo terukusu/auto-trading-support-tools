@@ -333,11 +333,11 @@ function setup_wine {
 
   # initialize wineprefix
   if [ -d "$WINEPREFIX" ]; then
-    echo "WINEPREFIX directory already exists. Delete and reinitialize it?(Y/n)"
+    echo "WINEPREFIX($WINEPREFIX) directory already exists. Delete and reinitialize it?(Y/n)"
     echo -n "> "
     read line
     if [ "n" != "${line,,}" ]; then
-      echo -n "Deleteing WINEPREFIX ... "
+      echo -n "Deleteing WINEPREFIX($WINEPREFIX) ... "
       rm -rf "$WINEPREFIX"
       echo "Done"
     fi

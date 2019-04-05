@@ -47,9 +47,9 @@ if [ -f "$TRD_CONFIG_DIR/.line_token" -a -f "$TRD_CONFIG_DIR/.line_recipients" ]
     echo -n "> "
     read answer
 
-    if [ "$(echo $answer | tr N n)" != "n" ]; then
+    if [ "${answer,,}" != "n" ]; then
         echo "LINE へメッセージを送信中...."
-        echo Hello! | "$ABS_PWD/send_to_line.sh"
+        echo Hello! | "$TRD_ABS_PWD/send_to_line.sh"
         if [ "$?" == "0" ]; then
             echo "送信しました。LINEを確認してください。"
         else
