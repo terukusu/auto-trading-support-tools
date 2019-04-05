@@ -54,35 +54,9 @@ function trd_send_to_line() {
   result=$(curl "https://notify-api.line.me/api/notify" \
     -s -o /dev/null -w "%{http_code}\n" \
     -H "Authorization: Bearer $TRD_LINE_TOKEN" \
-    -F "message=$msg" $image_form)
+    -F "message=$(echo)【$(hostname -s)】$msg" $image_form)
 
   if [ -n "$result" -a "$result" == "200" ]; then
-    return 0
-  else
-    return 1
-  fi
-}
-
-function trd_send_to_line_old() {
-  msg="`cat - | trd_escape_text`"
-
-  result=$(for r in $TRD_LINE_RECIPIENTS; do
-    curl 'https://api.line.me/v2/bot/message/push' \
-    -s -o /dev/null -w '%{http_code}\n' \
-    -H 'Content-Type:application/json; charset=utf-8' \
-    -H 'Authorization: Bearer {'$TRD_LINE_TOKEN'}' \
-    -d '{
-      "to": "'"$r"'",
-      "messages":[
-      {
-        "type":"text",
-        "text":"【'`hostname -s`'】'"$msg"'"
-      }
-      ]
-    }' | grep -v 200
-  done)
-
-  if [ -z "$result" ]; then
     return 0
   else
     return 1
