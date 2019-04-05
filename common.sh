@@ -44,6 +44,26 @@ function trd_read_file() {
 }
 
 function trd_send_to_line() {
+  msg=$(cat -)
+  image_file="$1"
+
+  if [ -n "$image_file" ]; then
+    image_form='-F imageFile=@'$image_file''
+  fi
+
+  result=$(curl "https://notify-api.line.me/api/notify" \
+    -s  -w "%{http_code}\n" \
+    -H "Authorization: Bearer $TRD_LINE_TOKEN" \
+    -F "message=$msg" $image_form)
+
+  if [ -n "$result" -a "$result" == "200" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+function trd_send_to_line_old() {
   msg="`cat - | trd_escape_text`"
 
   result=$(for r in $TRD_LINE_RECIPIENTS; do
