@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. "$(cd "$(dirname $0)" && pwd)/common.sh"
+. "$(cd "$(dirname "$BASH_SOURCE")"; pwd)/common.sh"
 
 num_mt=${#mt_home[@]}
 

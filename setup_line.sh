@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ABS_PWD=$(cd $(dirname "${BASH_SOURCE:-$0}"); pwd)
+. "$(cd "$(dirname "$BASH_SOURCE")"; pwd)/common.sh"
 
 echo "LINEへの通知を送るための設定をします。"
 echo ""
@@ -14,7 +14,7 @@ while [ 1 ]; do
     data_len=$(echo $line_token | fold -64 | openssl enc -d -base64 | wc -c)
 
     if [ "$data_len" == "128" ]; then
-        echo $line_token > "$ABS_PWD/.line_token"
+        echo $line_token > "$TRD_CONFIG_DIR/.line_token"
         break
     fi
 
@@ -32,7 +32,7 @@ while [ 1 ]; do
     data_len=$(echo ${line_id:1} | fold -64 | openssl enc -d -base64 | wc -c)
 
     if [ "$data_len" == "24" ]; then
-        echo $line_id > "$ABS_PWD/.line_recipients"
+        echo $line_id > "$TRD_CONFIG_DIR/.line_recipients"
         break
     fi
 
@@ -41,7 +41,7 @@ done
 
 echo ""
 
-if [ -f "$ABS_PWD/.line_token" -a -f "$ABS_PWD/.line_recipients" ]; then
+if [ -f "$TRD_CONFIG_DIR/.line_token" -a -f "$TRD_CONFIG_DIR/.line_recipients" ]; then
     echo "LINE通知の設定が完了しました。テストメッセージを送信しますか？[Y/n]"
     echo ""
     echo -n "> "

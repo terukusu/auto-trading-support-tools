@@ -1,6 +1,15 @@
 #!/bin/bash
 
-TRD_CONFIG_FILE="$(cd "$(dirname "$BASH_SOURCE")"; pwd)/config"
+TRD_ABS_PWD=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
+TRD_TEMPLATES_DIR="$TRD_ABS_PWD/templates"
+TRD_CONFIG_DIR="$HOME/.atst"
+
+if [ ! -e "$TRD_CONFIG_DIR/config" ]; then
+  install -m 644 -D "$TRD_TEMPLATES_DIR/config" "$TRD_CONFIG_DIR/config"
+  sed -i -e "s/%%TRD_DIR%%/$(echo $TRD_ABS_PWD | sed -e 's/\//\\\//g')/g" "$TRD_CONFIG_DIR/config"
+fi
+
+TRD_CONFIG_FILE="$TRD_CONFIG_DIR/config"
 . $TRD_CONFIG_FILE
 
 if [ ! -e $TRD_DATA_DIR ];then
