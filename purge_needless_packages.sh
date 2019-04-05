@@ -8,5 +8,9 @@ if [ "${YN_LOADSETTING}" != "y" ]; then
 fi
 
 for p in apache2 bind9 postfix rpcbind samba php mysql postgresql; do
-  sudo apt purge -y $(dpkg -l | grep $p | tr -s ' ' | cut -d' ' -f2)
+  pkgs=$(dpkg -l | grep $p | tr -s ' ' | cut -d' ' -f2)
+  if [ -n "$pkgs" ]; then
+    echo purging $pkgs
+    sudo apt purge -y $pkgs
+  fi
 done
