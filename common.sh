@@ -52,7 +52,7 @@ function trd_send_to_line() {
   fi
 
   result=$(curl "https://notify-api.line.me/api/notify" \
-    -s  -w "%{http_code}\n" \
+    -s -o /dev/null -w "%{http_code}\n" \
     -H "Authorization: Bearer $TRD_LINE_TOKEN" \
     -F "message=$msg" $image_form)
 
