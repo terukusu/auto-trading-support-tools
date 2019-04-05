@@ -48,7 +48,7 @@ function trd_send_to_line() {
   image_file="$1"
 
   if [ -n "$image_file" ]; then
-    image_form='-F imageFile=@'$image_file''
+    image_form="-F imageFile=@$image_file"
   fi
 
   result=$(curl "https://notify-api.line.me/api/notify" \
