@@ -189,7 +189,9 @@ EOS
     fi
   fi
 
-  is_apt_daily_timer_exists=$(systemctl list-unit-files | grep apt-daily.timer)
+  if [ -n "$IS_SYSTEMD" ]; then
+    is_apt_daily_timer_exists=$(systemctl list-unit-files | grep apt-daily.timer)
+  fi
 
   if [ -n "$is_apt_daily_timer_exists" ]; then
     # for systemd
