@@ -7,9 +7,9 @@
 VNC_PASSWORD=123123
 TARGET_LOCALE=ja_JP.UTF-8
 
+ABS_PWD=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
 ORG_USER=${SUDO_USER:-$USER}
 IS_SYSTEMD=$(which systemctl)
-ABS_PWD=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
 DIR_TEMPLATES="$ABS_PWD/templates"
 DIR_WINECACHE=$HOME/.cache/wine
 APT_OPT='-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'
@@ -20,7 +20,9 @@ export WINEDEBUG=-all,err+all
 export WINEPREFIX=$HOME/.wine
 export DISPLAY=:1
 
-
+########################################
+# Detect distribution.
+########################################
 . /etc/os-release
 
 if [ -z "$VERSION_CODENAME" ]; then
