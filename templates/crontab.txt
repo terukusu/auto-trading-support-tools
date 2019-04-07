@@ -1,8 +1,11 @@
 MAILTO=""
+ATST_HOME="%%ATST_HOME%%"
+TARGET_MT=("land-fx")
 
 # start MetaTrader automatically at boot
-@reboot $HOME/auto-trading-support-tools/mtctl.sh start land-fx
+@reboot "$ATST_HOME/mtctl.sh" start "${TARGET_MT[@]}"
 
-0 9 * * * $HOME/auto-trading-support-tools/check_daily.sh
-*/10 * * * * $HOME/auto-trading-support-tools/check_process.sh land-fx
-* * * * * $HOME/auto-trading-support-tools/check_reboot.sh
+0 9 * * * "$ATST_HOME/check_daily.sh"
+*/10 * * * * "$ATST_HOME/check_process.sh" "${TARGET_MT[@]}"
+* * * * * "$ATST_HOME/check_order.sh" "${TARGET_MT[@]}"
+* * * * * "$ATST_HOME/check_reboot.sh"
