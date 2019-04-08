@@ -1,7 +1,14 @@
-TRD_DIR="%%TRD_DIR%%"
-TRD_DATA_DIR="$TRD_DIR/data"
-TRD_CONFIG_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
-TRD_LINE_TOKEN=$(f="$TRD_CONFIG_DIR/.line_token"; if [ -e "$f" ]; then cat "$f"; fi)
+# この日数以上前のモニタリングデータは破棄します
+ATST_MONITORING_TRUNCATE_BEFORE=3
+
+# この秒数モニタリングデータの更新が無ければ通知します
+ATST_MONITORING_THRESHOLD=180
+
+# これ以上のスプレッドになったら通知します
+ATST_MONITORING_SPREAD=150
+
+ATST_CONFIG_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
+ATST_LINE_TOKEN=$(f="$ATST_CONFIG_DIR/.line_token"; if [ -e "$f" ]; then cat "$f"; fi)
 
 if [ -z "$WINEARCH" ]; then
     WINEARCH=win32

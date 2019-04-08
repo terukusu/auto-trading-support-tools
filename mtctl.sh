@@ -35,7 +35,7 @@ function start_mt() {
   i=0;
   while [ "$i" -lt "$target_num" ]; do
     target_name=${target_names[$i]}
-    target_path=$(trd_find_terminal "$target_name")
+    target_path=$(atst_find_terminal "$target_name")
 
     if [ -z "$target_path" ]; then
       pm "起動対象のMetaTraderのインストール場所が見つかりませ。起動をスキップします。: $target_name" 1>&2
@@ -46,7 +46,7 @@ function start_mt() {
     pm executing: "$target_path"
 
     work_dir=$(winepath -w "$(dirname "$target_path")")
-    wine_log=$TRD_DATA_DIR/wine_$(echo $target_name | trd_to_lower).log
+    wine_log=$ATST_CONFIG_DIR/wine_$(echo $target_name | atst_to_lower).log
 
     if [ -z "$WINE" ]; then
       WINE="$(which wine)"
@@ -68,7 +68,7 @@ function stop_mt() {
   while [ "$i" -lt "$target_num" ]; do
     target_name=${target_names[$i]}
 
-    target_pid=$(trd_find_pid "$target_name")
+    target_pid=$(atst_find_pid "$target_name")
 
     if [ -z "$target_pid" ]; then
       pm "指定されたMetaTraderは起動していません。: $target_name" 1>&2
@@ -92,7 +92,7 @@ function list_mt() {
   while [ "$i" -lt ${#mt_home[@]} ]; do
 
     if [ "$FLAG_STATUS" -eq 1 ]; then
-      mt_pid=$(trd_find_pid "${mt_name[$i]}")
+      mt_pid=$(atst_find_pid "${mt_name[$i]}")
       mt_status=" (stopped)"
       if [ -n "$mt_pid" ]; then
         mt_status=" (running)"
@@ -112,7 +112,7 @@ function status_mt() {
   while [ "$i" -lt "$target_num" ]; do
     target_name=${target_names[$i]}
 
-    target_pid=$(trd_find_pid "$target_name")
+    target_pid=$(atst_find_pid "$target_name")
 
     if [ -n "$target_pid" ]; then
       echo "status=running, pid=$target_pid, name=$target_name"
@@ -142,7 +142,7 @@ shift $((OPTIND - 1))
 
 is_arg_valid=true
 
-ope=$(echo "$1" | trd_to_upper)
+ope=$(echo "$1" | atst_to_upper)
 shift
 
 target_list=("$@")

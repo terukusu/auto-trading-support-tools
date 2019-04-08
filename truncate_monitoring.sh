@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# EA経由でMetaTraderのモニタリングデータを書き出しているファイルを
+# 過去三日間のデータだけを残してそれより古いデータを切り捨てます。
+#
+#
 
 . "$(cd "$(dirname $0)" && pwd)/common.sh"
 
@@ -24,11 +29,14 @@ while [ "$i" -lt "$target_num" ]; do
     target_mq_folder="MQL5"
   fi
 
-  order_status_file="$target_path/$target_mq_folder/Files/order_status"
+  monitoring_file="$target_path/$target_mq_folder/Files/terminal_monitoring.csv"
+  tmp_monitoring_file=$(basename $monitoring_file .csv)_tmp.csv
 
-  if [ -s "$order_status_file" ]; then
-    cat "$order_status_file" | atst_send_to_line
-    rm "$order_status_file"
+  if [ -s "$monitoring_file" ]; then
+    now=$(date +%s)
+    from=$(($now - 3600 * 24 * $ATST_MONITORING_TRUNCATE_BEFORE))
+    cat "$monitoring_file" | awk -F, '{if ($1 > '$from') print}' > "$tmp_monitoring_file"
+    mv "$tmp_monitoring_file" "$monitoring_file"
   fi
 
   let i++

@@ -14,7 +14,7 @@ while [ 1 ]; do
     data_len=$(echo -n "$line_token" | wc -c)
 
     if [ $data_len -eq 43 ]; then
-        echo $line_token > "$TRD_CONFIG_DIR/.line_token"
+        echo $line_token > "$ATST_CONFIG_DIR/.line_token"
         break
     fi
 
@@ -23,7 +23,7 @@ done
 
 echo ""
 
-if [ -f "$TRD_CONFIG_DIR/.line_token" ]; then
+if [ -f "$ATST_CONFIG_DIR/.line_token" ]; then
     echo "LINE通知の設定が完了しました。テストメッセージを送信しますか？[Y/n]"
     echo ""
     echo -n "> "
@@ -31,7 +31,7 @@ if [ -f "$TRD_CONFIG_DIR/.line_token" ]; then
 
     if [ "${answer,,}" != "n" ]; then
         echo "LINE へメッセージを送信中...."
-        echo Hello! | "$TRD_ABS_PWD/send_to_line.sh"
+        echo Hello! | "$ATST_HOME/send_to_line.sh"
         if [ "$?" == "0" ]; then
             echo "送信しました。LINEを確認してください。"
         else

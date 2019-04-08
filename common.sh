@@ -1,34 +1,33 @@
 #!/bin/bash
 
-TRD_ABS_PWD=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
-TRD_TEMPLATES_DIR="$TRD_ABS_PWD/templates"
-TRD_CONFIG_DIR="$HOME/.atst"
+ATST_HOME=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
+ATST_TEMPLATES_DIR="$ATST_HOME/templates"
+ATST_CONFIG_DIR="$HOME/.atst"
 
-if [ ! -e "$TRD_CONFIG_DIR/config" ]; then
-  install -m 644 -D "$TRD_TEMPLATES_DIR/config" "$TRD_CONFIG_DIR/config"
-  sed -i -e "s/%%TRD_DIR%%/$(echo $TRD_ABS_PWD | sed -e 's/\//\\\//g')/g" "$TRD_CONFIG_DIR/config"
+if [ ! -e $ATST_CONFIG_DIR ];then
+  mkdir -p $ATST_CONFIG_DIR
 fi
 
-TRD_CONFIG_FILE="$TRD_CONFIG_DIR/config"
-. $TRD_CONFIG_FILE
-
-if [ ! -e $TRD_DATA_DIR ];then
-  mkdir -p $TRD_DATA_DIR
+if [ ! -e "$ATST_CONFIG_DIR/config" ]; then
+  install -m 644 -D "$ATST_TEMPLATES_DIR/config" "$ATST_CONFIG_DIR/config"
 fi
 
-function trd_log() {
+ATST_CONFIG_FILE="$ATST_CONFIG_DIR/config"
+. $ATST_CONFIG_FILE
+
+function atst_log() {
   echo "["`date "+%Y-%m-%d %H:%M:%S"`"] "$@
 }
 
-function trd_to_upper() {
+function atst_to_upper() {
   cat - | tr '[a-z]' '[A-Z]'
 }
 
-function trd_to_lower() {
+function atst_to_lower() {
   cat - | tr '[A-Z]' '[a-z]'
 }
 
-function trd_escape_text() {
+function atst_escape_text() {
   if [ "$OSTYPE" != "${OSTYPE#darwin}" ];then
     # For Mac 改行付加。末尾に最低２個の改行がないと出力が空文字になるので。
     cat - <(echo -en '\n\n') | sed -e 's/\r//g' | sed -e :loop -e 'N; $!b loop' -e 's/\n/\\n/g' | sed -e 's/\"/\\"/g' | sed -e 's/\//\\\//g'
@@ -38,12 +37,12 @@ function trd_escape_text() {
   fi
 }
 
-function trd_read_file() {
+function atst_read_file() {
   path="$1"
   cat "$1" | sed -re 's/\r//g'
 }
 
-function trd_send_to_line() {
+function atst_send_to_line() {
   msg=$(cat -)
   image_file="$1"
 
@@ -53,7 +52,7 @@ function trd_send_to_line() {
 
   result=$(curl "https://notify-api.line.me/api/notify" \
     -s -o /dev/null -w "%{http_code}\n" \
-    -H "Authorization: Bearer $TRD_LINE_TOKEN" \
+    -H "Authorization: Bearer $ATST_LINE_TOKEN" \
     -F "message=【$(hostname -s)】$msg" $image_form)
 
   if [ -n "$result" -a "$result" == "200" ]; then
@@ -63,7 +62,7 @@ function trd_send_to_line() {
   fi
 }
 
-function trd_abs_path() {
+function atst_abs_path() {
   target_dir=$(dirname "$1")
   echo $(cd "$target_dir" && pwd)/$(basename "$1")
 }
@@ -78,9 +77,9 @@ function trd_abs_path() {
 #    mt_type[1]....
 #
 # Evaluating like this, you can use them as valiable.
-#    eval $(trd_gen_mt_list)
+#    eval $(atst_gen_mt_list)
 #
-function trd_gen_mt_list() {
+function atst_gen_mt_list() {
   if [ ! -d "$WINEPREFIX" ]; then
     return 0
   fi
@@ -92,9 +91,9 @@ function trd_gen_mt_list() {
       find "$program_folder" -maxdepth 2 -name terminal.exe
     done
   done) | sort | while read line; do
-    line=$(trd_abs_path "$line")
+    line=$(atst_abs_path "$line")
     mt_home=$(dirname "$line")
-    mt_name=$(basename "$mt_home" | trd_to_upper)
+    mt_name=$(basename "$mt_home" | atst_to_upper)
 
     if [ -d "$mt_home/MQL4" ]; then
       mt_type=MT4
@@ -116,7 +115,7 @@ function trd_gen_mt_list() {
 # return the index of MetaTrader which folder has specified prefix
 # return empty when it's not found.
 #
-function trd_find_mt_index() {
+function atst_find_mt_index() {
   target_mt_name="$1"
 
   i=0
@@ -134,20 +133,20 @@ function trd_find_mt_index() {
 # Returns the path of the termina.exe with a case-insensitive
 # prefix match between argument 1 and the folder name.
 #
-function trd_find_terminal() {
+function atst_find_terminal() {
   target_mt_name=$1
 
-  target_mt_index=$(trd_find_mt_index "$target_mt_name")
+  target_mt_index=$(atst_find_mt_index "$target_mt_name")
 
   if [ -n "$target_mt_index" ]; then
     echo "${mt_home[$target_mt_index]}/terminal.exe"
   fi
 }
 
-function trd_find_pid() {
+function atst_find_pid() {
   target_mt_name=$1
 
-  target_mt_path=$(trd_find_terminal "$target_mt_name")
+  target_mt_path=$(atst_find_terminal "$target_mt_name")
 
   if [ -z "$target_mt_path" ]; then
     return 0
@@ -166,4 +165,4 @@ function trd_find_pid() {
   fi
 }
 
-eval $(trd_gen_mt_list)
+eval $(atst_gen_mt_list)

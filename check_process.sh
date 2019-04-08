@@ -15,10 +15,10 @@ i=0;
 while [ "$i" -lt "$target_num" ]; do
   target_name=${target_names[$i]}
 
-  target_pid=$(trd_find_pid "$target_name")
+  target_pid=$(atst_find_pid "$target_name")
 
   if [ -z "$target_pid" ]; then
-    echo "MetaTraderプロセスが動作していません: $target_name" | trd_send_to_line
+    echo "MetaTraderプロセスが動作していません: $target_name" | atst_send_to_line
   fi
 
   let i++
