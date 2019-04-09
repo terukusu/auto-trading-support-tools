@@ -175,7 +175,7 @@ function atst_find_pid() {
 function atst_get_monitoring_csv_path() {
   local target_name="$1"
 
-  echo "$(atst_get_mql_folder_path)/Files/terminal_monitoring.csv"
+  echo "$(atst_get_mql_folder_path "$target_name")/Files/terminal_monitoring.csv"
 }
 
 function atst_get_mql_folder_path() {
