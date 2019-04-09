@@ -45,19 +45,19 @@ function atst_escape_text() {
 }
 
 function atst_read_file() {
-  path="$1"
+  local path="$1"
   cat "$1" | sed -re 's/\r//g'
 }
 
 function atst_send_to_line() {
-  msg=$(cat -)
-  image_file="$1"
+  local msg=$(cat -)
+  local image_file="$1"
 
   if [ -n "$image_file" ]; then
-    image_form="-F imageFile=@$image_file"
+    local image_form="-F imageFile=@$image_file"
   fi
 
-  result=$(curl "https://notify-api.line.me/api/notify" \
+  local result=$(curl "https://notify-api.line.me/api/notify" \
     -s -o /dev/null -w "%{http_code}\n" \
     -H "Authorization: Bearer $ATST_LINE_TOKEN" \
     -F "message=【$(hostname -s)】$msg" $image_form)
@@ -70,7 +70,7 @@ function atst_send_to_line() {
 }
 
 function atst_abs_path() {
-  target_dir=$(dirname "$1")
+  local target_dir=$(dirname "$1")
   echo $(cd "$target_dir" && pwd)/$(basename "$1")
 }
 
@@ -123,7 +123,7 @@ function atst_gen_mt_list() {
 # return empty when it's not found.
 #
 function atst_find_mt_index() {
-  target_mt_name="$1"
+  local target_mt_name="$1"
 
   i=0
   while [ $i -lt ${#mt_home[@]} ]; do
@@ -141,9 +141,9 @@ function atst_find_mt_index() {
 # prefix match between argument 1 and the folder name.
 #
 function atst_find_terminal() {
-  target_mt_name=$1
+  local target_mt_name=$1
 
-  target_mt_index=$(atst_find_mt_index "$target_mt_name")
+  local target_mt_index=$(atst_find_mt_index "$target_mt_name")
 
   if [ -n "$target_mt_index" ]; then
     echo "${mt_home[$target_mt_index]}/terminal.exe"
@@ -151,21 +151,21 @@ function atst_find_terminal() {
 }
 
 function atst_find_pid() {
-  target_mt_name=$1
+  local target_mt_name=$1
 
-  target_mt_path=$(atst_find_terminal "$target_mt_name")
+  local target_mt_path=$(atst_find_terminal "$target_mt_name")
 
   if [ -z "$target_mt_path" ]; then
     return 0
   fi
 
-  target_win_path=$(winepath -w "$target_mt_path" | sed -e 's/\\/\\\\/g')
+  local target_win_path=$(winepath -w "$target_mt_path" | sed -e 's/\\/\\\\/g')
 
   if [ -z "$target_win_path" ]; then
     return 0
   fi
 
-  target_pid=$(ps haxww -o pid,args | grep -v grep | grep "$target_win_path" | head -n 1 | awk '{print $1}')
+  local target_pid=$(ps haxww -o pid,args | grep -v grep | grep "$target_win_path" | head -n 1 | awk '{print $1}')
 
   if [ -n "$target_pid" ]; then
     echo $target_pid
