@@ -50,6 +50,16 @@ if [ "$#" -le 0 ]; then
   exit 1
 fi
 
+if [ -z "$(which gnuplot)" ]; then
+  echo gnuplot not found. please install gnuplot-nox package. 1>&2
+  exit 1
+fi
+
+if [ -z "$(which vncsnapshot)" ]; then
+  echo vncsnapshot not found. please install vncsnapshot package. 1>&2
+  exit 1
+fi
+
 if [ "$ATST_IMAGE_REPORT_TERM" == "0" ]; then
   # disaled
   exit 0

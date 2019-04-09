@@ -5,6 +5,11 @@ function print_usage_exit() {
   exit 0
 }
 
+if [ -z "$(which gnuplot)" ]; then
+  echo gnuplot not found. please install gnuplot-nox package. 1>&2
+  exit 1
+fi
+
 while getopts pt:f:hx:y: OPT
 do
   case $OPT in
