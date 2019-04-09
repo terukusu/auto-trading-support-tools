@@ -69,4 +69,4 @@ fi
 
 atst_random_sleep $ATST_CHECK_RANDOM_DELAY_MAX
 
-atst_traverse_mt do_check_price "${target_names[@]}"
+atst_traverse_mt do_check "${target_names[@]}"

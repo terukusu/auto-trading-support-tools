@@ -6,7 +6,7 @@
 
 . "$(cd "$(dirname $0)" && pwd)/common.sh"
 
-function do_check_spread() {
+function do_check() {
   local target_name="$1"
   local target_fullname="$2"
 
@@ -49,4 +49,4 @@ fi
 
 atst_random_sleep $ATST_CHECK_RANDOM_DELAY_MAX
 
-atst_traverse_mt do_check_spread "${target_names[@]}"
+atst_traverse_mt do_check "${target_names[@]}"
