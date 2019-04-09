@@ -1,13 +1,35 @@
 # この日数以上前のモニタリングデータは破棄します
 ATST_MONITORING_TRUNCATE_BEFORE=3
 
+# チェックが動くタイミングを散らすためのスリープの最大値
+ATST_CHECK_RANDOM_DELAY_MAX=40
+
 # この秒数モニタリングデータの更新が無ければ通知します
 ATST_MONITORING_THRESHOLD=180
 
-# これ以上のスプレッドになったら通知します
-ATST_MONITORING_SPREAD=150
+# 通常時にこれ以上のスプレッドになったら異常と判定
+ATST_THRESHOLD_SPREAD_UPPER=100
+
+# 異常時にこれ以下のスプレッドになったら復帰と判定
+ATST_THRESHOLD_SPREAD_LOWER=50
+
+# 通常時にこれ以上のping(マイクロ秒)になったら異常と判定
+ATST_THRESHOLD_PING_UPPER=600000
+
+# 異常時にこれ以下のping(マイクロ秒)になったら復帰と判定
+ATST_THRESHOLD_PING_LOWER=300000
+
+# 異常時にこれ以下のping(マイクロ秒)になったら復帰と判定
+ATST_THRESHOLD_PING_LOWER=300000
+
+# 通常時に10分間高値安値の差がこのpips以上になったら異常と判定
+ATST_THRESHOLD_PRICE_UPPER=100
+
+# 異常時に10分間高値安値の差がこのpips以下になったら復帰と判定
+ATST_THRESHOLD_PRICE_LOWER=50
 
 ATST_CONFIG_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
+ATST_ALERT_STATUS_FILE="$ATST_CONFIG_DIR/alert_status"
 ATST_LINE_TOKEN=$(f="$ATST_CONFIG_DIR/.line_token"; if [ -e "$f" ]; then cat "$f"; fi)
 
 if [ -z "$WINEARCH" ]; then

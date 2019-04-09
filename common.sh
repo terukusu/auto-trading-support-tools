@@ -15,6 +15,13 @@ fi
 ATST_CONFIG_FILE="$ATST_CONFIG_DIR/config"
 . $ATST_CONFIG_FILE
 
+function atst_random_sleep() {
+  local max_sleep=${1:-30}
+  local random=$(( $(dd if=/dev/urandom bs=2 count=1 2> /dev/null | cksum | cut -d' ' -f1) % 32767 ))
+  local sleep_time=$(($random % $max_sleep))
+  sleep $sleep_time
+}
+
 function atst_log() {
   echo "["`date "+%Y-%m-%d %H:%M:%S"`"] "$@
 }
@@ -165,7 +172,26 @@ function atst_find_pid() {
   fi
 }
 
-function traverse_mt() {
+function atst_get_monitoring_csv_path() {
+  local target_name="$1"
+
+  local target_index=$(atst_find_mt_index "$target_name")
+  local target_path=${mt_home[$target_index]}
+  local target_type=${mt_type[$target_index]}
+  local target_fullname=${mt_name[$target_index]}
+
+  local target_mq_folder
+
+  if [ "$target_type" == "MT4" ]; then
+    target_mq_folder="MQL4"
+  else
+    target_mq_folder="MQL5"
+  fi
+
+  echo "$target_path/$target_mq_folder/Files/terminal_monitoring.csv"
+}
+
+function atst_traverse_mt() {
   local callback_function="$1"
   shift
 
@@ -181,6 +207,34 @@ function traverse_mt() {
 
     "$callback_function" "$target_name" "$target_fullname" "$target_path" "$target_type"
   done
+}
+
+function atst_set_alert_status() {
+  local key=$1
+  local value=$2
+
+  if [ -z "$key" ]; then
+    echo "alert status key should not be empty" 1>&2
+    return 1
+  fi
+
+  if [ -e "$ATST_ALERT_STATUS_FILE" ] && [ -n "$(cat "$ATST_ALERT_STATUS_FILE" | grep -o "${key}," )" ]; then
+    sed -i -e "s/$key,.*/$key,$value,$(date +%s)/" "$ATST_ALERT_STATUS_FILE"
+  else
+    echo $key,$value,$(date +%s) >> "$ATST_ALERT_STATUS_FILE"
+  fi
+}
+
+function atst_get_alert_status() {
+  local key=$1
+
+  echo "$(cat "$ATST_ALERT_STATUS_FILE" | grep -oE "${key},.*" | cut -d',' -f 2)"
+}
+
+function atst_get_alert_status_time() {
+  local key=$1
+
+  echo "$(cat "$ATST_ALERT_STATUS_FILE" | grep -oE "${key},.*" | cut -d',' -f 3)"
 }
 
 eval $(atst_gen_mt_list)
