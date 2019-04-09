@@ -264,6 +264,7 @@ function setup_vncserver {
 
   # setting default password for vncserver
   if [ ! -e "$HOME/.vnc/passwd" ]; then
+    mkdir -p "$HOME/.vnc"
     echo 'Setting empty password to VNC. Please change this yourself later :-)'
     echo "" | vncpasswd -f > "$HOME/.vnc/passwd"
   fi
