@@ -156,6 +156,13 @@ function install_packages_misc_and_needed_by_mt4() {
 }
 
 #####################################################
+# Install packages required by graphical report
+#####################################################
+install_packages_needed_by_graphical_report() {
+  sudo -E apt $APT_OPT install gnuplot-nox vncsnapshot
+}
+
+#####################################################
 # Auto update package list.
 #####################################################
 function setup_auto_update_package_list() {
@@ -401,6 +408,7 @@ set_up_locale_and_timezone
 export LANG=$TARGET_LOCALE
 
 install_packages_misc_and_needed_by_mt4
+install_packages_needed_by_graphical_report
 setup_auto_update_package_list
 setup_vncserver
 setup_wine
