@@ -1,9 +1,3 @@
-[Control Panel\\Desktop]
-"FontSmoothing"="2"
-"FontSmoothingGamma"=dword:00000578
-"FontSmoothingOrientation"=dword:00000001
-"FontSmoothingType"=dword:00000002
-
 [Software\\Wine\\Fonts\\Replacements]
 "MS Gothic"="VL Gothic"
 "MS PGothic"="VL PGothic"
