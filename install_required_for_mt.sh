@@ -271,6 +271,7 @@ function setup_vncserver {
   if [ ! -e "$HOME/.vnc/passwd" ]; then
     echo 'Setting empty password to VNC. Please change this yourself later :-)'
     echo "" | vncpasswd -f > "$HOME/.vnc/passwd"
+    chmod 600 "$HOME/.vnc/passwd"
   fi
 }
 
