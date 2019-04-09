@@ -262,16 +262,15 @@ function setup_vncserver {
     sudo update-rc.d vncserver defaults
   fi
 
-  # setting default password for vncserver
-  if [ ! -e "$HOME/.vnc/passwd" ]; then
-    mkdir -p "$HOME/.vnc"
-    echo 'Setting empty password to VNC. Please change this yourself later :-)'
-    echo "" | vncpasswd -f > "$HOME/.vnc/passwd"
-  fi
-
   if [ ! -e "$HOME/.vnc/xstartup" ]; then
     # install xstartup
     install -m 755 -D "$DIR_TEMPLATES/xstartup" "$HOME/.vnc/xstartup"
+  fi
+
+  # setting default password for vncserver
+  if [ ! -e "$HOME/.vnc/passwd" ]; then
+    echo 'Setting empty password to VNC. Please change this yourself later :-)'
+    echo "" | vncpasswd -f > "$HOME/.vnc/passwd"
   fi
 }
 
