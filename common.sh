@@ -175,20 +175,26 @@ function atst_find_pid() {
 function atst_get_monitoring_csv_path() {
   local target_name="$1"
 
+  echo "$(atst_get_mql_folder_path)/Files/terminal_monitoring.csv"
+}
+
+function atst_get_mql_folder_path() {
+  local target_name="$1"
+
   local target_index=$(atst_find_mt_index "$target_name")
   local target_path=${mt_home[$target_index]}
   local target_type=${mt_type[$target_index]}
   local target_fullname=${mt_name[$target_index]}
 
-  local target_mq_folder
+  local target_mql_folder
 
   if [ "$target_type" == "MT4" ]; then
-    target_mq_folder="MQL4"
+    target_mql_folder="MQL4"
   else
-    target_mq_folder="MQL5"
+    target_mql_folder="MQL5"
   fi
 
-  echo "$target_path/$target_mq_folder/Files/terminal_monitoring.csv"
+  echo "$target_path/$target_mql_folder"
 }
 
 function atst_traverse_mt() {
