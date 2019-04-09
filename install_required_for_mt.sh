@@ -143,7 +143,7 @@ function install_packages_misc_and_needed_by_mt4() {
   sudo -E apt $APT_OPT install unattended-upgrades apt-transport-https psmisc bc vim nano less tmux curl net-tools lsof
 
   # install gui
-  sudo -E apt $APT_OPT install vnc4server fonts-vlgothic xterm wm2
+  sudo -E apt $APT_OPT install tightvncserver fonts-vlgothic xterm wm2
 
   # install wine
   sudo -E apt $APT_OPT install software-properties-common
