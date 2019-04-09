@@ -2,7 +2,7 @@ MAILTO=""
 ATST_HOME="%%ATST_HOME%%"
 
 # start MetaTrader automatically at boot time
-@reboot   "$ATST_HOME/mtctl.sh" start      "land-fx"
+@reboot   "$ATST_HOME/mtctl.sh" start         "land-fx"
 
 0 9 * * * "$ATST_HOME/check_daily.sh"
 * * * * * "$ATST_HOME/check_reboot.sh"
