@@ -165,4 +165,22 @@ function atst_find_pid() {
   fi
 }
 
+function traverse_mt() {
+  local callback_function="$1"
+  shift
+
+  local target_names=("$@")
+
+  local target_name target_index target_path target_type target_fullname
+
+  for target_name in "${target_names[@]}"; do
+    target_index=$(atst_find_mt_index "$target_name")
+    target_path=${mt_home[$target_index]}
+    target_type=${mt_type[$target_index]}
+    target_fullname=${mt_name[$target_index]}
+
+    "$callback_function" "$target_name" "$target_fullname" "$target_path" "$target_type"
+  done
+}
+
 eval $(atst_gen_mt_list)
