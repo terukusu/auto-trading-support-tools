@@ -2,15 +2,16 @@ MAILTO=""
 ATST_HOME="%%ATST_HOME%%"
 
 # start MetaTrader automatically at boot time
-@reboot   "$ATST_HOME/mtctl.sh" start         "land-fx"
+@reboot   "$ATST_HOME/mtctl.sh" start         land-fx
 
 0 9 * * * "$ATST_HOME/check_daily.sh"
 * * * * * "$ATST_HOME/check_reboot.sh"
 
-30 6 * * * "$ATST_HOME/truncate_monitoring.sh "land-fx"
-*  * * * * "$ATST_HOME/check_monitoring.sh"   "land-fx"
-*  * * * * "$ATST_HOME/check_order.sh"        "land-fx"
-*  * * * * "$ATST_HOME/check_process.sh"      "land-fx"
-*  * * * * "$ATST_HOME/check_ping.sh"         "land-fx"
-*  * * * * "$ATST_HOME/check_price.sh"        "land-fx"
-*  * * * * "$ATST_HOME/check_spread.sh"       "land-fx"
+30 6 * * * "$ATST_HOME/truncate_monitoring.sh land-fx
+30 8 * * * "$ATST_HOME/image_report.sh        land-fx
+*  * * * * "$ATST_HOME/check_monitoring.sh"   land-fx
+*  * * * * "$ATST_HOME/check_order.sh"        land-fx
+*  * * * * "$ATST_HOME/check_process.sh"      land-fx
+*  * * * * "$ATST_HOME/check_ping.sh"         land-fx
+*  * * * * "$ATST_HOME/check_price.sh"        land-fx
+*  * * * * "$ATST_HOME/check_spread.sh"       land-fx

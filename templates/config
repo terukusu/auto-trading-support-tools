@@ -4,6 +4,10 @@ ATST_MONITORING_TRUNCATE_BEFORE=3
 # チェックが動くタイミングを散らすためのスリープの最大値
 ATST_CHECK_RANDOM_DELAY_MAX=40
 
+# 過去 n 時間の値動きとスプレッド、現在のデスクトップの画像を通知します
+# 0 の場合は通知しない。
+ATST_IMAGE_REPORT_TERM=24
+
 # この秒数モニタリングデータの更新が無ければ通知します
 ATST_MONITORING_THRESHOLD=180
 

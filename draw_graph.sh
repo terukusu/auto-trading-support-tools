@@ -5,7 +5,7 @@ function print_usage_exit() {
   exit 0
 }
 
-while getopts pt:f:h OPT
+while getopts pt:f:hx:y: OPT
 do
   case $OPT in
     p) GP_OPT_P="-p"
@@ -13,6 +13,10 @@ do
     f) FORMAT=$OPTARG
     ;;
     t) TITLE=$OPTARG
+    ;;
+    x) X_LABEL=$OPTARG
+    ;;
+    y) Y_LABEL=$OPTARG
     ;;
     h) print_usage_exit
     ;;
@@ -33,8 +37,18 @@ if [ -n "$TITLE" ]; then
     GP_TITLE="ti '$TITLE'"
 fi
 
+if [ -n "$X_LABEL" ]; then
+    GP_X_LABEL="set xlabel '$X_LABEL'"
+fi
+
+if [ -n "$Y_LABEL" ]; then
+    GP_Y_LABEL="set ylabel '$Y_LABEL'"
+fi
+
 gp_script=$(cat <<EOS
 $GP_SET_TERM
+$GP_X_LABEL
+$GP_Y_LABEL
 set datafile separator ','
 set xdata time; set timefmt '%s'
 set format x '%m/%d %H:%M'
