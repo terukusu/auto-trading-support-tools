@@ -232,15 +232,25 @@ function atst_set_alert_status() {
 }
 
 function atst_get_alert_status() {
-  local key=$1
+  local key="$1"
+  local default="$2"
 
-  echo "$(cat "$ATST_ALERT_STATUS_FILE" | grep -oE "${key},.*" | cut -d',' -f 2)"
+  if [ -e "$ATST_ALERT_STATUS_FILE" ]; then
+    echo "$(cat "$ATST_ALERT_STATUS_FILE" | grep -oE "${key},.*" | cut -d',' -f 2)"
+  else
+    echo "$default"
+  fi
 }
 
 function atst_get_alert_status_time() {
-  local key=$1
+  local key="$1"
+  local default="$2"
 
-  echo "$(cat "$ATST_ALERT_STATUS_FILE" | grep -oE "${key},.*" | cut -d',' -f 3)"
+  if [ -e "$ATST_ALERT_STATUS_FILE" ]; then
+    echo "$(cat "$ATST_ALERT_STATUS_FILE" | grep -oE "${key},.*" | cut -d',' -f 3)"
+  else
+    echo "$default"
+  fi
 }
 
 eval $(atst_gen_mt_list)
