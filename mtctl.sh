@@ -124,6 +124,24 @@ function status_mt() {
   done
 }
 
+function monitor_mt {
+  local target_name="$1"
+  local monitoring_file=$(atst_get_monitoring_csv_path "$target_name")
+
+  if [ ! -f "$monitoring_file" ]; then
+    echo "monitoring data file not found: $monitoring_file" 1>&2
+    return 1;
+  fi
+
+  echo "================================="
+  echo "loading monitoring data from file: $monitoring_file"
+  echo "press Ctrl+c to stop."
+
+  echo "================================="
+
+  tail -f "$monitoring_file"
+}
+
 while getopts qsh OPT
 do
   case $OPT in
@@ -146,7 +164,8 @@ ope=$(echo "$1" | atst_to_upper)
 shift
 
 target_list=("$@")
-if [ "$ope" != "START" -a "$ope" != "STOP"  -a "$ope" != "LIST" -a "$ope" != "STATUS" ]; then
+
+if [ -z "$(echo "$ope" | grep -oE "START|STOP|LIST|STATUS|MONITOR")" ]; then
   print_usage_exit
 fi
 
@@ -162,4 +181,6 @@ elif [ "$ope" == "LIST" ]; then
   list_mt "$@"
 elif [ "$ope" == "STATUS" ]; then
   status_mt "$@"
+elif [ "$ope" == "MONITOR" ]; then
+  monitor_mt "$@"
 fi
