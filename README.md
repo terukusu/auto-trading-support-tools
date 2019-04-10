@@ -1,9 +1,8 @@
 # Auto Trading Support Tools
-Linux + Wine + MetaTrader4/5 の自動売買サーバーの構築と監視をサポートするツール群です。
+このツール群は Linux + Wine + MetaTrader4/5 で構成する自動売買サーバーの構築と監視をサポートするツール群です。
 とくに複数の MT4/5 を扱う手間を軽減するためのものです。  
 
-
-このツール群の外側も含めた全体構成図
+このツール群の外側も含めた全体構成  
 <img src="../../wiki/images/atst_outline.png" width="640px">  
 
 
@@ -18,7 +17,7 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 
 
 * 動作確認環境は以下のディストリビューションの x86_64, minimal 版
-    * Ubuntu 14.04, 16.04, 18.04, 18.10
+    * Ubuntu 14.04, 16.04, 18.04
     * Debian 8, 9
 
 
@@ -31,11 +30,11 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 
 
 ## このツール群でできること
-* まっさらな Linux VPS に MetaTrader4/5 (以下MT4/5) を動かすのに必要なもの一式をインストール
+* まっさらな VPS に MetaTrader4/5 (以下MT4/5) を動かすのに必要なもの一式をインストール
 * 起動時にMT4/5を自動起動
 * 以下のことを検知してLINEに通知
-    * VPSの再起動
-    * MT4/5 のクラッシュ
+    * VPSの再起動検知
+    * MT4/5 のクラッシュ検知
     * ソフトウェア更新有無(自動更新はしない)
     * ポジションの変化(新規、決済)の検知
     * 価格、スプレッド、Pingの異常値検知
@@ -44,8 +43,7 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 * [通知内容のサンプルはこちら](../../wiki/notification_sample)
 
 
-<img src="../../wiki/images/mt4_on_linux_vps.png" width="480px">  
-
+<img src="../../wiki/images/mt4_on_linux_vps.png" width="480px"><br />
 ↑ こうなる。そしてこの状態を保っていることを監視するためのもの。
 
 
@@ -59,7 +57,6 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 * MT4/5 インストーラ の起動
     * MT4/5本体は GUI で操作しながらインストールする必要が有るため手動でインストールする必要有り
 * スプレッド等のモニタリングデータをファイルに書き出すためのEA
-
 
 ## Google Compute Engin の無料VMインスタンスでの例
 まっさらな Linux VPS → 自動売買開始 → 監視 → LINE通知 までを一通りやってみましょうヽ(=´▽`=)ﾉ
@@ -77,11 +74,12 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 を、一通り行っている作業動画がこちら↓  
 [<img src="../../wiki/images/install_thumb.png" width="280px">](http://www.youtube.com/watch?v=h3-sCCXt8hY)
 
-
 ### おまけ
 * [Stackdriver で外側からの監視](../../wiki/setup_stackdriver)
     * サーバーそのものやネットワークのダウンを検知する
     * 全体構成図では LINE 通知になっていますが、まずは手順が簡単なメール通知の設定手順です
+* 不正アクセス防止のところは GCE がよしなにやってくれてるので気にしなくてOK
+    * 他の格安VPSの場合はちゃんとしないと驚くほど攻撃を受けるので注意
 
 
 ## 既にLinux + Wine + MetaTrader4/5 で自動売買をしている人向けの紹介
@@ -94,17 +92,17 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 0 9 * * * "$ATST_HOME/check_daily.sh"
 * * * * * "$ATST_HOME/check_reboot.sh"
 
-30 6 * * * "$ATST_HOME/truncate_monitoring.sh land-fx
-30 8 * * * "$ATST_HOME/image_report.sh        land-fx
-*  * * * * "$ATST_HOME/check_monitoring.sh"   land-fx
-*  * * * * "$ATST_HOME/check_order.sh"        land-fx
-*  * * * * "$ATST_HOME/check_process.sh"      land-fx
-*  * * * * "$ATST_HOME/check_ping.sh"         land-fx
-*  * * * * "$ATST_HOME/check_price.sh"        land-fx
-*  * * * * "$ATST_HOME/check_spread.sh"       land-fx
+30 6 * * * "$ATST_HOME/truncate_monitoring.sh" land-fx
+30 8 * * * "$ATST_HOME/image_report.sh"        land-fx
+*  * * * * "$ATST_HOME/check_monitoring.sh"    land-fx
+*  * * * * "$ATST_HOME/check_order.sh"         land-fx
+*  * * * * "$ATST_HOME/check_process.sh"       land-fx
+*  * * * * "$ATST_HOME/check_ping.sh"          land-fx
+*  * * * * "$ATST_HOME/check_price.sh"         land-fx
+*  * * * * "$ATST_HOME/check_spread.sh"        land-fx
 ```
 
-こんな感じで設定しておけば、再起動時とMT4/5プロセスが落ちたときにLINEへ通知を飛ばしてくれます。  
+こんな感じで設定しておけば、再起動時とMT4/5プロセスが落ちたときや、ポジションの新規や決済、値動きやスプレッド、Pingに異常が有った時ににLINEへ通知してくれます。  
 
 
 「land-fx」となっている部分はMT4/5がインストールされているフォルダ名なら何でもよく、複数指定可能。  指定された名前に該当するMT4/5のインストールフォルダを前方一致で検索するのでフォルダ名の先頭の一部を記載しておけばOK.
