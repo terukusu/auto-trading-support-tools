@@ -37,15 +37,16 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
     * VPSの再起動
     * MT4/5 のクラッシュ
     * ソフトウェア更新有無(自動更新はしない)
+    * ポジションの変化(新規、決済)の検知
+    * 価格、スプレッド、Pingの異常値検知
+
+
+* [通知内容のサンプルはこちら](../../wiki/notification_sample)
+
 
 <img src="../../wiki/images/mt4_on_linux_vps.png" width="480px">  
 
 ↑ こうなる。そしてこの状態を保っていることを監視するためのもの。
-
-
-### このツール群で未だできないこと
-全体構成図の「異常監視」の部分は未だリポジトリに有りません。
-手元環境では動いているのでもう少し整えてからリポジトリに追加します。
 
 
 ## このツールがインストール・設定するもの
@@ -56,7 +57,8 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 * wine
     * Linux 上で Windows 用アプリを動かすソフト
 * MT4/5 インストーラ の起動
-    * MT4/5本体は GUI で操作しながらインストールする必要が有るため手動でインストールする必要有リ
+    * MT4/5本体は GUI で操作しながらインストールする必要が有るため手動でインストールする必要有り
+* スプレッド等のモニタリングデータをファイルに書き出すためのEA
 
 
 ## Google Compute Engin の無料VMインスタンスでの例
@@ -69,6 +71,7 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 1. [LINE への通知設定(LINE側)](../../wiki/create_line_token)
 1. [LINE への通知設定(VM側)](../../wiki/setup_line)
 1. [再起動検知やMT4/5クラッシュ検知を設定](../../wiki/setup_monitoring)
+1. [ポジション新規／決済、価格、スプレッド、Pingの異常検知を設定](../../wiki/setup_monitoring2)
 
 
 を、一通り行っている作業動画がこちら↓  
@@ -85,15 +88,20 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 
 まずは crontab.
 ```
-MAILTO=""
-ATST_HOME="/path/to/the/atst_home"
-
-# start MetaTrader automatically at boot
-@reboot "$ATST_HOME/mtctl.sh" start "land-fx"
+# start MetaTrader automatically at boot time
+@reboot   "$ATST_HOME/mtctl.sh" start         land-fx
 
 0 9 * * * "$ATST_HOME/check_daily.sh"
-*/10 * * * * "$ATST_HOME/check_process.sh" "land-fx"
 * * * * * "$ATST_HOME/check_reboot.sh"
+
+30 6 * * * "$ATST_HOME/truncate_monitoring.sh land-fx
+30 8 * * * "$ATST_HOME/image_report.sh        land-fx
+*  * * * * "$ATST_HOME/check_monitoring.sh"   land-fx
+*  * * * * "$ATST_HOME/check_order.sh"        land-fx
+*  * * * * "$ATST_HOME/check_process.sh"      land-fx
+*  * * * * "$ATST_HOME/check_ping.sh"         land-fx
+*  * * * * "$ATST_HOME/check_price.sh"        land-fx
+*  * * * * "$ATST_HOME/check_spread.sh"       land-fx
 ```
 
 こんな感じで設定しておけば、再起動時とMT4/5プロセスが落ちたときにLINEへ通知を飛ばしてくれます。  

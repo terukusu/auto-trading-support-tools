@@ -1,9 +1,12 @@
 #!/bin/bash
+#
+# TODO: MT5対応
+#
 
 . "$(cd "$(dirname $0)" && pwd)/common.sh"
 
 
-for target_name in "$mt_name[@]"; do
+for target_name in "${mt_name[@]}"; do
   mql_folder_path=$(atst_get_mql_folder_path "$target_name")
 
   if [ -z "$(echo $mql_folder_path | grep -o MQL4)" ]; then

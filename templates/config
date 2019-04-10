@@ -23,9 +23,6 @@ ATST_THRESHOLD_PING_UPPER=600000
 # 異常時にこれ以下のping(マイクロ秒)になったら復帰と判定
 ATST_THRESHOLD_PING_LOWER=300000
 
-# 異常時にこれ以下のping(マイクロ秒)になったら復帰と判定
-ATST_THRESHOLD_PING_LOWER=300000
-
 # 通常時に10分間高値安値の差がこのpips以上になったら異常と判定
 ATST_THRESHOLD_PRICE_UPPER=100
 

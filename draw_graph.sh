@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function print_usage_exit() {
-  echo "Usage: cat <path/to/datafile> | $(basename $0) [-f format] [-t title]" 1>&2
+  echo "Usage: cat <path/to/datafile> | $(basename $0) [-f format] [-t title] [-x xlabel] [-y ylabel]" 1>&2
   exit 0
 }
 
