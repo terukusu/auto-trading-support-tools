@@ -12,11 +12,7 @@ while [ $i -lt $num_mt ]; do
   echo "processing: [$(($i + 1))/$num_mt] type=${mt_type[$i]}  path='$mt_home'"
   echo "delete needless files.."
 
-  mailbox="$mt_home/history/mailbox"
-  if [ -d "$mailbox" ] && [ -n "$(ls "$mailbox")" ]; then
-    rm "$mt_home/history/mailbox/"*
-  fi
-
+  find "$mt_home" -type d -name mail* -exec bash -c 'cd "{}"; rm -rf *' \;
   find "$mt_home" -name '*.hst' -exec rm {} \;
   find "$mt_home" -name 'news.dat' -exec rm {} \;
 
