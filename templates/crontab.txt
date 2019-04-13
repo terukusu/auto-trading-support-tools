@@ -8,7 +8,7 @@ ATST_HOME="%%ATST_HOME%%"
 * * * * * "$ATST_HOME/check_reboot.sh"
 
 30 6 * * * "$ATST_HOME/truncate_monitoring.sh" land-fx
-30 8 * * * "$ATST_HOME/image_report.sh"        land-fx
+30 8 * * * "$ATST_HOME/report_image.sh"        land-fx
 *  * * * * "$ATST_HOME/check_monitoring.sh"    land-fx
 *  * * * * "$ATST_HOME/check_order.sh"         land-fx
 *  * * * * "$ATST_HOME/check_process.sh"       land-fx
