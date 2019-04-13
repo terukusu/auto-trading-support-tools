@@ -67,6 +67,4 @@ if [ "$#" -le 0 ]; then
   exit 1
 fi
 
-atst_random_sleep $ATST_CHECK_RANDOM_DELAY_MAX
-
 atst_traverse_mt do_check "${target_names[@]}"
