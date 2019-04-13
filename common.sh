@@ -174,14 +174,24 @@ function atst_find_pid() {
 
 function atst_get_monitoring_csv_path() {
   local target_name="$1"
+  local target_mt_home=$(atst_get_mql_folder_path "$target_name")
 
-  echo "$(atst_get_mql_folder_path "$target_name")/Files/terminal_monitoring.csv"
+  if [ -z "$target_mt_home" ]; then
+    return 0
+  fi
+
+  echo "$target_mt_home/Files/terminal_monitoring.csv"
 }
 
 function atst_get_mql_folder_path() {
   local target_name="$1"
 
   local target_index=$(atst_find_mt_index "$target_name")
+
+  if [ -z "$target_index" ]; then
+    return 0;
+  fi
+
   local target_path=${mt_home[$target_index]}
   local target_type=${mt_type[$target_index]}
   local target_fullname=${mt_name[$target_index]}
@@ -207,6 +217,11 @@ function atst_traverse_mt() {
 
   for target_name in "${target_names[@]}"; do
     target_index=$(atst_find_mt_index "$target_name")
+
+    if [ -z "$target_index" ]; then
+      continue
+    fi
+
     target_path=${mt_home[$target_index]}
     target_type=${mt_type[$target_index]}
     target_fullname=${mt_name[$target_index]}
