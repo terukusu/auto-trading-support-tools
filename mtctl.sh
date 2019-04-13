@@ -129,6 +129,11 @@ function monitor_mt {
   local target_name="$1"
   local monitoring_file=$(atst_get_monitoring_csv_path "$target_name")
 
+  if [ -z "$monitoring_file" ]; then
+    echo "MetaTrader muches name not found: $target_name" 1>&2
+    return 1;
+  fi
+
   if [ ! -f "$monitoring_file" ]; then
     echo "monitoring data file not found: $monitoring_file" 1>&2
     return 1;
