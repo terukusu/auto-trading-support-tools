@@ -71,7 +71,7 @@ if [ -f "$desktop_image" ]; then
   rm "$desktop_image"
 fi
 
-vncsnapshot -quiet -passwd $HOME/.vnc/passwd -quality 30 :1 "$desktop_image" 2> /dev/null
+vncsnapshot -quiet -passwd $HOME/.vnc/passwd -quality 30 -nocursor :1 "$desktop_image" 2> /dev/null
 
 if [ -f "$desktop_image" ]; then
   echo "デスクトップ画像($(date +"%Y/%m/%d %H:%M:%S"))" | atst_send_to_line "$desktop_image"
