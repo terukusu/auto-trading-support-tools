@@ -8,7 +8,7 @@ crontab_old=$(crontab -l 2>/dev/null)
 is_overwrite=1
 
 if [ -n "$crontab_old" ]; then
-  echo "Your crontab is not empty. Overwrite it? (Y/n)('n' means append.)"
+  echo "Your crontab is not empty. Overwrite it? (Y/n)('n' means append.) "
   read line
 
   if [ "${line,,}" == "n" ]; then
