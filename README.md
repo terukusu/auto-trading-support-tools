@@ -86,20 +86,19 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 
 まずは crontab.
 ```
-# start MetaTrader automatically at boot time
-@reboot   "$ATST_HOME/mtctl.sh" start         land-fx
+0 9 * * * check_daily.sh
+* * * * * check_reboot.sh
 
-0 9 * * * "$ATST_HOME/check_daily.sh"
-* * * * * "$ATST_HOME/check_reboot.sh"
-
-30 6 * * * "$ATST_HOME/truncate_monitoring.sh" land-fx
-30 8 * * * "$ATST_HOME/image_report.sh"        land-fx
-*  * * * * "$ATST_HOME/check_monitoring.sh"    land-fx
-*  * * * * "$ATST_HOME/check_order.sh"         land-fx
-*  * * * * "$ATST_HOME/check_process.sh"       land-fx
-*  * * * * "$ATST_HOME/check_ping.sh"          land-fx
-*  * * * * "$ATST_HOME/check_price.sh"         land-fx
-*  * * * * "$ATST_HOME/check_spread.sh"        land-fx
+@reboot    mtctl.sh start                       land-fx
+30 6 * * * truncate_monitoring.sh               land-fx
+30 8 * * * report_image.sh                      land-fx
+*  * * * * sleep 10; check_order.sh             land-fx
+*  * * * * sleep 40; check_order.sh             land-fx
+*  * * * * sleep_random.sh; check_monitoring.sh land-fx
+*  * * * * sleep_random.sh; check_process.sh    land-fx
+*  * * * * sleep_random.sh; check_ping.sh       land-fx
+*  * * * * sleep_random.sh; check_price.sh      land-fx
+*  * * * * sleep_random.sh; check_spread.sh     land-fx
 ```
 
 こんな感じで設定しておけば、再起動時とMT4/5プロセスが落ちたときや、ポジションの新規や決済、値動きやスプレッド、Pingに異常が有った時ににLINEへ通知してくれます。  
@@ -112,11 +111,12 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 
 mtctl.sh は 複数の MT4/5 の一覧・起動・終了・状態確認ができるスクリプトです。使い方は↓こん感じ。
 ```
-Usage: mtctl.sh [-qsh] <list|start|status|stop> <MetaTrader Name1> [<MetaTrader Name2> ...]
+Usage: mtctl.sh [-qsh] <list|start|status|stop|monitor> <MetaTrader Name1> [<MetaTrader Name2> ...]
 	list: list MetaTrader installed
 	start: start MetaTrader
 	status: print status of specified MetaTrader
 	stop: stop MetaTrader
+	monitor: preview monitoring data file.
 	<MetaTrader Name>: folder name MetaTrader installed. It's searched in a forward match. (ex: "MetaTrader 4")
 	-s: when list, show running status.(slow)
 	-q: quiet mode. print nothing.
