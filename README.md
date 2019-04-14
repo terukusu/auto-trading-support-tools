@@ -86,19 +86,27 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 
 まずは crontab.
 ```
+MAILTO=""
+PATH="%%ATST_HOME%%:/bin:/usr/bin:/usr/local/bin" ← %%ATST_HOME%% はインストール時に auto-trading-support-tools のフォルダに置換される
+
+# List of MetaTrader which should be Monitored.
+# It consists of space separated, single quoted MetaTrader name.
+# ex. "('Land-FX' 'MetaTrader 5' 'MetaTrader 4')"
+TARGET="('Land-FX')"
+
 0 9 * * * check_daily.sh
 * * * * * check_reboot.sh
 
-@reboot    mtctl.sh start                       land-fx
-30 6 * * * truncate_monitoring.sh               land-fx
-30 8 * * * report_image.sh                      land-fx
-*  * * * * sleep 10; check_order.sh             land-fx
-*  * * * * sleep 40; check_order.sh             land-fx
-*  * * * * sleep_random.sh; check_monitoring.sh land-fx
-*  * * * * sleep_random.sh; check_process.sh    land-fx
-*  * * * * sleep_random.sh; check_ping.sh       land-fx
-*  * * * * sleep_random.sh; check_price.sh      land-fx
-*  * * * * sleep_random.sh; check_spread.sh     land-fx
+@reboot    wrapper.sh                  "$TARGET" mtctl.sh start
+30 6 * * * wrapper.sh                  "$TARGET" truncate_monitoring.sh
+30 8 * * * wrapper.sh                  "$TARGET" report_image.sh
+*  * * * * sleep 10; wrapper.sh        "$TARGET" check_order.sh
+*  * * * * sleep 40; wrapper.sh        "$TARGET" check_order.sh
+*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_monitoring.sh
+*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_process.sh
+*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_ping.sh
+*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_price.sh
+*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_spread.sh
 ```
 
 こんな感じで設定しておけば、再起動時とMT4/5プロセスが落ちたときや、ポジションの新規や決済、値動きやスプレッド、Pingに異常が有った時ににLINEへ通知してくれます。  
