@@ -21,4 +21,23 @@ while [ $i -lt $num_mt ]; do
   let i++
 done
 
+echo deleting needless update data.
+
+clwdir=(
+  "$WINEPREFIX/drive_c/users/$USER/Application Data/MetaQuotes"
+  "$WINEPREFIX/drive_c/ProgramData/MetaQuotes"
+  "$WINEPREFIX/drive_c/Documents and Settings/All Users/Application Data/MetaQuotes"
+)
+
+for d in "${clwdir[@]}"; do
+  find "$d" -type f -name mt?clw*.png 2>/dev/null
+done | while read png; do
+  type=$(file -Z -b "$png" | grep -ioE "PE.*executable|data")
+  if [ -n "$type" ]; then
+    rm "$png";
+  fi
+done
+
+echo done
+
 exit 0
