@@ -55,7 +55,7 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 * wine
     * Linux 上で Windows 用アプリを動かすソフト
 * MT4/5 インストーラ の起動
-    * MT4/5本体は GUI で操作しながらインストールする必要が有るため手動でインストールする必要有り
+    * MT4 のインストールは GUI での操作が必要なためインストーラ起動後は手動で進める必要あり
 * スプレッド等のモニタリングデータをファイルに書き出すためのEA
 
 ## Google Compute Engin の無料VMインスタンスでの例
@@ -78,16 +78,19 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 * [Stackdriver で外側からの監視](../../wiki/setup_stackdriver)
     * サーバーそのものやネットワークのダウンを検知する
     * 全体構成図では LINE 通知になっていますが、まずは手順が簡単なメール通知の設定手順です
-* 不正アクセス防止のところは GCE がよしなにやってくれてるので気にしなくてOK
+* 不正アクセス防止のところは GCP がよしなにやってくれてるので気にしなくてOK
     * 他の格安VPSの場合はちゃんとしないと驚くほど攻撃を受けるので注意
-
+* [スマートフォンで口座を操作する](../../wiki/setup_mobile)
+    * 緊急時の手動決済などのための備え
+* (未完)[スマートフォンで自動売買サーバーを操作する](../../wiki/setup_mobile_vnc)
+    * これも緊急時の備え。スマートフォンからでもVMインスタンスのGUIに接続して操作できるようにしておく。
 
 ## 既にLinux + Wine + MetaTrader4/5 で自動売買をしている人向けの紹介
 
 まずは crontab.
 ```
 MAILTO=""
-PATH="%%ATST_HOME%%:/bin:/usr/bin:/usr/local/bin" ← %%ATST_HOME%% はインストール時に auto-trading-support-tools のフォルダに置換される
+PATH="%%ATST_HOME%%:/bin:/usr/bin:/usr/local/bin" ← %%ATST_HOME%% の部分はインストール時に auto-trading-support-tools のパスに置換される
 
 # List of MetaTrader which should be Monitored.
 # It consists of space separated, single quoted MetaTrader name.
