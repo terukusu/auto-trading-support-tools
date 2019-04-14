@@ -1,7 +1,8 @@
 MAILTO=""
 PATH="%%ATST_HOME%%:/bin:/usr/bin:/usr/local/bin"
 
-# Monitoring target MetaTrader list. Space separated single quoted name.
+# List of MetaTrader which should be Monitored.
+# It consists of space separated, single quoted MetaTrader name.
 # ex. "('Land-FX' 'MetaTrader 5' 'MetaTrader 4')"
 TARGET="('Land-FX')"
 
