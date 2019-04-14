@@ -1,17 +1,14 @@
 MAILTO=""
-ATST_HOME="%%ATST_HOME%%"
-PATH="$ATST_HOME:$PATH"
+PATH="%%ATST_HOME%%:/bin:/usr/bin:/usr/local/bin"
 
 0 9 * * * check_daily.sh
 * * * * * check_reboot.sh
 
-@reboot    mtctl.sh start           land-fx
-30 6 * * * truncate_monitoring.sh"  land-fx
-30 8 * * * report_image.sh          land-fx
-*  * * * * sleep  5; check_order.sh land-fx
-*  * * * * sleep 20; check_order.sh land-fx
-*  * * * * sleep 35; check_order.sh land-fx
-*  * * * * sleep 50; check_order.sh land-fx
+@reboot    mtctl.sh start                       land-fx
+30 6 * * * truncate_monitoring.sh               land-fx
+30 8 * * * report_image.sh                      land-fx
+*  * * * * sleep 10; check_order.sh             land-fx
+*  * * * * sleep 40; check_order.sh             land-fx
 *  * * * * sleep_random.sh; check_monitoring.sh land-fx
 *  * * * * sleep_random.sh; check_process.sh    land-fx
 *  * * * * sleep_random.sh; check_ping.sh       land-fx
