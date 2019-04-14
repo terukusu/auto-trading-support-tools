@@ -15,7 +15,7 @@ fi
 
 # check mt update
 clwdir=(
-  "$WINEPREFIX/drive_c/users/$USER/Application Data/MetaQuotes/"
+  "$WINEPREFIX/drive_c/users/$USER/Application Data/MetaQuotes"
   "$WINEPREFIX/drive_c/ProgramData/MetaQuotes"
   "$WINEPREFIX/drive_c/Documents and Settings/All Users/Application Data/MetaQuotes"
 )
