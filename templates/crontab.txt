@@ -8,13 +8,13 @@ TARGET="('Land-FX')"
 0 9 * * * check_daily.sh
 * * * * * check_reboot.sh
 
-@reboot    wrapper.sh mtctl.sh                             "$TARGET" start
-30 6 * * * wrapper.sh truncate_monitoring.sh               "$TARGET"
-30 8 * * * wrapper.sh report_image.sh                      "$TARGET"
-*  * * * * sleep 10; wrapper.sh check_order.sh             "$TARGET"
-*  * * * * sleep 40; wrapper.sh check_order.sh             "$TARGET"
-*  * * * * sleep_random.sh; wrapper.sh check_monitoring.sh "$TARGET"
-*  * * * * sleep_random.sh; wrapper.sh check_process.sh    "$TARGET"
-*  * * * * sleep_random.sh; wrapper.sh check_ping.sh       "$TARGET"
-*  * * * * sleep_random.sh; wrapper.sh check_price.sh      "$TARGET"
-*  * * * * sleep_random.sh; wrapper.sh check_spread.sh     "$TARGET"
+@reboot    wrapper.sh                  "$TARGET" mtctl.sh start
+30 6 * * * wrapper.sh                  "$TARGET" truncate_monitoring.sh
+30 8 * * * wrapper.sh                  "$TARGET" report_image.sh
+*  * * * * sleep 10; wrapper.sh        "$TARGET" check_order.sh
+*  * * * * sleep 40; wrapper.sh        "$TARGET" check_order.sh
+*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_monitoring.sh
+*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_process.sh
+*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_ping.sh
+*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_price.sh
+*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_spread.sh
