@@ -54,8 +54,9 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
     * 要するに最小構成のGUI
 * wine
     * Linux 上で Windows 用アプリを動かすソフト
-* MT4/5 インストーラ の起動
+* MT4 インストーラ の起動
     * MT4 のインストールは GUI での操作が必要なためインストーラ起動後は手動で進める必要あり
+    * MT5を使う場合は[インストーラの起動も手動](../../wiki/install_mt#mt5-%E3%82%92%E3%82%A4%E3%83%B3%E3%82%B9%E3%83%88%E3%83%BC%E3%83%AB%E3%81%99%E3%82%8B%E6%89%8B%E9%A0%86)
 * スプレッド等のモニタリングデータをファイルに書き出すためのEA
 
 ## Google Compute Engin の無料VMインスタンスでの例
@@ -68,6 +69,7 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 1. [LINE への通知設定(LINE側)](../../wiki/create_line_token)
 1. [LINE への通知設定(VM側)](../../wiki/setup_line)
 1. [再起動検知やMT4/5クラッシュ検知を設定](../../wiki/setup_monitoring)
+1. [自動売買を開始する](../../wiki/setup_ea)
 1. [ポジション新規／決済、価格、スプレッド、Pingの異常検知を設定](../../wiki/setup_monitoring2)
 
 
