@@ -140,7 +140,7 @@ function set_up_locale_and_timezone() {
 #####################################################
 function install_packages_misc_and_needed_by_mt4() {
   # install misc
-  sudo -E apt $APT_OPT install unattended-upgrades apt-transport-https psmisc file bc vim nano less tmux curl net-tools lsof
+  sudo -E apt $APT_OPT install unattended-upgrades apt-transport-https ntp psmisc file bc vim nano less tmux curl net-tools lsof
 
   # install gui
   sudo -E apt $APT_OPT install tightvncserver fonts-vlgothic xterm wm2
