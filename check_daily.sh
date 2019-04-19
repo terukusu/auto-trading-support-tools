@@ -7,7 +7,7 @@ echo "稼働OK！`uptime`" | atst_send_to_line
 
 # check upgradable package
 upgradable=$(apt list --upgradable 2>/dev/null | grep / | cut -d'/' -f 1)
-num_upgradable=$(echo -n "$upgradable" | wc -l)
+num_upgradable=$(echo "$upgradable" | grep -ve '^\s*$' | wc -l)
 
 if [ "$num_upgradable" -gt "0" ]; then
   echo -e "${num_upgradable}個のアップグレード可能なパッケージが有ります。\n$upgradable" |  atst_send_to_line
