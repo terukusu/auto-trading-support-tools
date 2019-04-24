@@ -31,7 +31,7 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 
 ## このツール群でできること
 * まっさらな VPS に MetaTrader4/5 (以下MT4/5) を動かすのに必要なもの一式をインストール
-* 起動時にMT4/5を自動起動
+* VPS再起動時にMT4/5を自動起動
 * 以下のことを検知してLINEに通知
     * VPSの再起動検知
     * MT4/5 のクラッシュ検知
@@ -60,8 +60,11 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 * スプレッド等のモニタリングデータをファイルに書き出すためのEA
 
 ## Google の無料VPSでの例
-まっさらな Linux VPS → 自動売買開始 → 監視 → LINE通知 までを一通りやってみましょうヽ(=´▽`=)ﾉ  
-Google Compute Engin の一番低スペックのVPS(VMインスタンス)は無料で使えるので、とりあえずこれで。
+まっさらな Linux VPS → 自動売買開始 → 監視 → 通知 までを一通りやってみましょうヽ(=´▽`=)ﾉ
+
+
+[Google Cloud Platform](https://cloud.google.com/products/?hl=ja) の一番低スペックの[VPS(VMインスタンス)](https://cloud.google.com/compute/?hl=ja)は[無料で使えて](https://cloud.google.com/free/?hl=ja)十分実用に耐えるので、とりあえずこれで。
+
 
 1. [VMインスタンス作成](../../wiki/create_vm_gce)
 1. [自動売買に必要なものをインストール](../../wiki/install_misc)
@@ -80,13 +83,14 @@ Google Compute Engin の一番低スペックのVPS(VMインスタンス)は無�
 ### おまけ
 * [Stackdriver で外側からの監視](../../wiki/setup_stackdriver)
     * サーバーそのものやネットワークのダウンを検知する
-    * 全体構成図では LINE 通知になっていますが、まずは手順が簡単なメール通知の設定手順です
 * 不正アクセス防止のところは GCP がよしなにやってくれてるので気にしなくてOK
     * 他の格安VPSの場合はちゃんとしないと驚くほど攻撃を受けるので注意
 * [スマートフォンで口座を操作する](../../wiki/setup_mobile_mt)
     * 緊急時の手動決済などのための備え
-* (未完)[スマートフォンで自動売買サーバーを操作する](../../wiki/setup_mobile_mt_vnc)
+* (未完)[スマートフォンで自動売買サーバーを操作する](https://www.google.com/)
     * これも緊急時の備え。スマートフォンからでもVMインスタンスのGUIに接続して操作できるようにしておく。
+* (未完)[格安VPSのススメ](https://www.google.com/)
+    * 年利5%有れば上等という
 
 ## 既にLinux + Wine + MetaTrader4/5 で自動売買をしている人向けの紹介
 
