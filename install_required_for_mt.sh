@@ -65,7 +65,7 @@ function create_bash_profile_if_needed() {
 
 export WINEARCH=$WINEARCH
 export WINEDEBUG=$WINEDEBUG
-export WINEPREFIX=$WINEPREFIX
+export WINEPREFIX=\$HOME/.wine
 export DISPLAY=$DISPLAY
 
 if [ -e \$HOME/.bashrc ]; then
