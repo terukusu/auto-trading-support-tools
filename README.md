@@ -3,7 +3,7 @@
 とくに複数の MT4/5 を扱う手間を軽減するためのものです。  
 
 このツール群の外側も含めた全体構成  
-<img src="../../wiki/images/atst_outline.png" width="640px">  
+<img src="../../wiki/wiki/images/atst_outline.png" width="640px">  
 
 
 自動売買において、最も最悪の事態は「決済されないこと」です。
@@ -84,7 +84,7 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 * [Stackdriver で外側からの監視](../../wiki/setup_stackdriver)
     * サーバーそのものやネットワークのダウンを検知する
 * 不正アクセス防止のところは GCP がよしなにやってくれてるので気にしなくてOK
-    * 他の格安VPSの場合はちゃんとしないと驚くほど攻撃を受けるので注意
+    * 他の格安VPSの場合はちゃんとしないと驚くほど攻撃を受けるので注意。 [設定例](../../wiki/setup_iptables)
 * [スマートフォンで口座を操作する](../../wiki/setup_mobile_mt)
     * 緊急時の手動決済などのための備え
 * [スマートフォンで自動売買サーバーを操作する](../../wiki/setup_mobile_ssh)
