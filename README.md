@@ -3,7 +3,7 @@
 とくに複数の MT4/5 を扱う手間を軽減するためのものです。  
 
 このツール群の外側も含めた全体構成  
-<img src="../../wiki/wiki/images/atst_outline.png" width="640px">  
+<img src="../../wiki/images/atst_outline.png" width="640px">  
 
 
 自動売買において、最も最悪の事態は「決済されないこと」です。
