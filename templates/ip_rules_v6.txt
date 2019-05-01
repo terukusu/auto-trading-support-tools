@@ -1,0 +1,23 @@
+*filter
+
+:INPUT   DROP   [0:0]
+:FORWARD DROP   [0:0]
+:OUTPUT  ACCEPT [0:0]
+
+-A INPUT -i lo -j ACCEPT
+-A INPUT -p tcp --tcp-flags ALL NONE -j DROP
+-A INPUT -p tcp ! --syn -m state --state NEW -j DROP
+-A INPUT -p tcp --tcp-flags ALL ALL -j DROP
+
+-A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 128 -m hashlimit --hashlimit-upto 1/min --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-name t_icmp --hashlimit-htable-expire 120000 -j ACCEPT
+-A INPUT -p ipv6-icmp -m icmp6 ! --icmpv6-type 128 -j ACCEPT
+
+-A INPUT -p tcp -m state --state RELATED,ESTABLISHED -j ACCEPT
+-A INPUT -p udp -m udp --sport 53 -j ACCEPT
+
+-A INPUT -p tcp -m state --state NEW -m tcp --dport 22 --tcp-flags FIN,SYN,RST,ACK SYN -m hashlimit --hashlimit-upto 1/min --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-name t_sshd --hashlimit-htable-expire 120000 -j ACCEPT
+
+-A INPUT -p tcp -m tcp --dport 80 -j ACCEPT
+-A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
+
+COMMIT

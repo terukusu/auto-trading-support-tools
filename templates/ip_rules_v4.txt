@@ -1,0 +1,23 @@
+*filter
+
+:INPUT   DROP   [0:0]
+:FORWARD DROP   [0:0]
+:OUTPUT  ACCEPT [0:0]
+
+-A INPUT -i lo -j ACCEPT
+-A INPUT -p tcp --tcp-flags ALL NONE -j DROP
+-A INPUT -p tcp ! --syn -m state --state NEW -j DROP
+-A INPUT -p tcp --tcp-flags ALL ALL -j DROP
+
+-A INPUT -p icmp --icmp-type echo-request -m hashlimit --hashlimit-name t_icmp --hashlimit 1/m --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-htable-expire 120000 -j ACCEPT
+-A INPUT -p icmp ! --icmp-type echo-request -j ACCEPT
+
+-A INPUT -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
+-A INPUT -p udp --sport 53 -j ACCEPT
+
+-A INPUT -p tcp -m state --syn --state NEW --dport 22 -m hashlimit --hashlimit-name t_sshd --hashlimit 1/m --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-htable-expire 120000 -j ACCEPT
+
+-A INPUT -p tcp --dport 80   -j ACCEPT
+-A INPUT -p tcp --dport 443  -j ACCEPT
+
+COMMIT
