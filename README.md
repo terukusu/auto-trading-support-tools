@@ -82,7 +82,7 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 
 
 を、一通り行っている作業動画がこちら↓  
-[<img src="../../wiki/images/install_thumb.png" width="280px">](https://youtu.be/_NWUpf0n5mw)
+[<img src="../../wiki/images/install_thumb.png" width="280px">](https://youtu.be/6kdOmCvU9ZU)
 
 ### おまけ
 * [Stackdriver で外側からの監視](../../wiki/setup_stackdriver)
