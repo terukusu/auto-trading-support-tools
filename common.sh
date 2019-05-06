@@ -76,6 +76,7 @@ function atst_abs_path() {
 
 # scan wine drive and find terminal.exe. and output lines like below.
 #
+#    mt_term[0]='/Users/teru/.wine/drive_c/Program Files/MetaTrader 5/terminal.exe'
 #    mt_home[0]='/Users/teru/.wine/drive_c/Program Files/MetaTrader 4'
 #    mt_name[0]='METATRADER 4'
 #    mt_type[0]='MT4'
@@ -95,10 +96,11 @@ function atst_gen_mt_list() {
   # Windowsの各ドライブのプログラムフォルダ内からtemrinal.exeを検索する
   cat <(find "$WINEPREFIX" -maxdepth 1 -type d -name drive_* | sort | while read drive; do
     find "$drive" -maxdepth 1 -type d -name Program* -maxdepth 1 | sort | while read program_folder; do
-      find "$program_folder" -maxdepth 2 -name terminal.exe
+      find "$program_folder" -maxdepth 2 -name terminal*.exe
     done
   done) | sort | while read line; do
     line=$(atst_abs_path "$line")
+    mt_term="$line"
     mt_home=$(dirname "$line")
     mt_name=$(basename "$mt_home" | atst_to_upper)
 
@@ -111,6 +113,7 @@ function atst_gen_mt_list() {
       continue
     fi
 
+    echo mt_term[$i]="'$mt_term'"
     echo mt_home[$i]="'$mt_home'"
     echo mt_name[$i]="'$mt_name'"
     echo mt_type[$i]="'$mt_type'"
@@ -146,7 +149,7 @@ function atst_find_terminal() {
   local target_mt_index=$(atst_find_mt_index "$target_mt_name")
 
   if [ -n "$target_mt_index" ]; then
-    echo "${mt_home[$target_mt_index]}/terminal.exe"
+    echo "${mt_term[$target_mt_index]}"
   fi
 }
 
