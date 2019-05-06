@@ -33,11 +33,15 @@ ATST_CONFIG_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
 ATST_ALERT_STATUS_FILE="$ATST_CONFIG_DIR/alert_status"
 ATST_LINE_TOKEN=$(f="$ATST_CONFIG_DIR/.line_token"; if [ -e "$f" ]; then cat "$f"; fi)
 
-if [ -z "$WINEARCH" ]; then
-    WINEARCH=win32
-fi
 if [ -z "$WINEPREFIX" ]; then
     WINEPREFIX=$HOME/.wine
+fi
+if [ -z "$WINEARCH" ]; then
+    if [ -d "$WINEPREFIX" ]; then
+        WINEARCH=$(cat "$WINEPREFIX"/system.reg | grep -m 1 '#arch' | cut -d '=' -f2)
+    else
+        WINEARCH=win32
+    fi
 fi
 if [ -z "$WINEDEBUG" ]; then
     WINEDEBUG=-all,err+all
