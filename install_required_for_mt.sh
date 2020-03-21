@@ -170,8 +170,9 @@ function install_packages_misc_and_needed_by_mt4() {
   if [ -z "$REPOS_EXISTS" ]; then
     WEB_REPOS_EXITS=$(curl -s --head "$FAUDIO_REPOS/" | head -n1 | cut -d' ' -f2 | grep -oe '^2')
     if [ -n "$WEB_REPOS_EXITS" ]; then
-      wget -nc $FAUDIO_REPOS/Release.key
-      sudo apt-key add Release.key
+      wget -q -nc -P "$DIR_WINECACHE" $FAUDIO_REPOS/Release.key
+      sudo apt-key add "$DIR_WINECACHE/Release.key"
+      rm "$DIR_WINECACHE/Release.key"
       sudo apt-add-repository "deb $FAUDIO_REPOS ./"
     fi
   fi
