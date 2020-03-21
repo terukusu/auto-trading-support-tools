@@ -165,7 +165,7 @@ function install_packages_misc_and_needed_by_mt4() {
 
   REPOS_EXISTS=$(cat /etc/apt/sources.list | grep "$FAUDIO_REPOS" | head -n1)
   if [ -z "$REPOS_EXISTS" ]; then
-    WEB_REPOS_EXITS=$(curl -s --head "$FAUDIO_REPOS" | head -n1 | cut -d' ' -f2 | grep -oe '^2')
+    WEB_REPOS_EXITS=$(curl -s --head "$FAUDIO_REPOS/" | head -n1 | cut -d' ' -f2 | grep -oe '^2')
     if [ -n "$WEB_REPOS_EXITS" ]; then
       wget -nc $FAUDIO_REPOS/Release.key
       sudo apt-key add Release.key
