@@ -32,10 +32,11 @@ fi
 WINE_REPOS="deb https://dl.winehq.org/wine-builds/$ID/ $VERSION_CODENAME main"
 
 FAUDIO_REPOS_BASE="https://download.opensuse.org/repositories/Emulators:/Wine:/Debian"
-if [ -n "$(echo $NAME | grep -o Ubuntu)" ]; then
-    FAUDIO_REPOS=${FAUDIO_REPOS_BASE}/x${NAME}_${VERSION_ID}
-elif [ -n "$(echo $NAME | grep -o Debian)" ]; then
-    FAUDIO_REPOS=${FAUDIO_REPOS_BASE}/${NAME}_${VERSION_ID}
+DIST_NAME=$(echo $NAME | tr '[A-Z]' '[a-z]' | grep -oE "ubuntu|debian")
+if [ "$DIST_NAME" = "ubuntu" ]; then
+    FAUDIO_REPOS=${FAUDIO_REPOS_BASE}/xUbuntu_${VERSION_ID}
+elif [ "$DIST_NAME" = "debian" ]; then
+    FAUDIO_REPOS=${FAUDIO_REPOS_BASE}/Debian_${VERSION_ID}
 fi
 
 ########################################
@@ -49,6 +50,8 @@ mkdir -p "$DIR_WINECACHE"
 ########################################
 function setup_root_crontab() {
   # For old OpenVZ kernel. SSHD doesn't start after updating systemd without this.
+
+  sudo -E apt $APT_OPT install cron
 
   cron_line=$(sudo bash -c "crontab -l 2>/dev/null" | grep -o "mkdir -p -m0755 /var/run/sshd")
 
