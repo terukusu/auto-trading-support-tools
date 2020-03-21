@@ -331,7 +331,7 @@ function setup_wine {
   fi
 
   msi_mono=wine-mono-$latest_mono.msi
-  msi_gecko=wine_gecko-$latest_gecko-$msi_arch.msi
+  msi_gecko=wine-gecko-$latest_gecko-$msi_arch.msi
 
   echo -n Downlaoding mono: $latest_mono ...
   wget -q -N -P "$DIR_WINECACHE" "http://dl.winehq.org/wine/wine-mono/$latest_mono/$msi_mono"
