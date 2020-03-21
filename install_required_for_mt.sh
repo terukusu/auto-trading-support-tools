@@ -31,6 +31,13 @@ fi
 
 WINE_REPOS="deb https://dl.winehq.org/wine-builds/$ID/ $VERSION_CODENAME main"
 
+FAUDIO_REPOS_BASE="https://download.opensuse.org/repositories/Emulators:/Wine:/Debian"
+if [ -n "$(echo $NAME | grep -o Ubuntu)" ]; then
+    FAUDIO_REPOS=${FAUDIO_REPOS_BASE}/x${NAME}_${VERSION_ID}
+elif [ -n "$(echo $NAME | grep -o Debian)" ]; then
+    FAUDIO_REPOS=${FAUDIO_REPOS_BASE}/${NAME}_${VERSION_ID}
+fi
+
 ########################################
 # Creating directories
 ########################################
@@ -148,9 +155,24 @@ function install_packages_misc_and_needed_by_mt4() {
   # install wine
   sudo -E apt $APT_OPT install software-properties-common
   sudo dpkg --add-architecture i386
-  wget -q -nc -P "$DIR_WINECACHE" https://dl.winehq.org/wine-builds/winehq.key
-  sudo apt-key add "$DIR_WINECACHE/winehq.key"
-  sudo apt-add-repository "$WINE_REPOS"
+
+  REPOS_EXISTS=$(cat /etc/apt/sources.list | grep "$WINE_REPOS" | head -n1)
+  if [ -z "$REPOS_EXISTS" ]; then
+    wget -q -nc -P "$DIR_WINECACHE" https://dl.winehq.org/wine-builds/winehq.key
+    sudo apt-key add "$DIR_WINECACHE/winehq.key"
+    sudo apt-add-repository "$WINE_REPOS"
+  fi
+
+  REPOS_EXISTS=$(cat /etc/apt/sources.list | grep "$FAUDIO_REPOS" | head -n1)
+  if [ -z "$REPOS_EXISTS" ]; then
+    WEB_REPOS_EXITS=$(curl -s --head "$FAUDIO_REPOS" | head -n1 | cut -d' ' -f2 | grep -oe '^2')
+    if [ -n "$WEB_REPOS_EXITS" ]; then
+      wget -nc $FAUDIO_REPOS/Release.key
+      sudo apt-key add Release.key
+      sudo apt-add-repository "deb $FAUDIO_REPOS ./"
+    fi
+  fi
+
   sudo -E apt $APT_OPT update
   sudo -E apt $APT_OPT install --install-recommends winehq-stable
 }
