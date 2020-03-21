@@ -403,7 +403,9 @@ function clean_needless_files {
   sudo apt-get -y clean
   rm "$DIR_WINECACHE/$msi_mono"
   rm "$DIR_WINECACHE/$msi_gecko"
-  rm "$DIR_WINECACHE/winehq.key"
+  if [ -e "$DIR_WINECACHE/winehq.key" ]; then
+    rm "$DIR_WINECACHE/winehq.key"
+  fi
   "$ABS_PWD/minimize_wine.sh"
 }
 
