@@ -97,6 +97,8 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 * [オススメVPS](../../wiki/best_vps)
     * 年利 5% 有れば上等という投資・投機の世界でインフラ代は安ければ安いほど良いという話
 * [Google 以外のVPSでの例](../../wiki/setup_vps)
+* [WindowsのRDPを使ってVMインスタンスの GUI にリモート接続する方法](../../wiki/setup_xrdp)
+* [VMにデスクトップ環境であるLXDEを導入する方法](../../wiki/setup_lxde)
 
 
 ## 既にLinux + Wine + MetaTrader4/5 で自動売買をしている人向けの紹介
