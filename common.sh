@@ -49,47 +49,52 @@ function atst_read_file() {
   cat "$1" | sed -re 's/\r//g'
 }
 
+# 画像アップロード関数
+function atst_upload_image_to_0x0() {
+  local file="$1"
+
+  if [ ! -f "$file" ]; then
+    echo "Error: File not found: $file" >&2
+    return 1
+  fi
+
+  # IPv4を強制的に使用してアップロード（3日間保持）
+  local url=$(curl -4 -s -F"file=@$file" -Fexpires=72 https://0x0.st 2>/dev/null)
+
+  if [ -n "$url" ] && [[ "$url" =~ ^https?:// ]]; then
+    echo "$url"
+    return 0
+  else
+    echo "Error: Upload failed" >&2
+    return 1
+  fi
+}
+
+# LINE送信関数
 function atst_send_to_line() {
   local msg=$(cat -)
   local image_file="$1"
 
-  # LINE Messaging API の設定
   local channel_access_token="$ATST_LINE_TOKEN"
-  local user_id="$ATST_LINE_ID" 
+  local user_id="$ATST_LINE_ID"
   local api_endpoint="https://api.line.me/v2/bot/message/push"
 
-  # メッセージのJSON作成
   local messages=""
 
-  # テキストメッセージ
-  messages='[{"type":"text","text":"【'$(hostname -s)'】'"$msg"'"}]'
-
-  # 画像がある場合は、先に画像をアップロードしてURLを取得する必要がある
   if [ -n "$image_file" ]; then
-    # 画像をLINEのContent APIにアップロード
-    local upload_result=$(curl -X POST "https://api-data.line.me/v2/bot/message/upload/prepare" \
-      -H "Authorization: Bearer $channel_access_token" \
-      -H "Content-Type: application/json" \
-      -d '{
-        "file": "'$(basename "$image_file")'",
-        "type": "image"
-      }')
+    # アップロード関数を呼び出し
+    local image_url=$(atst_upload_image_to_0x0 "$image_file")
 
-    local upload_url=$(echo "$upload_result" | jq -r '.uploadUrl')
-
-    # 画像をアップロード
-    if [ -n "$upload_url" ]; then
-      curl -X PUT "$upload_url" \
-        -H "Content-Type: image/jpeg" \
-        --data-binary "@$image_file"
-
-      # メッセージに画像を追加
-      local image_url="$upload_url"
+    if [ $? -eq 0 ] && [ -n "$image_url" ]; then
       messages='[
         {"type":"text","text":"【'$(hostname -s)'】'"$msg"'"},
         {"type":"image","originalContentUrl":"'$image_url'","previewImageUrl":"'$image_url'"}
       ]'
+    else
+      messages='[{"type":"text","text":"【'$(hostname -s)'】'"$msg"' (画像アップロード失敗)"}]'
     fi
+  else
+    messages='[{"type":"text","text":"【'$(hostname -s)'】'"$msg"'"}]'
   fi
 
   # メッセージ送信
