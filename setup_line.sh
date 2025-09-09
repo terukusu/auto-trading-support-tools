@@ -5,21 +5,23 @@
 echo "LINEへの通知を送るための設定をします。"
 echo ""
 
-while [ 1 ]; do
-    echo "LINE トークンを入力してください。43文字の文字列です。例：n3DganilkwSjpi...."
-    echo ""
-    echo -n "> "
-    read line_token
+echo "LINE トークンを入力してください。例：n3DganilkwSjpi...."
+echo ""
+echo -n "> "
+read line_token
 
-    data_len=$(echo -n "$line_token" | wc -c)
+echo $line_token > "$ATST_CONFIG_DIR/.line_token"
 
-    if [ $data_len -eq 43 ]; then
-        echo $line_token > "$ATST_CONFIG_DIR/.line_token"
-        break
-    fi
+echo ""
 
-    echo "トークンの値が不正です。もう一度入れ直してください"
-done
+echo "LINE ユーザーIDもしくはグループIDを入力してください。例：Uccf0eb6...."
+echo ""
+echo -n "> "
+read line_id
+
+echo $line_id > "$ATST_CONFIG_DIR/.line_id"
+echo ""
+
 
 echo ""
 

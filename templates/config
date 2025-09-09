@@ -32,6 +32,7 @@ ATST_THRESHOLD_PRICE_LOWER=50
 ATST_CONFIG_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
 ATST_ALERT_STATUS_FILE="$ATST_CONFIG_DIR/alert_status"
 ATST_LINE_TOKEN=$(f="$ATST_CONFIG_DIR/.line_token"; if [ -e "$f" ]; then cat "$f"; fi)
+ATST_LINE_ID=$(f="$ATST_CONFIG_DIR/.line_id"; if [ -e "$f" ]; then cat "$f"; fi)
 
 if [ -z "$WINEPREFIX" ]; then
     WINEPREFIX=$HOME/.wine

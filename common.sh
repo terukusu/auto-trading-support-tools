@@ -53,14 +53,54 @@ function atst_send_to_line() {
   local msg=$(cat -)
   local image_file="$1"
 
+  # LINE Messaging API の設定
+  local channel_access_token="$ATST_LINE_TOKEN"
+  local user_id="$ATST_LINE_ID" 
+  local api_endpoint="https://api.line.me/v2/bot/message/push"
+
+  # メッセージのJSON作成
+  local messages=""
+
+  # テキストメッセージ
+  messages='[{"type":"text","text":"【'$(hostname -s)'】'"$msg"'"}]'
+
+  # 画像がある場合は、先に画像をアップロードしてURLを取得する必要がある
   if [ -n "$image_file" ]; then
-    local image_form="-F imageFile=@$image_file"
+    # 画像をLINEのContent APIにアップロード
+    local upload_result=$(curl -X POST "https://api-data.line.me/v2/bot/message/upload/prepare" \
+      -H "Authorization: Bearer $channel_access_token" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "file": "'$(basename "$image_file")'",
+        "type": "image"
+      }')
+
+    local upload_url=$(echo "$upload_result" | jq -r '.uploadUrl')
+
+    # 画像をアップロード
+    if [ -n "$upload_url" ]; then
+      curl -X PUT "$upload_url" \
+        -H "Content-Type: image/jpeg" \
+        --data-binary "@$image_file"
+
+      # メッセージに画像を追加
+      local image_url="$upload_url"
+      messages='[
+        {"type":"text","text":"【'$(hostname -s)'】'"$msg"'"},
+        {"type":"image","originalContentUrl":"'$image_url'","previewImageUrl":"'$image_url'"}
+      ]'
+    fi
   fi
 
-  local result=$(curl "https://notify-api.line.me/api/notify" \
+  # メッセージ送信
+  local result=$(curl -X POST "$api_endpoint" \
     -s -o /dev/null -w "%{http_code}\n" \
-    -H "Authorization: Bearer $ATST_LINE_TOKEN" \
-    -F "message=【$(hostname -s)】$msg" $image_form)
+    -H "Authorization: Bearer $channel_access_token" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "to": "'"$user_id"'",
+      "messages": '"$messages"'
+    }')
 
   if [ -n "$result" -a "$result" == "200" ]; then
     return 0
