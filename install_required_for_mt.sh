@@ -150,7 +150,12 @@ function set_up_locale_and_timezone() {
 #####################################################
 function install_packages_misc_and_needed_by_mt4() {
   # install misc
-  sudo -E apt $APT_OPT install unattended-upgrades apt-transport-https ntp psmisc file bc vim nano less tmux curl net-tools lsof
+  # Use chrony for time sync (instead of the classic 'ntp'). chrony is the portable, modern
+  # choice across supported distros: Debian 12 dropped classic ntp(ntpd) in favour of ntpsec,
+  # and chrony transparently replaces systemd-timesyncd. (On Ubuntu noble 'ntp' still exists in
+  # universe, so this is a portability/consistency choice, not a fix for a missing package.)
+  # gnupg (gpg --dearmor) and wget are needed for the keyring/repo setup below.
+  sudo -E apt $APT_OPT install unattended-upgrades apt-transport-https chrony gnupg wget psmisc file bc vim nano less tmux curl net-tools lsof
 
   # install gui
   sudo -E apt $APT_OPT install tightvncserver fonts-vlgothic xterm wm2
