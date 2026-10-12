@@ -26,10 +26,28 @@ export DISPLAY=:1
 . /etc/os-release
 
 if [ -z "$VERSION_CODENAME" ]; then
-  VERSION_CODENAME=`echo -n $VERSION | tr '[A-Z]' '[a-z]' | grep -Eo 'artful|bionic|cosmic|precise|trusty|xenial|yakkety|zesty|jessie|stretch|buster'`
+  # Fallback for old os-release files without VERSION_CODENAME.
+  # Only currently-supported (non-EOL) codenames are listed; older releases are no longer supported.
+  VERSION_CODENAME=`echo -n $VERSION | tr '[A-Z]' '[a-z]' | grep -Eo 'focal|jammy|noble|bullseye|bookworm|trixie'`
 fi
 
-WINE_REPOS="deb https://dl.winehq.org/wine-builds/$ID/ $VERSION_CODENAME main"
+# Only currently-supported (non-EOL) releases are handled. Fail clearly on an unknown or empty
+# codename instead of writing a broken sources.list entry that would later break apt.
+case "$VERSION_CODENAME" in
+  focal|jammy|noble|bullseye|bookworm|trixie) : ;;
+  *) echo "[error] unsupported or undetected release: VERSION_CODENAME='$VERSION_CODENAME' (supported: focal/jammy/noble/bullseye/bookworm/trixie)" >&2; exit 1 ;;
+esac
+
+# APT signing keys (apt-key is removed on modern distros; store dearmored keys here and
+# reference them with signed-by. Works on apt 1.1+, i.e. Ubuntu 16.04+ / Debian 9+).
+APT_KEYRINGS_DIR=/etc/apt/keyrings
+WINE_KEY_URL=https://dl.winehq.org/wine-builds/winehq.key
+WINE_KEYRING=$APT_KEYRINGS_DIR/winehq-archive.gpg
+FAUDIO_KEYRING=$APT_KEYRINGS_DIR/winehq-faudio-archive.gpg
+WINE_LIST=/etc/apt/sources.list.d/winehq.list
+FAUDIO_LIST=/etc/apt/sources.list.d/winehq-faudio.list
+
+WINE_REPOS="deb [signed-by=$WINE_KEYRING arch=amd64,i386] https://dl.winehq.org/wine-builds/$ID/ $VERSION_CODENAME main"
 
 FAUDIO_REPOS_BASE="https://download.opensuse.org/repositories/Emulators:/Wine:/Debian"
 DIST_NAME=$(echo $NAME | tr '[A-Z]' '[a-z]' | grep -oE "ubuntu|debian")
@@ -161,14 +179,24 @@ function install_packages_misc_and_needed_by_mt4() {
   sudo -E apt $APT_OPT install tightvncserver fonts-vlgothic xterm wm2
 
   # install wine
-  sudo -E apt $APT_OPT install software-properties-common
   sudo dpkg --add-architecture i386
+  sudo install -d -m 0755 "$APT_KEYRINGS_DIR"
 
-  REPOS_EXISTS=$(cat /etc/apt/sources.list | grep "$WINE_REPOS" | head -n1)
-  if [ -z "$REPOS_EXISTS" ]; then
-    wget -q -nc -P "$DIR_WINECACHE" https://dl.winehq.org/wine-builds/winehq.key
-    sudo apt-key add "$DIR_WINECACHE/winehq.key"
-    sudo apt-add-repository "$WINE_REPOS"
+  # WineHQ repository (keyring + signed-by instead of the removed apt-key).
+  # Skip entirely if WineHQ is already configured in any form — adding a second definition with a
+  # different signed-by keyring makes apt fail with "Conflicting values set for option Signed-By".
+  if grep -rqsE 'winehq|wine-builds' /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null; then
+    echo "WineHQ repository already configured; skipping key/list setup."
+  elif [ ! -e "$WINE_LIST" ]; then
+    wget -q --timeout=30 --tries=3 -O - "$WINE_KEY_URL" | sudo gpg --dearmor --yes -o "$WINE_KEYRING"
+    sudo chmod 0644 "$WINE_KEYRING"
+    # Only write the repo list once the key is actually present; otherwise apt would break with
+    # NO_PUBKEY and the leftover list would make every re-run skip the key step (permanent break).
+    if [ -s "$WINE_KEYRING" ]; then
+      echo "$WINE_REPOS" | sudo tee "$WINE_LIST" > /dev/null
+    else
+      echo "[error] failed to fetch/import WineHQ key from $WINE_KEY_URL; not writing $WINE_LIST" >&2
+    fi
   fi
 
   REPOS_EXISTS=$(cat /etc/apt/sources.list | grep "$FAUDIO_REPOS" | head -n1)
