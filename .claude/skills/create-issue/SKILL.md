@@ -121,26 +121,24 @@ feature / spike では **自由形式** で、会話文脈にしか存在しな�
 
 ## ラベル付与
 
-**起票時にラベルを付与する。** ただし **本リポジトリに実在するラベルのみ**を使う（存在しないラベルを渡すと `gh issue create` が失敗する）。起票前に `gh label list` で実在を確認し、無ければそのラベルは付けない（必要なら新設を別 Issue で検討）。
+**起票時にラベルを付与する。** 本節の表が**ラベル体系の正本（SSoT）**で、表のラベルはすべてリポジトリに実在する（#34 で新設）。表に無いラベルは使わない。新設が必要なら別 Issue で表と `gh label create` を同時に更新する。
 
-付与の指針（実在する範囲で）:
-
-| 軸 | 選択肢の例 | 方針 |
+| 軸 | ラベル | 方針 |
 |---|---|---|
-| 優先度 | `P0` / `P1` / `P2` / `P3` / `P4` | 可能なら付与。迷ったら `P3` |
-| 種別 | `feature` / `bug` / `tech-debt` / `docs` | 種類判定の結果に従う（spike は `feature`） |
-| 領域 | `install` / `wine` / `vnc` / `monitoring` / `mt` / `cron` / `line` / `compat` | 該当時のみ（`docs` は種別側に寄せ、領域には置かない） |
+| 優先度 | `P0` / `P1` / `P2` / `P3` / `P4` | 必ず 1 つ付与。迷ったら `P3`。`P0` は本番障害・資金リスク |
+| 種別 | `enhancement` / `bug` / `spike` / `tech-debt` / `documentation` | 種類判定の結果に対応させる（feature → `enhancement`、bug → `bug`、spike → `spike`）。負債解消は `tech-debt`、文書のみは `documentation` |
+| 領域 | `install` / `wine` / `vnc` / `monitoring` / `mt` / `cron` / `line` / `compat` | 該当するものを 0 個以上 |
+| EPIC | `epic` | `/create-epic` が EPIC 本体に付与する（通常 Issue には付けない） |
+| フロー制御 | `contract-first` / `skip-refinement` | `/implement-issue` の gate を人が明示的に切り替えるときだけ付与する |
 
-`gh issue create --label 'P3,feature,wine'` のようにカンマ区切りで指定する。優先度はユーザー指定があればそれに従う。
-
-※ `implement-issue` が参照する `spike` / `contract-first` / `skip-refinement` ラベルを運用で使う場合は、`gh label list` で実在を確認し、無ければ新設するか付けない（存在しないラベル指定は起票失敗を招く）。
+`gh issue create --label 'P3,enhancement,wine'` のようにカンマ区切りで指定する。優先度はユーザー指定があればそれに従う。
 
 ## 実行手順
 
 1. `gh auth status` で認証を確認（本リポジトリでは terukusu の `GH_CONFIG_DIR` で動く想定）。失敗ならユーザーに報告して中断
 2. `$ARGUMENTS` が空なら「タイトルまたはトピックを指定してください」と報告して中断
 3. `$ARGUMENTS` の内容から **種類判定**（feature / spike / bug）。曖昧なら **feature にフォールバック**
-4. **ラベル決定**: `gh label list` で実在を確認し、優先度 + 種別（+ 領域）を実在する範囲で決める
+4. **ラベル決定**: 「ラベル付与」節の表から優先度 + 種別（+ 領域）を決める
 5. **種類別の本文生成**:
    - **bug**: 固定スキーマ（症状・再現手順・環境）を `$ARGUMENTS` と会話文脈から推測可能な範囲で埋める。情報がない欄はプレースホルダ（`<...>`）を残す
    - **feature / spike**: 会話文脈から事実情報をサルベージして自由形式で記載（prompt injection 対策・機微情報フィルタを適用）。事実情報が無ければ本文は 1 行コンテキストまたは空

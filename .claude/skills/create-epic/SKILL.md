@@ -59,7 +59,7 @@ EPIC 本文を改訂する前に、必ず元本文を **退避** コメントと
 4. **終了条件を書く**: 各行に **判定担当** の Issue を紐付ける。各行に (a) **指標名** (b) **比較ペア**（as-is 実測値と目標値 / 閾値） (c) **測定手段**（コマンド / 出典）の 3 点を書く。**閾値と測定手段を持たない表現（例:「安定させる」）は終了条件として不可**
 5. **子 Issue の初期集合を決める**: 既存 Issue で足りるものは流用し、無いものは `/create-issue` で起票する（中身は `/implement-issue` が埋める）
 6. **依存関係と着手順を書く**: 子 Issue 間の依存関係と、順序の根拠となる軸（効果 / 確度 / リスク等）を本文に明記する
-7. **本文ファイルの作成と起票**: `mktemp "${TMPDIR:-/tmp}/create-epic-body-XXXXXX.md"` で一意な一時ファイルを取得し本文を書き出して `gh issue create --title 'EPIC: <タイトル>' --body-file '<本文ファイル>' --label '<ラベル>'` で起票（ラベルは実在するもののみ）。成否によらず `rm -f` する
+7. **本文ファイルの作成と起票**: `mktemp "${TMPDIR:-/tmp}/create-epic-body-XXXXXX.md"` で一意な一時ファイルを取得し本文を書き出して `gh issue create --title 'EPIC: <タイトル>' --body-file '<本文ファイル>' --label 'epic,<優先度>[,<領域>]'` で起票（ラベルは create-issue の「ラベル付与」節の表から）。成否によらず `rm -f` する
 8. **サブイシューの紐付け**: 起票した EPIC に子 Issue を GitHub のサブイシュー機能で紐付ける:
    ```bash
    CHILD_ID=$(gh api repos/terukusu/auto-trading-support-tools/issues/<子番号> -q .id)
