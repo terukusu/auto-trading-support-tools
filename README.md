@@ -22,16 +22,16 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 
 
 * 動作確認環境は以下のディストリビューションの x86_64, minimal 版
-    * Ubuntu 14.04, 16.04, 18.04
-    * Debian 8, 9
+    * Ubuntu 20.04, 22.04, 24.04
+    * Debian 11, 12
+    * ※ サポート終了(EOL)した古い版(Ubuntu 14〜18 / Debian 8〜10 等)は切り捨て。当時は動作していたが現在は未サポート
 
 
 * 動作確認環境のカーネルバージョン
-    * 格安VPSに多い仮想化方式 [OpenVZ](https://ja.wikipedia.org/wiki/OpenVZ) で使われるカーネル
-        * 2.6.32-xxx
-        * 3.10.0-xxx
+    * 格安VPSに多い仮想化方式 [OpenVZ](https://ja.wikipedia.org/wiki/OpenVZ) / Virtuozzo で使われるカーネル
+        * 2.6.32-xxx 〜 6.x 系まで動作実績あり
     * 少しお高い VPS に多い仮想化方式 [KVM](https://ja.wikipedia.org/wiki/Kernel-based_Virtual_Machine) で使える最近のカーネル
-        * 4.15.0-xxxx
+        * 4.15.0 以降
 
 
 ## このツール群でできること
