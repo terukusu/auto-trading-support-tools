@@ -4,8 +4,8 @@ ATST_HOME=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
 ATST_TEMPLATES_DIR="$ATST_HOME/templates"
 ATST_CONFIG_DIR="$HOME/.atst"
 
-if [ ! -e $ATST_CONFIG_DIR ];then
-  mkdir -p $ATST_CONFIG_DIR
+if [ ! -e "$ATST_CONFIG_DIR" ];then
+  mkdir -p "$ATST_CONFIG_DIR"
 fi
 
 if [ ! -e "$ATST_CONFIG_DIR/config" ]; then
