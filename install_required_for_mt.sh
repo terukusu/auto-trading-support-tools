@@ -95,6 +95,9 @@ export WINEARCH=$WINEARCH
 export WINEDEBUG=$WINEDEBUG
 export WINEPREFIX=\$HOME/.wine
 export DISPLAY=$DISPLAY
+# MT4/5 need neither .NET (mono) nor embedded IE (gecko); disable both so Wine never pops a
+# download dialog at runtime (keeps mtctl / cron-launched MT unattended).
+export WINEDLLOVERRIDES="mscoree=;mshtml="
 
 if [ -e \$HOME/.bashrc ]; then
   . \$HOME/.bashrc
@@ -357,39 +360,10 @@ function start_vncserver_service() {
 }
 
 #####################################################
-# Setup Wine, Downlaod & install Wine-Mono and Wine-Gecko package.
+# Setup Wine (initialize WINEPREFIX). Wine-Mono / Wine-Gecko are intentionally NOT installed;
+# they are disabled via WINEDLLOVERRIDES because MetaTrader does not need them.
 #####################################################
 function setup_wine {
-  latest_mono=$(curl -s http://dl.winehq.org/wine/wine-mono/ | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | sort -nr | head -n1)
-  latest_gecko=$(curl -s http://dl.winehq.org/wine/wine-gecko/ | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | sort -nr | head -n1)
-
-  msi_arch=x86
-
-  if [ "win64" == "$WINEARCH" ]; then
-    msi_arch=x86_64
-  fi
-
-  msi_mono=wine-mono-$latest_mono.msi
-  msi_gecko=wine-gecko-$latest_gecko-$msi_arch.msi
-
-  echo -n Downlaoding mono: $latest_mono ...
-  wget -q -N -P "$DIR_WINECACHE" "http://dl.winehq.org/wine/wine-mono/$latest_mono/$msi_mono"
-
-  if [ $? == 0 ]; then
-    echo done.
-  else
-    echo failed.
-  fi
-
-  echo -n Downlaoding gecko: $latest_gecko ...
-  wget -q -N -P "$DIR_WINECACHE" "http://dl.winehq.org/wine/wine-gecko/$latest_gecko/$msi_gecko"
-
-  if [ $? == 0 ]; then
-    echo done.
-  else
-    echo failed.
-  fi
-
   #####################################################
   # Setup Wine (it must be exec without GUI.)
   #####################################################
@@ -412,23 +386,29 @@ function setup_wine {
     fi
   fi
 
+  # MetaTrader 4/5 are native Win32 apps and need neither Wine-Mono (.NET / mscoree) nor
+  # Wine-Gecko (embedded IE / mshtml). Disabling both stops wineboot from prompting for or
+  # downloading them, which keeps this headless install unattended, lighter and free of a
+  # fragile network dependency. (If the in-terminal HTML views are ever needed, install gecko
+  # later with: winetricks gecko)
   echo Initializing wine.. this takes few minutes.
+  unset WINEDLLOVERRIDES_OLD
+  [ -n "${WINEDLLOVERRIDES+x}" ] && WINEDLLOVERRIDES_OLD="$WINEDLLOVERRIDES"
+  export WINEDLLOVERRIDES="mscoree=;mshtml="
   wineserver -kw
   wineboot -i
   wineserver -w
+  if [ -n "${WINEDLLOVERRIDES_OLD+x}" ]; then
+    export WINEDLLOVERRIDES="$WINEDLLOVERRIDES_OLD"
+  else
+    unset WINEDLLOVERRIDES
+  fi
 
   # setting japanese fonts
   font_replace_exist=$(cat "$WINEPREFIX/user.reg" | tr -d '\r' | grep -o '\[Software\\\\Wine\\\\Fonts\\\\Replacements\]')
   if [ -z "$font_replace_exist" ]; then
     cat "$DIR_TEMPLATES/font_replace.reg" >> "$WINEPREFIX/user.reg"
   fi
-
-  # install wine-mono and wine-gecko
-  echo Installing Wine-Mono
-  wine msiexec /i "$DIR_WINECACHE/$msi_mono"
-
-  echo Installing Wine-Gecko
-  wine msiexec /i "$DIR_WINECACHE/$msi_gecko"
 
   export WINEDEBUG=$WINEDEBUG_OLD
   export DISPLAY=$DISPLAY_OLD
@@ -440,11 +420,6 @@ function setup_wine {
 function clean_needless_files {
   sudo apt-get -y autoremove
   sudo apt-get -y clean
-  rm "$DIR_WINECACHE/$msi_mono"
-  rm "$DIR_WINECACHE/$msi_gecko"
-  if [ -e "$DIR_WINECACHE/winehq.key" ]; then
-    rm "$DIR_WINECACHE/winehq.key"
-  fi
   "$ABS_PWD/minimize_wine.sh"
 }
 
