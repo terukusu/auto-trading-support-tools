@@ -1,7 +1,7 @@
 ---
 name: implement-epic
 description: "EPIC 配下の子 Issue を依存順に 1 本ずつ /implement-issue（条件付きで /implement-issue-lite）へ渡して完遂させるオーケストレーター"
-argument-hint: "<EPIC 番号 または URL> [--approve-plans] [--allow-lite]"
+argument-hint: "<EPIC 番号 または URL> [--approve-plans] [--allow-lite] [--auto-merge]"
 allowed-tools: [Read, Edit, Write, Bash, Glob, Grep, Agent]
 ---
 
@@ -31,6 +31,7 @@ allowed-tools: [Read, Edit, Write, Bash, Glob, Grep, Agent]
 | フラグ | 意味 |
 |---|---|
 | `--approve-plans` | 各子の Phase 3 計画承認を、計画要旨の提示をもって承認済みとみなす |
+| `--auto-merge` | 各子の PR マージ承認を委任する（`/implement-issue` の「マージ運用」節の条件に従う）。本番VPS 反映の承認は委任されない |
 | `--allow-lite` | 子ごとに `/implement-issue-lite` の適用条件 L2〜L7 を判定し、すべて真なら lite で実装する。**このフラグが lite の L1（ユーザーの明示指示）を満たす**。フラグが無ければ全子をフルフローで実装する |
 
 ## 進捗の導出と再開
@@ -53,7 +54,7 @@ gh api graphql -f query='query{repository(owner:"terukusu",name:"auto-trading-su
 | 確認ポイント | 既定 | 一括委任 |
 |---|---|---|
 | Phase 3 計画承認 | 子 Issue ごとに毎回聞く | `--approve-plans` の明示時に限り、計画要旨を提示して承認済みとみなす |
-| PR の master マージ承認 | 子 Issue ごとに毎回聞く | **不可**（起動時の明示があっても委任できない） |
+| PR の master マージ承認 | 子 Issue ごとに毎回聞く | `--auto-merge` の明示、またはセッション中のユーザーの明示発話で委任可（詳細・stacked PR の規定は `/implement-issue` の「マージ運用」節） |
 | **本番VPS への反映**（稼働中の自動売買機の変更: VPS 上実行・crontab 変更・apt・mtctl start/stop 等） | 人に聞く | **不可**（委任しない。不可逆・実弾） |
 
 **`/implement-issue` の SKILL.md は変更しない**。上記は main orchestrator が人に諮るステップで、本スキル経由ではその main orchestrator が `/implement-epic` 自身なので、起動時に得た委任をそのステップの充足として扱う。**単体で `/implement-issue <N>` を起動したときの挙動は一切変わらない**。

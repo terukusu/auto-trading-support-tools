@@ -61,3 +61,4 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 
 - 変更は Issue 駆動。計画は `.claude/skills/` の create-epic / create-issue、実装は implement-issue / implement-issue-lite / implement-epic を使う。
 - 本番 VPS を変える操作（MT の start/stop、cron 設定、`apt` 実行、鍵・リポジトリ追加、ロケール/TZ 変更、swap 変更）は Issue ごとに**毎回ユーザー承認を得る**。委任不可。
+- PR の master マージ承認の委任条件と stacked PR の扱いは、`.claude/skills/implement-issue/SKILL.md` の「マージ運用」節を正とする。
