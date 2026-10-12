@@ -6,7 +6,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 
 - 目的は **レビューが機械的に照合できること**。各原則は「違反を具体的に指摘できる」粒度で書く。抽象的な心構えは最小限。
 - 構成: **第I部 設計思想（Why）** → **第II部 原則（What: レビューチェックリスト）** → **第III部 具体パターン（How）** → **付録: レビュアーペルソナ / レビュー運用フロー / 最終チェックリスト**。
-- レビュー時は第II部の各原則 ID（P1〜P12）で指摘する。例: 「P3 違反: `$var` が未クォート」。
+- レビュー時は第II部の各原則 ID（P1〜P15）で指摘する。例: 「P3 違反: `$var` が未クォート」。
 - **最優先の価値基準**: ① 実弾本番の安全性（建玉・MT を壊さない）> ② 冪等性・無人実行の堅牢性 > ③ 秘匿情報の保護 > ④ 可搬性 > ⑤ 可読性。トレードオフはこの順で判断する。
 
 ---
@@ -35,7 +35,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 
 各原則は「観察可能な違反」を伴う。レビューはコード上の該当箇所を示して指摘する。
 
-**重大度の判定基準**（レンジ表記「block〜warn」はこの基準で確定する）: 違反が **① 実弾本番の安全性（MT/建玉/cron/apt/reboot）② 外部入力由来のインジェクション ③ 無人実行のハング/プロンプト ④ 秘匿情報の漏洩** のいずれかに直結するなら **block**、それ以外（可読性・様式・軽微な堅牢性）は **warn**。
+**重大度の判定基準**（レンジ表記「block〜warn」はこの基準で確定する）: 違反が **① 実弾本番の安全性（MT/建玉/cron/apt/reboot）② 外部入力由来のインジェクション ③ 無人実行のハング/プロンプト ④ 秘匿情報の漏洩 ⑤ リモート到達性の喪失（sshd 停止等）⑥ 失敗を成功と表示する偽装** のいずれかに直結するなら **block**、それ以外（可読性・様式・軽微な堅牢性）は **warn**。
 
 ## P1. 本番安全性（最優先・block）
 
@@ -56,11 +56,10 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 - `[ -e $x ]` のような test 内の未クォートは block（`$x` が空/空白で構文崩壊）。
 - 配列は `"${arr[@]}"`（`$arr` や `${arr[*]}` の誤用を指摘）。
 - 例外: 意図的に分割させたい箇所（例: `$target_cmd` をコマンド+引数に割る）はコメントで意図を明示していれば可。
-- ※ 既存 `common.sh`（config 生成部の `[ ! -e $ATST_CONFIG_DIR ]` 等）に未クォートの既知の逸脱がある。是正は別 Issue 扱いとし、**新規・改修コードは本原則に従う**。
 
 ## P4. エラーハンドリングと終了ステータス（block〜warn）
 
-- `atst` の慣習は `set -e` に頼らず**明示的に失敗を扱う**（監視系は 1 コマンドの失敗で全体を落としたくないため）。ただしインストール系の「失敗したら止めるべき直列処理」は、各ステップの戻り値を確認しているか確認する。
+- `atst` の慣習は `set -e` に頼らず**明示的に失敗を扱う**（監視系は 1 コマンドの失敗で全体を落としたくないため）。インストール系の「失敗したら止めるべき直列処理」は P13 に従う。
 - `cmd1 | cmd2` の **cmd1 の失敗が握りつぶされる**箇所（パイプ先頭の失敗検知が必要なのに未対応）は warn。
 - `foo=$(cmd); if [ $? ... ]` の間に別コマンドを挟んで `$?` を汚す誤りは block。
 - 「失敗時は通知する／安全側に倒す」べき監視で、失敗が無言 `return 0` になっていれば block（P1 と重複）。
@@ -75,7 +74,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 ## P6. JSON / 外部入力のエスケープ（block〜warn）
 
 - `curl -d '{...'"$var"'...}'` のように**変数を JSON へ文字列連結**する箇所は、`$var` に `"` / `\` / 改行 / 制御文字が入ると壊れる/インジェクションになる。ユーザー由来・MT 由来・ファイル由来の値を JSON に入れるなら**エスケープ必須**（`common.sh` の `atst_escape_text`、または `jq -Rn --arg`）。未エスケープは warn、外部入力なら block。
-  - 現状 `atst_send_to_line` は `$msg` を未エスケープで JSON 連結しており、通知本文に特殊文字が入ると壊れる。新規/改修時はエスケープを入れる。
+  - 現行の `atst_send_to_line` は jq があれば `jq --arg` で組み立て、無ければ `atst_escape_text` を通す（#20）。フォールバック経路はタブ等 `\n` 以外の制御文字を未エスケープなので、jq を導入しておくこと。
 
 ## P7. eval の安全性（block〜warn）
 
@@ -87,11 +86,13 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 - **`apt-key` は使用禁止**（新しめのディストロで廃止）。署名鍵は `/etc/apt/keyrings/` に dearmor して置き、`deb [signed-by=...] ...` で参照する。
 - リポジトリ追加は `sources.list.d/*.list`(or `.sources`) に冪等に書く（`cat /etc/apt/sources.list | grep` 前提の判定は不可）。
 - 外部リポジトリの追加は「distro 本体に無いときだけ」に限定する（例: FAudio は `apt-cache policy libfaudio0` で distro 提供を確認し、無い場合のみ opensuse を足す）。
-- `apt install` に渡すパッケージ名は全対応ディストロに存在するものだけ（例: `ntp` は不可、`chrony` を使う）。
+- `apt-get install` に渡すパッケージ名は全対応ディストロに存在するものだけ。存在確認は `apt-cache policy <pkg>`（`LC_ALL=C` で `Candidate:` を見る）で行い、推測で決めない。
+- **時刻同期は既存の time-daemon を維持する**: `systemd-timesyncd` / `ntp` / `ntpsec` / `chrony` のいずれかが既に動いていれば導入しない。無い場合のみ導入する（chrony は ntp/ntpsec と `time-daemon` で競合する）。
+- スクリプトでは `apt` ではなく `apt-get` を使う（`apt` は CLI の互換性が保証されない）。
 
 ## P9. クロスディストロ / 可搬性（warn〜block）
 
-- ディストロ判定は `/etc/os-release`（`ID` / `VERSION_ID` / `VERSION_CODENAME`）を使う。ハードコードのバージョン分岐は避ける。サポート外（EOL）を踏んだときの挙動を定義する。
+- ディストロ判定は `/etc/os-release`（`ID` / `VERSION_ID` / `VERSION_CODENAME`）を使う。ハードコードのバージョン分岐は避ける。サポート外（EOL・未知・空）は**エラーを出して中断**する（§27）。
 - GNU/BSD 差（`sed -r` vs `-E`、`date`）に触れるコードは分岐の正しさを確認（`common.sh` の `atst_escape_text` が `$OSTYPE` で分岐している前例あり）。
 - bash 固有構文（`${var,,}`, 配列, `[[ ]]`, `let`）を使うなら shebang が `#!/bin/bash` であること（`#!/bin/sh` で bash 構文は block）。
 
@@ -114,6 +115,29 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 - 1 スクリプト 1 責務。cron から叩く監視は `check_*.sh`、セットアップは `setup_*.sh` の命名に合わせる。
 - テンプレート化すべき設定ファイルは `templates/` に置き、`%%PLACEHOLDER%%` 置換の既存流儀に合わせる。
 - usage を持つスクリプトは引数不足時に usage を出して非 0 終了する（`wrapper.sh` の `print_usage_exit` 参照）。
+
+## P13. install の fail-fast と最終検証（block）
+
+- install / setup の**致命ステップ**（パッケージ導入、WineHQ リポジトリ設定、`wineboot`、MT インストーラの取得）は戻り値を確認し、失敗したら以降に進まず `[error]` を stderr に出して**非 0 で終了**する。失敗を無視して後続を続けるコードは block。
+- 終了時は成果物を**検証してから**成功を表示する（例: `command -v wine`、`wine --version`、`[ -f "$WINEPREFIX/system.reg" ]`、インストーラファイルの存在）。**検証無しの無条件な成功表示は block**（実例: wine 不在のまま「installer is running」と表示した）。
+- `/var/run/reboot-required` があれば、終了時に再起動を推奨する表示を出す（自動再起動はしない。P1）。
+- 破壊的な既定動作を持つ対話（例: 既存 `WINEPREFIX` の削除）は**既定を安全側（N）**にし、無人実行（stdin が tty でない）では破壊しない。
+
+## P14. リモート到達性の保全（block）
+
+- パッケージの全体更新、または `systemd` / `openssh-server` を更新しうる処理の**直後（失敗時も）**に sshd を復帰させ、確認する:
+  ```bash
+  sudo install -d -m 0755 /run/sshd
+  sudo systemctl start ssh.socket ssh 2>/dev/null || sudo systemctl start ssh
+  ss -tlnp | grep -q ':22 ' || echo "[error] sshd is not listening" >&2
+  ```
+  OpenVZ では `/run/sshd` が再作成されず sshd が戻らないことがある。root crontab の `@reboot` 対策は再起動時にしか効かない（実例: svr1 で遠隔締め出し）。
+- 現在の ssh 経路を断ちうる変更（sshd 設定・ファイアウォール・ネットワーク設定）は P1 の承認対象。
+
+## P15. multi-arch・同版パッケージの整合と apt トランザクションの分離（block〜warn）
+
+- 同一版を要求するパッケージ群（例: `winehq-stable` / `wine-stable` / `wine-stable-amd64` / `wine-stable-i386:i386`）は**一括で導入・更新する**。全体 `apt-get upgrade` に任せると片方だけ上がり、ファイル衝突で dpkg が壊れる（実例: wine 10→11 で `/opt/wine-stable/bin/wine` 衝突）。全体更新の前に `apt-mark hold` で除外し、後で一括更新する。dpkg 破損を起こしうる構成は block。
+- 競合（`Conflicts` / 同一 `Provides`）しうるパッケージを**同じ `apt-get install` 行に混ぜない**。1 つが解決不能だと行全体が失敗し、他も巻き添えで入らない（実例: chrony×ntp）。必須群と任意群はトランザクションを分ける。
 
 ---
 
@@ -144,7 +168,7 @@ grep -qF "$LINE" "$FILE" 2>/dev/null || echo "$LINE" >> "$FILE"
 ## 23. 外部コマンドの戻り値とタイムアウト（→ P4）
 
 ```bash
-# HTTP ステータスで成否を判定（推奨パターン。現状の common.sh の curl は --max-time も戻り値確認も無く未対応＝改善余地）
+# HTTP ステータスで成否を判定（common.sh の curl は --max-time 付与済み: #22）
 code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url") || return 1
 [ "$code" = "200" ] || return 1
 ```
@@ -159,7 +183,7 @@ data='{"text":"'"$msg"'"}'
 
 # OK: jq で組み立て（エスケープを jq に任せる）
 data=$(jq -Rn --arg t "$msg" '{text:$t}')
-# jq が無い環境では atst_escape_text を通す。ただし現状 \ (バックスラッシュ) を未エスケープのため不完全。可能なら jq を第一選択にする
+# jq が無い環境では atst_escape_text を通す（" \ 改行は対応済み: #20）。タブ等の制御文字は未対応なので jq を第一選択にする
 ```
 
 ## 25. 変数展開の防御（→ P3, P1）
@@ -189,7 +213,7 @@ echo "deb [signed-by=/etc/apt/keyrings/foo.gpg arch=amd64,i386] $REPO $CODENAME 
 . /etc/os-release   # ID, VERSION_ID, VERSION_CODENAME
 case "$VERSION_CODENAME" in
   focal|jammy|noble|bullseye|bookworm|trixie) : ;;   # サポート対象
-  *) echo "unsupported release: $VERSION_CODENAME" >&2 ;;  # 挙動を定義
+  *) echo "[error] unsupported release: $VERSION_CODENAME" >&2; exit 1 ;;  # サポート外は中断
 esac
 ```
 
@@ -200,7 +224,7 @@ esac
 レビューは以下の観点を順に当てる。各ペルソナは「見つけたら指摘する具体事象」を持つ。
 
 ## R1. 本番オペレーション / リスク担当（最優先）
-- MT・建玉・cron・apt・reboot を触る自動処理に承認フローがあるか。異常の握りつぶし・監視の自己無効化が無いか。破壊的コマンドの空変数ガード。→ P1, P2, P11
+- MT・建玉・cron・apt・reboot を触る自動処理に承認フローがあるか。異常の握りつぶし・監視の自己無効化が無いか。破壊的コマンドの空変数ガード。失敗の成功偽装、sshd 停止の放置。→ P1, P2, P11, P13, P14
 
 ## R2. シェルスクリプト品質担当
 - クォート/word splitting、`$?` の扱い、パイプの失敗検知、`eval` の安全性、bash 構文と shebang の整合、関数長・重複。→ P3, P4, P7, P9, P12
@@ -209,13 +233,13 @@ esac
 - 秘匿情報のハードコード/漏洩（ログ・引数・通知本文・コミット）、JSON/外部入力のエスケープ、`.gitignore` 整合。→ P5, P6
 
 ## R4. ディストリ/インフラ担当
-- apt 鍵・リポジトリの正しさと冪等性、全対応ディストロでのパッケージ存在、Wine 環境変数と無人実行、OpenVZ 制約（swap/カーネル）。→ P8, P9, P10
+- apt 鍵・リポジトリの正しさと冪等性、全対応ディストロでのパッケージ存在、Wine 環境変数と無人実行、OpenVZ 制約（swap/カーネル/sshd）、multi-arch の版整合と apt トランザクション分離。→ P8, P9, P10, P14, P15
 
 ## レビュー運用フロー
 
 1. 変更ファイルごとに `bash -n` が通ることを確認（通らなければ即 block）。
 2. `shellcheck` を当て、未抑止の警告を洗う（抑止する場合は `# shellcheck disable=...` と理由コメント）。
-3. R1→R4 の順でチェックリスト（P1〜P12）を当て、該当行を示して指摘する。重大度 block / warn を付ける。
+3. R1→R4 の順でチェックリスト（P1〜P15）を当て、該当行を示して指摘する。重大度 block / warn を付ける。
 4. block が 1 件でもあれば approve しない。warn は対応 or 明示的な見送り理由を求める。
 
 ## 最終チェックリスト（PR 前に自己点検）
@@ -230,3 +254,6 @@ esac
 - [ ] `apt-key` を使わず signed-by。追加リポジトリは distro に無いときだけ。パッケージは全対応ディストロに存在
 - [ ] Wine を使うなら `WINEARCH`/`WINEPREFIX`/`DISPLAY` 明示、mono/gecko の自動取得を抑止
 - [ ] `common.sh` の `atst_*` 流儀・命名・テンプレート配置に合わせた。デバッグ残骸（固定パス出力等）が無い
+- [ ] install/setup は致命ステップの失敗で非 0 終了し、成果物を検証してから成功を表示する。破壊的な既定動作は安全側（P13）
+- [ ] 全体更新・systemd/openssh 更新の後に sshd を復帰・確認している（P14）
+- [ ] 同版要求の multi-arch 群は一括更新、競合しうるパッケージは別トランザクション、時刻同期は既存を維持（P15, P8）
