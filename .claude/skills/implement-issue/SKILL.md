@@ -310,9 +310,35 @@ case "$L" in *contract-first*) echo on ;; *spike*) echo off ;; *) { [ "$N" -ge 3
 2. `git status --porcelain` に `.claude/handoff/` が出ないこと（= `.gitignore` が効いていること）を確認（出たら誤コミット防止のため中断）
 3. 変更ファイルを**個別に** `git add` する（**`git add -A` / `git add .` は使わない**）。機微ファイル（`auth.txt` / `.claude/settings.local.json` / 鍵 / トークン）が含まれていないことを `git status` で確認する
 4. commit（1 行目 `<種別>: <要約> (#<ISSUE_NUM>)`、HEREDOC）→ `git push -u origin feature/issue-<ISSUE_NUM>` → `gh pr create --base master --body-file <tmp>`。本文には `Closes #<ISSUE_NUM>` と Test plan（検証結果・AC 機械検証の pass/fail/not-observable）を含める。commit メッセージ・PR 本文末尾の署名行は Claude Code の通常ルールに従う。一時ファイルは成否によらず `rm -f`
-5. PR URL を提示し **「PR を master にマージしてよいですか？」とユーザーに確認**する。承認後 `gh pr merge` → `git checkout master && git pull`
+5. PR URL を提示し、下記「マージ運用」節に従ってマージする（既定はユーザーに **「PR を master にマージしてよいですか？」と確認**。委任があれば確認を省略）。マージ後 `git checkout master && git pull`
 6. **本番VPS への反映は Phase 6 の自動処理に含めない**。反映が必要な変更（install / cron / 監視 / テンプレート等）は、PR 本文と完了報告に「本番VPS 反映が必要」と明記し、反映手順（VPS で `git pull` → 該当スクリプトの再実行等）と**それがユーザーの明示承認を要する不可逆操作であること**を案内する。AI は無承認で本番VPS を変更しない
 7. 完了報告を出す
+
+---
+
+## マージ運用（承認の委任と stacked PR）
+
+本節が implement-issue / implement-issue-lite / implement-epic / CLAUDE.md に共通する**マージ規定の正本（SSoT）**である。他ファイルは本節を参照し、文言を複製しない。
+
+### 承認の委任
+
+- 既定: PR を master にマージする前に、子 Issue ごとにユーザーへ確認する。
+- 委任: 次のいずれかがあれば、確認を省略してマージしてよい。
+  - `/implement-epic` 起動時の `--auto-merge` フラグ
+  - セッション中のユーザーの明示発話（例:「マージは承認不要」「よしなにマージして」）。委任は**そのセッション限り**で、別セッションへは持ち越さない
+- 委任中でも、マージ前に**独立レビューの approve と検証（`bash -n` 等）の pass** を必須とする。block が残る PR はマージしない
+- **本番VPS への反映の承認は委任できない**（上記の委任があっても毎回聞く）
+
+### stacked PR
+
+- **原則 stacking しない**。同じファイルに触れる複数 Issue は、1 本マージしてから最新 master を起点に次のブランチを切る（直列）。どうしても stacking する場合のみ以下に従う
+- 下位 PR をマージする**前に**、直上の子 PR の base を master へ付け替える。`gh pr edit --base` は Projects (classic) の GraphQL エラーで失敗するため、**REST を正規手順とする**:
+  ```bash
+  gh api -X PATCH repos/terukusu/auto-trading-support-tools/pulls/<子PR番号> -f base=master
+  ```
+- `gh pr merge --delete-branch` は、そのブランチを base にしている open PR が**残っていないことを確認してから**使う。base ブランチを消すと子 PR は自動クローズされ、**closed PR は base を変更できない**
+- 子 PR が自動クローズされた場合は、同じ head ブランチから **master 向けの新 PR を作り直し**、旧 PR に作り直し先を記録する
+- マージ直後は GitHub の `mergeable` 計算が `UNKNOWN` になりうる。`MERGEABLE` になるまで確認してからマージする
 
 ---
 

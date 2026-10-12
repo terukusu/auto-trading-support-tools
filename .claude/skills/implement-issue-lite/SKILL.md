@@ -63,7 +63,7 @@ allowed-tools: [Read, Edit, Write, Bash, Glob, Grep]
 | 7 | **main インライン 3 視点セルフレビュー**: 脆弱性/事故 / 影響波及 / ドキュメント影響 | 縮退の下限。これを割ると「レビュー無し」になる |
 | 8 | ドキュメント更新要否の**全項目確認**（README / Wiki / guidelines / CLAUDE.md） | 該当なしでも全項目を確認した旨を報告する |
 | 9 | **`git add -A` は使わない**。変更ファイルを個別に `git add`（機微ファイルの混入を確認） | 誤コミット防止 |
-| 10 | PR マージ前のユーザー承認、および本番VPS 反映の承認委任不可 | 不可逆操作の保護 |
+| 10 | PR マージ前のユーザー承認（委任条件は `/implement-issue` の「マージ運用」節）、および本番VPS 反映の承認委任不可 | 不可逆操作の保護 |
 | 11 | 実装後のエスカレーション再判定 | 事前判定は見込みでしかない |
 
 ---
@@ -134,7 +134,7 @@ Issue 本文の AC を 1 件ずつ観察可能な assertion（`bash -n` / `grep`
 - 変更ファイルを個別に `git add`（**`git add -A` は使わない**）
 - commit（1 行目 `<種別>: <要約> (#<ISSUE_NUM>)`）→ `git push -u origin feature/issue-<ISSUE_NUM>` → `gh pr create --base master --body-file <tmp>`。commit / PR 本文末尾の署名行は Claude Code の通常ルールに従う。一時ファイルは成否によらず `rm -f`
 - PR 本文には「成果物」節の各点を必ず加える
-- PR URL を提示し **「PR を master にマージしてよいですか？」とユーザーに確認**する。承認後マージ
+- PR URL を提示し、`/implement-issue` の「マージ運用」節に従ってマージする（既定はユーザー確認。委任があれば省略。stacked PR の規定も同節）
 - **本番VPS 反映が必要な変更なら、その旨と反映手順・承認が要ることを PR 本文と報告に明記**する（AI は無承認で本番へ適用しない）
 
 ---
