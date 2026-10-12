@@ -35,7 +35,8 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 
 - 構文チェック: `bash -n <script>.sh`（必須）。
 - 静的解析: `shellcheck <script>.sh`（推奨。警告は原則つぶす）。
-- 実挙動の確認は **使い捨ての VPS/コンテナ**で行い、**稼働中の本番 VPS では試さない**。
+- 実挙動の確認は **使い捨ての VPS、またはユーザーが指定した MT 非稼働・建玉なしの検証機**で行い、**稼働中の本番 VPS では試さない**（手順は implement-issue の Phase 5.5）。
+- **master へのマージは公開リリース**（Wiki の gist が `archive/master.zip` を取得して実行する）。install / setup / templates / cron 経路の変更はマージ前に実機検証を通す。
 
 ## git / GitHub
 

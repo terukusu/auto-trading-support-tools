@@ -15,7 +15,7 @@ allowed-tools: [Read, Edit, Write, Bash, Glob, Grep]
 
 簡易フローはフルフロー（`/implement-issue`）の**縮退版**であり、上位互換ではない。**レビューをゼロにするものではなく、独立 context の subagent レビューを main インラインのセルフレビューへ縮退させるもの**である。適用条件を 1 つでも満たさないなら、この skill を使わずフルフローへ回すこと。
 
-**危険度モデルは `/implement-issue` と同一**: ローカル完結の操作（編集・bash -n・shellcheck・git・PR・master マージ）は自由。**本番VPS（稼働中の実弾自動売買機）への変更はユーザーの明示承認を都度得る**。検証は本番VPS で行わない。
+**危険度モデルは `/implement-issue` と同一**: ローカル完結の操作（編集・bash -n・shellcheck・git・PR）は自由。**master マージは公開リリース**（gist が master.zip を配布する）なので「マージ運用」節に従う。実機検証（Phase 5.5）が要る変更は L4 によりそもそも lite の対象外。**本番VPS（稼働中の実弾自動売買機）への変更はユーザーの明示承認を都度得る**。検証は本番VPS で行わない。
 
 ---
 
