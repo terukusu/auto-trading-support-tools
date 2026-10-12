@@ -59,7 +59,7 @@ function atst_upload_image_to_0x0() {
   fi
 
   # IPv4を強制的に使用してアップロード（3日間保持）
-  local url=$(curl -4 -s -F"file=@$file" -Fexpires=72 https://0x0.st 2>/dev/null)
+  local url=$(curl --max-time 30 --connect-timeout 10 -4 -s -F"file=@$file" -Fexpires=72 https://0x0.st 2>/dev/null)
 
   if [ -n "$url" ] && [[ "$url" =~ ^https?:// ]]; then
     echo "$url"
@@ -98,7 +98,7 @@ function atst_send_to_line() {
   fi
 
   # メッセージ送信
-  local result=$(curl -X POST "$api_endpoint" \
+  local result=$(curl --max-time 30 --connect-timeout 10 -X POST "$api_endpoint" \
     -s -o /dev/null -w "%{http_code}\n" \
     -H "Authorization: Bearer $channel_access_token" \
     -H "Content-Type: application/json" \
