@@ -1,0 +1,63 @@
+# CLAUDE.md
+
+auto-trading-support-tools（以下 atst）で作業する際のオリエンテーション。詳細なレビュー基準は [`docs/CODING_GUIDELINES.md`](docs/CODING_GUIDELINES.md) を参照。
+
+## プロジェクト概要
+
+Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買サーバー** の構築・監視・LINE 通知を支援する **bash スクリプト群**。複数の MT4/5 をまとめて扱い、クラッシュ・再起動・値動き/スプレッド/Ping の異常を検知して管理者へ通知する。概要は `README.md`、導入手順は GitHub Wiki を参照。
+
+> **最重要の前提**: 本番 = **稼働中の実弾（リアルマネー）自動売買 VPS**。自動売買において最悪の事態は「建玉が決済されないこと」。MT のプロセス・建玉・cron・監視を**停止/中断する操作は、ユーザーの明示承認なしに実行しない**。
+
+## 構成（主要ファイルの役割）
+
+- `common.sh` — 全スクリプトが source する共通ライブラリ。`atst_*` 関数と設定ロード。source 時に `eval $(atst_gen_mt_list)` で MT 一覧を検出し、グローバル配列 `mt_home/mt_name/mt_type/mt_term` に展開する。
+- `install_required_for_mt.sh` — まっさらな VPS に GUI(VNC+wm2) / Wine / MT インストーラ一式を導入するメインスクリプト。
+- `mtctl.sh` — 複数 MT の list/start/status/stop/monitor。
+- `check_*.sh` — cron から定期実行される監視（reboot / process / order / ping / price / spread / monitoring / daily）。
+- `wrapper.sh` — crontab の `TARGET`（MT 名の配列リテラル）を展開し、各 check スクリプトへ渡すラッパ。
+- `setup_*.sh` — `setup_cron.sh`（cron 設定）、`setup_line.sh`（LINE トークン設定）、`setup_monitoring_ea.sh`（監視 EA 配置）。
+- `report_image.sh` / `draw_graph.sh` — スプレッド/値動きのグラフとデスクトップ画像を LINE 通知。
+- `sleep_random.sh` / `truncate_monitoring.sh` / `minimize_*.sh` / `purge_needless_packages.sh` — 補助。
+- `templates/` — 配置用テンプレート（`config`、`crontab.txt`、`xstartup`、`vncserver@:1.service`、`font_replace.reg`、`ip_rules_v*.txt`）。
+- `MQL4/` `MQL5/` — MT に組み込む監視 EA のソース。
+
+設定は `~/.atst/config`（`templates/config` から初回生成）を source して `ATST_*` 変数で参照。LINE トークン等の秘匿値は `~/.atst/.line_token` / `~/.atst/.line_id`（リポジトリ外）。
+
+## 対応環境
+
+- ディストロ: Ubuntu 20.04 / 22.04 / 24.04、Debian 11 / 12（minimal 推奨）。EOL 版（Ubuntu 14〜18 / Debian 8〜10 等）は非サポート。
+- 仮想化: OpenVZ/Virtuozzo の格安 VPS 〜 KVM。カーネルは共有のことがある（OpenVZ ではカーネル入替・swap 作成不可）。
+- ランタイム: bash（一部 bash 固有構文を使用）、Wine（`WINEARCH=win32`）。
+
+## 実行・検証
+
+自動テストスイートは無い。変更の検証は以下で行う。
+
+- 構文チェック: `bash -n <script>.sh`（必須）。
+- 静的解析: `shellcheck <script>.sh`（推奨。警告は原則つぶす）。
+- 実挙動の確認は **使い捨ての VPS/コンテナ**で行い、**稼働中の本番 VPS では試さない**。
+
+## git / GitHub
+
+- **コミット名義はこのリポジトリの既存履歴の作者に合わせる**（設定済み。`git log` の author と一致させる）。
+- **gh は terukusu アカウントで実行**する。アカウント切替は per-project の `GH_CONFIG_DIR`（`.claude/settings.local.json` に設定。このファイルは**コミットしない**ので各自の環境に合わせる）で行い、スキル側で `gh auth switch` しない。push/fetch は `origin`（`teru.github.com` の SSH エイリアス経由）で terukusu として行う。
+- 対象リポジトリ: `terukusu/auto-trading-support-tools`、デフォルトブランチ `master`。
+
+## コミット衛生（公開リポジトリ）
+
+このリポジトリは **公開（PUBLIC）**。コミット内容も Issue / PR 本文も誰でも読める。
+
+**置かないもの**（コミットにも Issue / PR 本文にも入れない）:
+
+- LINE 通知トークン・ユーザー/グループ ID、`~/.atst/.line_token`・`.line_id` の中身、各種アクセストークン・署名付き URL・鍵
+- `auth.txt` 等の共通パスワード、`.claude/settings.local.json`（個人アカウント切替）
+- スキルの作業用ファイル（`.claude/handoff/`、`.claude/worktrees/`、一時ディレクトリ）
+- 個人アカウントに結び付く情報（メールアドレス、別組織のアカウント名、ホームディレクトリの絶対パス）
+- ログ・コマンド出力の生貼り（必要なら件数・要約・該当行の抜粋にする）
+
+コミット前に `git status --porcelain` で上記が含まれないことを確認し、`git add -A` / `git add .` は使わず**個別に `git add`** する。
+
+## 作業の進め方
+
+- 変更は Issue 駆動。計画は `.claude/skills/` の create-epic / create-issue、実装は implement-issue / implement-issue-lite / implement-epic を使う。
+- 本番 VPS を変える操作（MT の start/stop、cron 設定、`apt` 実行、鍵・リポジトリ追加、ロケール/TZ 変更、swap 変更）は Issue ごとに**毎回ユーザー承認を得る**。委任不可。

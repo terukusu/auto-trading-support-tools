@@ -3,3 +3,6 @@
 .line_token
 winehq.key
 data
+.claude/settings.local.json
+.claude/handoff/
+.claude/worktrees/

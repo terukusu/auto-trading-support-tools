@@ -1,0 +1,232 @@
+# Coding Guidelines (atst)
+
+auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サーバー構築・監視ツール群）のコーディング規約兼 **レビュー基準**。
+
+## このドキュメントの読み方
+
+- 目的は **レビューが機械的に照合できること**。各原則は「違反を具体的に指摘できる」粒度で書く。抽象的な心構えは最小限。
+- 構成: **第I部 設計思想（Why）** → **第II部 原則（What: レビューチェックリスト）** → **第III部 具体パターン（How）** → **付録: レビュアーペルソナ / レビュー運用フロー / 最終チェックリスト**。
+- レビュー時は第II部の各原則 ID（P1〜P12）で指摘する。例: 「P3 違反: `$var` が未クォート」。
+- **最優先の価値基準**: ① 実弾本番の安全性（建玉・MT を壊さない）> ② 冪等性・無人実行の堅牢性 > ③ 秘匿情報の保護 > ④ 可搬性 > ⑤ 可読性。トレードオフはこの順で判断する。
+
+---
+
+# 第I部: 設計思想 (Why)
+
+## 1. 本番は実弾。停止=損失になりうる
+
+監視対象は**リアルマネーで動いている MT**。スクリプトのバグが「建玉が決済されない」「監視が黙って止まる」を招くと金銭損失に直結する。したがって atst のコードは、**落ちるより誤検知の方がまし／黙って止まるのが最悪**という価値観で書く。監視スクリプトは「自分が動かなくなったこと」自体も検知・通知できる設計（`check_monitoring.sh` / `check_process.sh`）を壊さない。
+
+## 2. 無人・冪等が前提
+
+ほぼ全スクリプトは cron から無人で、同一環境で何度も再実行される。「人が見ていれば気づく」前提のコードは書かない。インストール/セットアップ系は**途中から再実行しても壊れない（冪等）**こと、監視系は**ブロッキングなプロンプトや無限待ちを絶対に作らない**ことが設計の中心。
+
+## 3. 枯れた最小構成を好む
+
+対象は格安 VPS（メモリ 0.5〜2GB、OpenVZ 共有カーネル）。派手な依存より、枯れて軽量で確実に動くものを選ぶ（VNC + wm2、素の bash、`curl`）。新しい依存の追加は「本当に要るか」「全対応ディストロに在るか」を必ず問う。
+
+## 4. 共通処理は common.sh に寄せる
+
+全スクリプトは `common.sh` を source し、`atst_*` 関数・`ATST_*` 変数を使う。ロジックの重複を見つけたら `common.sh` の関数化を検討する（ただし 3 回ルール: 2 回目までは重複を許容し、3 回目で抽象化）。
+
+---
+
+# 第II部: 原則 (What) — レビューチェックリスト
+
+各原則は「観察可能な違反」を伴う。レビューはコード上の該当箇所を示して指摘する。
+
+**重大度の判定基準**（レンジ表記「block〜warn」はこの基準で確定する）: 違反が **① 実弾本番の安全性（MT/建玉/cron/apt/reboot）② 外部入力由来のインジェクション ③ 無人実行のハング/プロンプト ④ 秘匿情報の漏洩** のいずれかに直結するなら **block**、それ以外（可読性・様式・軽微な堅牢性）は **warn**。
+
+## P1. 本番安全性（最優先・block）
+
+- MT プロセスの停止 (`mtctl.sh stop`, `kill`)、建玉に影響する操作、`sudo reboot`、cron の無効化/書き換え、`apt` 実行、リポジトリ/鍵の追加、ロケール/TZ 変更を**新規に自動実行**するコードは、承認フロー無しなら **block**。
+- 監視スクリプトが異常時に**通知せず握りつぶす**経路があれば block（例: エラーで `return 0` して無通知）。
+- 「監視が止まったこと自体の検知」(`check_monitoring.sh`, `check_process.sh`) を実質無効化する変更は block。
+- 破壊的コマンド（`rm -rf`, `sed -i`, `>` リダイレクト, `truncate`）の対象が**変数展開**で、その変数が空になりうる経路があれば block（`rm -rf "$DIR/"` で `$DIR` が空だと `/` を掃く）。
+
+## P2. 冪等性（install/setup 系・block〜warn）
+
+- インストール/セットアップ処理は**再実行安全**であること。追記 (`>>`, `cat >> crontab`)、リポジトリ追加、鍵配置、`/etc/fstab` や `user.reg` への書き込みは、**既存チェック無しの無条件追記を block**（重複行・多重登録を生む）。
+  - 既存の良い例: `common.sh` の config 生成は `[ ! -e ]` ガード、`install_required_for_mt.sh` の crontab 追記は `grep` で既存確認してから追加。
+- 冪等化の手段は「存在チェックしてから書く」「`install -D`」「`grep -q` してから追記」など。レビューはガードの有無を確認する。
+
+## P3. クォートと word splitting（block〜warn）
+
+- 変数・コマンド置換の展開は原則ダブルクォートする: `"$var"`, `"$(cmd)"`, `"${arr[@]}"`。未クォートで word splitting / glob 展開が起きうる箇所は warn、パスやユーザー入力なら block。
+- `[ -e $x ]` のような test 内の未クォートは block（`$x` が空/空白で構文崩壊）。
+- 配列は `"${arr[@]}"`（`$arr` や `${arr[*]}` の誤用を指摘）。
+- 例外: 意図的に分割させたい箇所（例: `$target_cmd` をコマンド+引数に割る）はコメントで意図を明示していれば可。
+- ※ 既存 `common.sh`（config 生成部の `[ ! -e $ATST_CONFIG_DIR ]` 等）に未クォートの既知の逸脱がある。是正は別 Issue 扱いとし、**新規・改修コードは本原則に従う**。
+
+## P4. エラーハンドリングと終了ステータス（block〜warn）
+
+- `atst` の慣習は `set -e` に頼らず**明示的に失敗を扱う**（監視系は 1 コマンドの失敗で全体を落としたくないため）。ただしインストール系の「失敗したら止めるべき直列処理」は、各ステップの戻り値を確認しているか確認する。
+- `cmd1 | cmd2` の **cmd1 の失敗が握りつぶされる**箇所（パイプ先頭の失敗検知が必要なのに未対応）は warn。
+- `foo=$(cmd); if [ $? ... ]` の間に別コマンドを挟んで `$?` を汚す誤りは block。
+- 「失敗時は通知する／安全側に倒す」べき監視で、失敗が無言 `return 0` になっていれば block（P1 と重複）。
+- 外部コマンド (`curl`, `wget`, `wine`) の失敗を想定し、タイムアウトや戻り値確認があるか。無人実行で**無限に待つ**可能性がある呼び出しは block。
+
+## P5. 秘匿情報（block）
+
+- LINE トークン/ID、アクセストークン、署名付き URL、パスワード、鍵を**ソースにハードコードしない**。設定は `~/.atst/`（リポジトリ外）から読む。
+- 秘匿値を**ログ・標準出力・通知本文・コマンドライン引数**に出さない（`ps` で見える引数渡しに注意）。`set -x` を秘匿処理区間に残さない。
+- 秘匿値を含みうるファイルを**コミット対象に追加**するコード・手順は block。`.gitignore` 整合も確認。
+
+## P6. JSON / 外部入力のエスケープ（block〜warn）
+
+- `curl -d '{...'"$var"'...}'` のように**変数を JSON へ文字列連結**する箇所は、`$var` に `"` / `\` / 改行 / 制御文字が入ると壊れる/インジェクションになる。ユーザー由来・MT 由来・ファイル由来の値を JSON に入れるなら**エスケープ必須**（`common.sh` の `atst_escape_text`、または `jq -Rn --arg`）。未エスケープは warn、外部入力なら block。
+  - 現状 `atst_send_to_line` は `$msg` を未エスケープで JSON 連結しており、通知本文に特殊文字が入ると壊れる。新規/改修時はエスケープを入れる。
+
+## P7. eval の安全性（block〜warn）
+
+- `eval` は入力が**自前生成の信頼できる文字列**に限る。外部・ネットワーク由来を `eval` するのは block。
+  - 許容例: `eval $(atst_gen_mt_list)`（自前で単一クォート済みの代入文を生成）、`wrapper.sh` の `eval "target_mt=$1"`（crontab 管理者が書いた配列リテラル）。これらは**生成側が安全を担保**している前提。生成側を変えるときは単一クォート・エスケープが崩れていないか確認。
+
+## P8. apt / 鍵 / リポジトリ（block）
+
+- **`apt-key` は使用禁止**（新しめのディストロで廃止）。署名鍵は `/etc/apt/keyrings/` に dearmor して置き、`deb [signed-by=...] ...` で参照する。
+- リポジトリ追加は `sources.list.d/*.list`(or `.sources`) に冪等に書く（`cat /etc/apt/sources.list | grep` 前提の判定は不可）。
+- 外部リポジトリの追加は「distro 本体に無いときだけ」に限定する（例: FAudio は `apt-cache policy libfaudio0` で distro 提供を確認し、無い場合のみ opensuse を足す）。
+- `apt install` に渡すパッケージ名は全対応ディストロに存在するものだけ（例: `ntp` は不可、`chrony` を使う）。
+
+## P9. クロスディストロ / 可搬性（warn〜block）
+
+- ディストロ判定は `/etc/os-release`（`ID` / `VERSION_ID` / `VERSION_CODENAME`）を使う。ハードコードのバージョン分岐は避ける。サポート外（EOL）を踏んだときの挙動を定義する。
+- GNU/BSD 差（`sed -r` vs `-E`、`date`）に触れるコードは分岐の正しさを確認（`common.sh` の `atst_escape_text` が `$OSTYPE` で分岐している前例あり）。
+- bash 固有構文（`${var,,}`, 配列, `[[ ]]`, `let`）を使うなら shebang が `#!/bin/bash` であること（`#!/bin/sh` で bash 構文は block）。
+
+## P10. Wine / MT 環境（block〜warn）
+
+- Wine を使うコードは `WINEARCH` / `WINEPREFIX` / `DISPLAY` を**明示**して実行する（cron の最小環境では未定義になりうる）。
+- **無人実行で GUI プロンプト・ダウンロードダイアログを誘発しない**: `wineboot` 等は `WINEDLLOVERRIDES="mscoree=;mshtml="` 等で mono/gecko の自動取得を抑止する。MT4/5 は .NET も埋め込み IE も不要。ブロッキングを招く変更は block。
+- MT の検出・特定は `common.sh` の `atst_find_mt_index`（フォルダ名の前方一致・大文字小文字無視）に合わせる。独自の照合ロジックを増やさない。
+
+## P11. cron / wrapper の堅牢性（warn）
+
+- cron から動く前提のスクリプトは `PATH`・`cwd`・環境変数に依存しない（`common.sh` を絶対パス解決で source する既存パターン `. "$(cd "$(dirname "$BASH_SOURCE")"; pwd)/common.sh"` を踏襲）。
+- 1 分毎ジョブは `sleep_random.sh` / `atst_random_sleep` で実行タイミングを散らし、同時多発の負荷を避ける既存設計を壊さない。
+- デバッグ用の固定パスへの出力・残骸（例: `>> $HOME/hoge` のような一時リダイレクト）を**残さない**。発見したら指摘。
+
+## P12. 命名・構成の一貫性（warn）
+
+- 公開関数・共通変数は `atst_*` / `ATST_*`。新規共通処理は `common.sh` に置く。
+  - 例外: `mt_home` / `mt_name` / `mt_type` / `mt_term` は `atst_gen_mt_list` が `eval` で生成するグローバル配列で、`ATST_*` 命名の意図的な例外（この 4 つ以外の新規共通変数は `ATST_*` にする）。
+- 1 スクリプト 1 責務。cron から叩く監視は `check_*.sh`、セットアップは `setup_*.sh` の命名に合わせる。
+- テンプレート化すべき設定ファイルは `templates/` に置き、`%%PLACEHOLDER%%` 置換の既存流儀に合わせる。
+- usage を持つスクリプトは引数不足時に usage を出して非 0 終了する（`wrapper.sh` の `print_usage_exit` 参照）。
+
+---
+
+# 第III部: 具体パターン (How)
+
+## 21. 共通ライブラリの source（→ P11）
+
+```bash
+#!/bin/bash
+. "$(cd "$(dirname "$BASH_SOURCE")"; pwd)/common.sh"
+```
+
+cwd に依存せず common.sh を読む。`$0` 版（`"$(cd "$(dirname "$0")" && pwd)"`）も既存にあるが、`$BASH_SOURCE` 版が source 耐性で堅い。新規は `$BASH_SOURCE` 版に揃える。
+
+## 22. 冪等な追記・配置（→ P2）
+
+```bash
+# NG: 無条件追記（再実行で重複）
+echo "$LINE" >> "$FILE"
+
+# OK: 既存チェックしてから
+grep -qF "$LINE" "$FILE" 2>/dev/null || echo "$LINE" >> "$FILE"
+
+# OK: テンプレートから初回だけ配置
+[ -e "$DST" ] || install -m 644 -D "$SRC" "$DST"
+```
+
+## 23. 外部コマンドの戻り値とタイムアウト（→ P4）
+
+```bash
+# HTTP ステータスで成否を判定（推奨パターン。現状の common.sh の curl は --max-time も戻り値確認も無く未対応＝改善余地）
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url") || return 1
+[ "$code" = "200" ] || return 1
+```
+
+ネットワーク呼び出しには `--max-time` を付け、無人実行でのハングを防ぐ。
+
+## 24. JSON への安全な値埋め込み（→ P6）
+
+```bash
+# NG: 文字列連結（" や改行で壊れる）
+data='{"text":"'"$msg"'"}'
+
+# OK: jq で組み立て（エスケープを jq に任せる）
+data=$(jq -Rn --arg t "$msg" '{text:$t}')
+# jq が無い環境では atst_escape_text を通す。ただし現状 \ (バックスラッシュ) を未エスケープのため不完全。可能なら jq を第一選択にする
+```
+
+## 25. 変数展開の防御（→ P3, P1）
+
+```bash
+# 破壊的操作は空ガードしてから
+[ -n "$DIR" ] || { echo "DIR is empty" >&2; return 1; }
+rm -rf "${DIR:?DIR must be set}"/*
+```
+
+`${VAR:?}` で「空なら即エラー」にすると、空変数による誤爆（`rm -rf /`）を構造的に防げる。
+
+## 26. apt 鍵・リポジトリ（→ P8）
+
+```bash
+sudo install -d -m 0755 /etc/apt/keyrings
+wget -q -O - "$KEY_URL" | sudo gpg --dearmor -o /etc/apt/keyrings/foo.gpg
+echo "deb [signed-by=/etc/apt/keyrings/foo.gpg arch=amd64,i386] $REPO $CODENAME main" \
+  | sudo tee /etc/apt/sources.list.d/foo.list > /dev/null
+```
+
+`apt-key` は使わない。`.list` の存在で冪等化する。
+
+## 27. ディストロ判定（→ P9）
+
+```bash
+. /etc/os-release   # ID, VERSION_ID, VERSION_CODENAME
+case "$VERSION_CODENAME" in
+  focal|jammy|noble|bullseye|bookworm|trixie) : ;;   # サポート対象
+  *) echo "unsupported release: $VERSION_CODENAME" >&2 ;;  # 挙動を定義
+esac
+```
+
+---
+
+# 付録: レビュアーペルソナ
+
+レビューは以下の観点を順に当てる。各ペルソナは「見つけたら指摘する具体事象」を持つ。
+
+## R1. 本番オペレーション / リスク担当（最優先）
+- MT・建玉・cron・apt・reboot を触る自動処理に承認フローがあるか。異常の握りつぶし・監視の自己無効化が無いか。破壊的コマンドの空変数ガード。→ P1, P2, P11
+
+## R2. シェルスクリプト品質担当
+- クォート/word splitting、`$?` の扱い、パイプの失敗検知、`eval` の安全性、bash 構文と shebang の整合、関数長・重複。→ P3, P4, P7, P9, P12
+
+## R3. セキュリティ担当
+- 秘匿情報のハードコード/漏洩（ログ・引数・通知本文・コミット）、JSON/外部入力のエスケープ、`.gitignore` 整合。→ P5, P6
+
+## R4. ディストリ/インフラ担当
+- apt 鍵・リポジトリの正しさと冪等性、全対応ディストロでのパッケージ存在、Wine 環境変数と無人実行、OpenVZ 制約（swap/カーネル）。→ P8, P9, P10
+
+## レビュー運用フロー
+
+1. 変更ファイルごとに `bash -n` が通ることを確認（通らなければ即 block）。
+2. `shellcheck` を当て、未抑止の警告を洗う（抑止する場合は `# shellcheck disable=...` と理由コメント）。
+3. R1→R4 の順でチェックリスト（P1〜P12）を当て、該当行を示して指摘する。重大度 block / warn を付ける。
+4. block が 1 件でもあれば approve しない。warn は対応 or 明示的な見送り理由を求める。
+
+## 最終チェックリスト（PR 前に自己点検）
+
+- [ ] `bash -n` が全変更スクリプトで通る／`shellcheck` 警告を解消した
+- [ ] MT 停止・cron・apt・reboot 等、本番に影響する自動実行を増やしていない（増やすなら承認フロー付き）
+- [ ] インストール/セットアップ処理は再実行しても壊れない（冪等）
+- [ ] 変数・コマンド置換・配列展開をクォートした。破壊的操作に空変数ガードがある
+- [ ] 外部コマンドの失敗を検知し、ネットワーク呼び出しに `--max-time` がある。無人実行でハング/プロンプトしない
+- [ ] 秘匿情報をハードコード・ログ・引数・通知・コミットに出していない
+- [ ] JSON へ入れる外部入力をエスケープした
+- [ ] `apt-key` を使わず signed-by。追加リポジトリは distro に無いときだけ。パッケージは全対応ディストロに存在
+- [ ] Wine を使うなら `WINEARCH`/`WINEPREFIX`/`DISPLAY` 明示、mono/gecko の自動取得を抑止
+- [ ] `common.sh` の `atst_*` 流儀・命名・テンプレート配置に合わせた。デバッグ残骸（固定パス出力等）が無い
