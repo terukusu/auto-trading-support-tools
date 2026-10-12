@@ -37,10 +37,10 @@ function atst_to_lower() {
 function atst_escape_text() {
   if [ "$OSTYPE" != "${OSTYPE#darwin}" ];then
     # For Mac 改行付加。末尾に最低２個の改行がないと出力が空文字になるので。
-    cat - <(echo -en '\n\n') | sed -e 's/\r//g' | sed -e :loop -e 'N; $!b loop' -e 's/\n/\\n/g' | sed -e 's/\"/\\"/g' | sed -e 's/\//\\\//g'
+    cat - <(echo -en '\n\n') | sed -e 's/\r//g' | sed -e 's/\\/\\\\/g' | sed -e :loop -e 'N; $!b loop' -e 's/\n/\\n/g' | sed -e 's/\"/\\"/g' | sed -e 's/\//\\\//g'
   else
     # For linux (gnu sed)
-    cat - | sed -re 's/\r//g' | sed -re ':loop;N;$!b loop;s/\n/\\n/g' | sed -re 's/\"/\\"/g' | sed -re 's/\//\\\//g'
+    cat - | sed -re 's/\r//g' | sed -re 's/\\/\\\\/g' | sed -re ':loop;N;$!b loop;s/\n/\\n/g' | sed -re 's/\"/\\"/g' | sed -re 's/\//\\\//g'
   fi
 }
 
@@ -72,42 +72,58 @@ function atst_upload_image_to_0x0() {
 
 # LINE送信関数
 function atst_send_to_line() {
-  local msg=$(cat -)
+  local msg; msg=$(cat -)
   local image_file="$1"
 
   local channel_access_token="$ATST_LINE_TOKEN"
   local user_id="$ATST_LINE_ID"
   local api_endpoint="https://api.line.me/v2/bot/message/push"
 
-  local messages=""
+  # 通知本文。MT 由来の値などが含まれるため JSON へはエスケープして埋め込む (P6)。
+  local text="【$(hostname -s)】$msg"
 
+  # 画像があればアップロード。失敗時は本文に注記して画像なしで送る。
+  local image_url=""
   if [ -n "$image_file" ]; then
-    # アップロード関数を呼び出し
-    local image_url=$(atst_upload_image_to_0x0 "$image_file")
+    image_url=$(atst_upload_image_to_0x0 "$image_file")
+    if [ $? -ne 0 ] || [ -z "$image_url" ]; then
+      image_url=""
+      text="$text (画像アップロード失敗)"
+    fi
+  fi
 
-    if [ $? -eq 0 ] && [ -n "$image_url" ]; then
-      messages='[
-        {"type":"text","text":"【'$(hostname -s)'】'"$msg"'"},
-        {"type":"image","originalContentUrl":"'$image_url'","previewImageUrl":"'$image_url'"}
-      ]'
+  # ペイロード生成: jq があれば全エスケープを jq に任せる。無ければ atst_escape_text を通す。
+  local payload
+  if command -v jq >/dev/null 2>&1; then
+    if [ -n "$image_url" ]; then
+      payload=$(jq -cn --arg to "$user_id" --arg t "$text" --arg u "$image_url" \
+        '{to:$to, messages:[{type:"text",text:$t},{type:"image",originalContentUrl:$u,previewImageUrl:$u}]}')
     else
-      messages='[{"type":"text","text":"【'$(hostname -s)'】'"$msg"' (画像アップロード失敗)"}]'
+      payload=$(jq -cn --arg to "$user_id" --arg t "$text" \
+        '{to:$to, messages:[{type:"text",text:$t}]}')
     fi
   else
-    messages='[{"type":"text","text":"【'$(hostname -s)'】'"$msg"'"}]'
+    local t_e u_e url_e messages
+    t_e=$(printf '%s' "$text" | atst_escape_text)
+    u_e=$(printf '%s' "$user_id" | atst_escape_text)
+    if [ -n "$image_url" ]; then
+      url_e=$(printf '%s' "$image_url" | atst_escape_text)
+      messages='[{"type":"text","text":"'"$t_e"'"},{"type":"image","originalContentUrl":"'"$url_e"'","previewImageUrl":"'"$url_e"'"}]'
+    else
+      messages='[{"type":"text","text":"'"$t_e"'"}]'
+    fi
+    payload='{"to":"'"$u_e"'","messages":'"$messages"'}'
   fi
 
   # メッセージ送信
-  local result=$(curl --max-time 30 --connect-timeout 10 -X POST "$api_endpoint" \
+  local result
+  result=$(curl --max-time 30 --connect-timeout 10 -X POST "$api_endpoint" \
     -s -o /dev/null -w "%{http_code}\n" \
     -H "Authorization: Bearer $channel_access_token" \
     -H "Content-Type: application/json" \
-    -d '{
-      "to": "'"$user_id"'",
-      "messages": '"$messages"'
-    }')
+    -d "$payload")
 
-  if [ -n "$result" -a "$result" == "200" ]; then
+  if [ "$result" == "200" ]; then
     return 0
   else
     return 1
