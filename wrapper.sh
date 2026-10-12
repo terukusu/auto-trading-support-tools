@@ -13,4 +13,4 @@ eval "target_mt=$1"
 target_cmd="$2"
 shift 2
 
-$target_cmd "$@" "${target_mt[@]}" >> $HOME/hoge
+$target_cmd "$@" "${target_mt[@]}"
