@@ -199,14 +199,16 @@ function install_packages_misc_and_needed_by_mt4() {
     fi
   fi
 
-  REPOS_EXISTS=$(cat /etc/apt/sources.list | grep "$FAUDIO_REPOS" | head -n1)
-  if [ -z "$REPOS_EXISTS" ]; then
+  # FAudio (libfaudio0) is a dependency of winehq. Newer releases (Ubuntu 22.04+/Debian 12+)
+  # ship it in the distro, so we only add the external opensuse repo on older releases that
+  # don't provide it. (The opensuse repo exists for 24.04 too, so we must decide by distro
+  # availability, not by whether the repo URL exists.)
+  if [ ! -e "$FAUDIO_LIST" ] && ! LC_ALL=C apt-cache policy libfaudio0 2>/dev/null | grep -q 'Candidate: [0-9]'; then
     WEB_REPOS_EXITS=$(curl -s --head "$FAUDIO_REPOS/" | head -n1 | cut -d' ' -f2 | grep -oe '^2')
     if [ -n "$WEB_REPOS_EXITS" ]; then
-      wget -q -nc -P "$DIR_WINECACHE" $FAUDIO_REPOS/Release.key
-      sudo apt-key add "$DIR_WINECACHE/Release.key"
-      rm "$DIR_WINECACHE/Release.key"
-      sudo apt-add-repository "deb $FAUDIO_REPOS ./"
+      wget -q -O - "$FAUDIO_REPOS/Release.key" | sudo gpg --dearmor -o "$FAUDIO_KEYRING"
+      sudo chmod 0644 "$FAUDIO_KEYRING"
+      echo "deb [signed-by=$FAUDIO_KEYRING] $FAUDIO_REPOS ./" | sudo tee "$FAUDIO_LIST" > /dev/null
     fi
   fi
 
