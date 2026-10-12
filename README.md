@@ -110,8 +110,8 @@ PATH="%%ATST_HOME%%:/bin:/usr/bin:/usr/local/bin" ← %%ATST_HOME%% の部分は
 
 # List of MetaTrader which should be Monitored.
 # It consists of space separated, single quoted MetaTrader name.
-# ex. "('Land-FX' 'MetaTrader 5' 'MetaTrader 4')"
-TARGET="('Land-FX')"
+# ex. "('Land Prime' 'MetaTrader 5' 'MetaTrader 4')"
+TARGET="('Land Prime')"
 
 0 9 * * * check_daily.sh
 * * * * * check_reboot.sh
@@ -131,7 +131,9 @@ TARGET="('Land-FX')"
 こんな感じで設定しておけば、再起動時とMT4/5プロセスが落ちたときや、ポジションの新規や決済、値動きやスプレッド、Pingに異常が有った時ににLINEへ通知してくれます。  
 
 
-「land-fx」となっている部分はMT4/5がインストールされているフォルダ名なら何でもよく、複数指定可能。  指定された名前に該当するMT4/5のインストールフォルダを前方一致で検索するのでフォルダ名の先頭の一部を記載しておけばOK.
+「Land Prime」となっている部分はMT4/5がインストールされているフォルダ名なら何でもよく、複数指定可能。  指定された名前に該当するMT4/5のインストールフォルダを前方一致で検索するのでフォルダ名の先頭の一部を記載しておけばOK.
+
+※ 既定のインストーラ(Land Prime)でMT4を入れると、フォルダ名は "Land Prime MetaTrader 4 Terminal" になるので `TARGET` には前方一致する "Land Prime" を指定すればよい。
 
 
 @reboot の行は再起動時のMT4/5の自動起動設定です。

@@ -7,6 +7,13 @@
 VNC_PASSWORD=123123
 TARGET_LOCALE=ja_JP.UTF-8
 
+# MetaTrader installer to download and launch.
+# MetaQuotes no longer distributes MT4; its own mt4setup.exe actually installs MT5.
+# So we use a broker that still ships a real MT4 build. Default: Land Prime (formerly LandFX),
+# whose installer creates the "Land Prime MetaTrader 4 Terminal" folder.
+# To use a different broker/platform, replace this URL with that broker's installer.
+MT_INSTALLER_URL='https://download.mql5.com/cdn/web/land.prime.ltd/mt4/landprime4setup.exe'
+
 ABS_PWD=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
 ORG_USER=${SUDO_USER:-$USER}
 IS_SYSTEMD=$(which systemctl)
@@ -427,15 +434,23 @@ function clean_needless_files {
 # Download MT4 and start installer
 #####################################################
 function download_and_start_mt4_installer() {
-  echo Downloading MetaTrader4 ...
-  if [ -f "$DIR_WINECACHE/landfx4setup.exe" ]; then
-    rm "$DIR_WINECACHE/landfx4setup.exe"
+  local installer="$DIR_WINECACHE/$(basename "$MT_INSTALLER_URL")"
+
+  echo Downloading MetaTrader installer ...
+  if [ -f "$installer" ]; then
+    rm "$installer"
   fi
 
-  wget -q -N -P "$DIR_WINECACHE" 'https://download.mql5.com/cdn/web/land.prime.ltd/mt4/landfx4setup.exe'
+  wget -q --timeout=30 --tries=3 -N -P "$DIR_WINECACHE" "$MT_INSTALLER_URL"
 
-  echo Staring MetaTrader4 installer...
-  WINEDEBUG=-all wine start /unix "$DIR_WINECACHE/landfx4setup.exe"
+  if [ ! -f "$installer" ]; then
+    echo "[error] MT installer download failed: $MT_INSTALLER_URL" >&2
+    return 1
+  fi
+
+  echo Staring MetaTrader installer...
+  # Disable mono/gecko here too so the installer never blocks on a download dialog.
+  WINEDLLOVERRIDES="mscoree=;mshtml=" WINEDEBUG=-all wine start /unix "$installer"
 }
 
 setup_root_crontab
