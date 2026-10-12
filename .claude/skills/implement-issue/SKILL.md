@@ -17,12 +17,14 @@ allowed-tools: [Read, Edit, Write, Bash, Glob, Grep, Agent]
 
 ## このプロジェクトの危険度モデル（最重要）
 
-atst は bash スクリプト群であり、**本番 = 稼働中の実弾自動売買VPS（Linux + Wine + MetaTrader 4/5）**。コードの編集・PR・master へのマージは安全だが、**本番VPS への反映は建玉・決済を失わせうる不可逆操作**である。
+atst は bash スクリプト群であり、**本番 = 稼働中の実弾自動売買VPS（Linux + Wine + MetaTrader 4/5）**。**本番VPS への反映は建玉・決済を失わせうる不可逆操作**である。
 
-- **ローカル（この作業ツリー）で完結する操作は自由**: 編集・`bash -n`・`shellcheck`・git 操作・PR 作成・master マージ。
+**master へのマージは公開リリースである**。公式の導入手順（Wiki の gist `init_atst.sh`）は `archive/master.zip` を取得して実行するため、master に入った変更は**即座に全利用者の新規導入・再導入へ配布される**。したがって install / setup / templates / cron 経路の変更は、**マージ前に Phase 5.5 の実機検証を通すこと**を必須とする。
+
+- **ローカル（この作業ツリー）で完結する操作は自由**: 編集・`bash -n`・`shellcheck`・git 操作・PR 作成。master マージは「マージ運用」節と Phase 5.5 の条件を満たした場合に限る。
 - **本番VPS に対しては、読み取り専用のみ無承認で可**: `mtctl.sh status` / `mtctl.sh list` / `crontab -l` / ログ閲覧 / `lsb_release -a` など状態確認。
 - **本番VPS を変更するあらゆる操作はユーザーの明示承認を都度得てから**: VPS 上でのスクリプト実行、`crontab` の変更、`apt install` / `apt upgrade`、`mtctl.sh start/stop/kill`（稼働中 MT に影響）、cron 監視設定の変更、`setup_line.sh` 等 LINE トークン操作、その他建玉・決済・MT プロセスに影響しうる一切。
-- **検証を本番VPS で行わない**。MT の実挙動確認がどうしても要るなら使い捨てのデモ環境で行い、その旨を明記する。
+- **検証を本番VPS（稼働中・建玉あり）で行わない**。実挙動の確認は Phase 5.5 の「検証機」（使い捨て VPS、またはユーザーが指定した MT 非稼働・建玉なしの機）で行う。
 
 この危険度モデルは、本スキル内の「ユーザー承認」が指すものの定義である。
 
@@ -52,7 +54,8 @@ Phase 6 は main 直実行のため対象外。品質劣化や目的未達が観
 | Phase 4 | Phase 3 の計画レビュー（5 ペルソナ）実施・修正完了 + ユーザー承認 |
 | Phase 4.6 | Phase 4 の実装完了 + 検証パス |
 | Phase 5 | Phase 4.6 のコードレビュー（4 ペルソナ）approve + 検証パス |
-| Phase 6 | Phase 5 のドキュメントレビュー（3 ペルソナ）実施・修正完了 + 検証パス |
+| Phase 5.5 | Phase 5 のドキュメントレビュー（3 ペルソナ）実施・修正完了 + 検証パス + 実機検証の要否判定が「要」 |
+| Phase 6 | Phase 5 完了、かつ Phase 5.5 が「不要」判定または実機検証 pass |
 
 **前提条件を満たさずにフェーズを開始したら、即座に戻って未完了のレビューを実施すること。**
 
@@ -301,6 +304,35 @@ case "$L" in *contract-first*) echo on ;; *spike*) echo off ;; *) { [ "$N" -ge 3
 7. **handoff 書き出し**: `phase-5.md` に更新ドキュメント一覧・整合性確認結果・PR description に反映すべき要旨を記載し、末尾に機械可読行
 
 > **注**: Wiki は別 git リポジトリなので、Wiki の更新は本 PR には含まれない。Wiki に変更が要る場合は handoff と PR 本文に「要 Wiki 更新」と明記し、Wiki への反映手順（別クローンで編集・push）をユーザーに案内する。
+
+---
+
+## Phase 5.5: 実機検証（条件付き・main 直実行・ユーザー承認必須）
+
+master マージ＝公開リリースのため、実環境でしか判定できない変更はマージ前に検証機で確かめる。
+
+### 要否判定（main）
+
+次のいずれかに触れる変更は**「要」**。どれにも触れなければ「不要」として理由を報告し Phase 6 へ進む。
+
+- `install_required_for_mt.sh` / `setup_*.sh` / `templates/`（crontab・systemd・xstartup・config）
+- cron から起動される経路（`wrapper.sh` / `mtctl.sh` / `check_*.sh` / `common.sh` のうち実行時に通る部分）で、ローカルの静的検査・dry-run では挙動を判定できないもの
+- MQL（`.mq4` / `.mq5`）
+
+### 検証機の条件
+
+- 使い捨て VPS、または**ユーザーが指定した MT 非稼働・建玉なし**の機。稼働中の本番VPS は使わない
+- 実行は**毎回ユーザーの明示承認**を得る（「マージ運用」の委任とは別。委任不可）
+
+### 手順
+
+1. **命綱の確保**: 検証機への既存 ssh セッションを 1 本、検証が終わるまで**閉じずに保持**するようユーザーに依頼する（apt / systemd 更新で sshd が止まりうるため）
+2. **事前スナップショット**（ロールバック用）: `dpkg -l > ~/atst-verify/dpkg.before`、`crontab -l`、`ls ~/.wine`、`ss -tlnp` を記録する
+3. **ブランチ版の取得**: gist は master しか取らないので、検証は `https://github.com/terukusu/auto-trading-support-tools/archive/refs/heads/<branch>.zip` を取得・展開して実行する（または `git clone -b <branch>`）
+4. **実行とログ採取**: 出力を `tee` でファイルに残す
+5. **事後検証**: Issue の AC に加え、常に `ss -tlnp | grep ':22 '`（sshd 生存）、`apt-get check`（apt 健全性）、`wine --version` と `~/.wine` の存在（Wine 系の場合）を確認する
+6. **報告**: PR 本文に「実機検証」節として、検証機の OS・仮想化方式・実施日・AC ごとの pass/fail・逸脱を**要約**で書く（ログの生貼りはしない。必要なら該当行の抜粋のみ）
+7. **失敗時**: Phase 4 に戻る（再試行は 1 回まで。2 回目も失敗ならユーザーに判断を仰ぐ）。検証機はスナップショットを基に復旧手順を提示し、ユーザー承認のうえで戻す
 
 ---
 
