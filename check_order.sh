@@ -16,6 +16,12 @@ while [ "$i" -lt "$target_num" ]; do
   target_name=${target_names[$i]}
 
   target_index=$(atst_find_mt_index "$target_name")
+  if [ -z "$target_index" ]; then
+    # Not installed (reported by check_process.sh). An empty index would read mt_home[0], i.e. a
+    # different MetaTrader.
+    let i++
+    continue
+  fi
   target_path=${mt_home[$target_index]}
   target_type=${mt_type[$target_index]}
   if [ "$target_type" == "MT4" ]; then
