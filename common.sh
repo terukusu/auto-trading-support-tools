@@ -98,6 +98,7 @@ function atst_upload_image() {
 }
 
 # LINE送信関数
+# shellcheck disable=SC2120  # image files are optional; atst_update_alert sends text only
 function atst_send_to_line() {
   local msg; msg=$(cat -)
   # 画像ファイル (0 〜 4 個)。LINE は 1 回の push を何個のメッセージが入っていても 1 通と数える
@@ -478,6 +479,71 @@ function atst_get_alert_status() {
 
 function atst_get_alert_status_time() {
   atst_get_alert_status_field "$1" 3 "$2"
+}
+
+# alert_status records what has been delivered to LINE, not what was observed: a key changes only
+# after its message was sent. The message texts belong to the callers (check_*.sh).
+
+# atst_alert_transition <key> <verdict>
+# verdict: 1 = abnormal observed, 0 = normal observed, empty = undecided (between the thresholds).
+# Prints "1" when the fire message is due (verdict 1 and state is not 1), "0" when the recover
+# message is due (verdict 0 and state 1), nothing otherwise. Reads the state only; writes nothing.
+# Returns 2 on an empty key or an invalid verdict.
+function atst_alert_transition() {
+  local key="$1" verdict="$2" state
+
+  if [ -z "$key" ]; then
+    echo "atst_alert_transition: key should not be empty" 1>&2
+    return 2
+  fi
+  case "$verdict" in
+    1|0) ;;
+    '') return 0 ;;
+    *)
+      echo "atst_alert_transition: invalid verdict: $verdict" 1>&2
+      return 2
+      ;;
+  esac
+
+  state=$(atst_get_alert_status "$key")
+  if [ "$verdict" == "1" ] && [ "$state" != "1" ]; then
+    echo 1
+  elif [ "$verdict" == "0" ] && [ "$state" == "1" ]; then
+    echo 0
+  fi
+  return 0
+}
+
+# atst_update_alert <key> <verdict> <fire_msg> <recover_msg>
+# Sends fire_msg or recover_msg (one push) when atst_alert_transition says so, and records the new
+# state only when the send succeeded, so a failed send is tried again on the next run.
+# Returns 0 when nothing was due or both the send and the record succeeded, 1 when the send or the
+# record failed, 2 on invalid arguments (nothing sent, nothing recorded).
+function atst_update_alert() {
+  if [ "$#" -ne 4 ]; then
+    echo "Usage: atst_update_alert <key> <verdict> <fire_msg> <recover_msg>" 1>&2
+    return 2
+  fi
+
+  local key="$1" verdict="$2" fire_msg="$3" recover_msg="$4"
+  local transition msg
+
+  transition=$(atst_alert_transition "$key" "$verdict") || return 2
+  if [ -z "$transition" ]; then
+    return 0
+  fi
+
+  if [ "$transition" == "1" ]; then
+    msg="$fire_msg"
+  else
+    msg="$recover_msg"
+  fi
+
+  if ! printf '%s\n' "$msg" | atst_send_to_line; then
+    return 1
+  fi
+  atst_set_alert_status "$key" "$transition" || return 1
+  return 0
 }
 
 eval "$(atst_gen_mt_list)"
