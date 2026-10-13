@@ -58,15 +58,7 @@ while [ "$i" -lt "$target_num" ]; do
     let i++
     continue
   fi
-  target_path=${mt_home[$target_index]}
-  target_type=${mt_type[$target_index]}
-  if [ "$target_type" == "MT4" ]; then
-    target_mq_folder="MQL4"
-  else
-    target_mq_folder="MQL5"
-  fi
-
-  order_status_file="$target_path/$target_mq_folder/Files/order_status"
+  order_status_file="$(atst_get_mql_folder_path "$target_name")/Files/order_status"
   # Orders taken from order_status but not delivered yet. Kept until LINE accepts them, so a failed
   # send is retried on the next run instead of losing the notification.
   pending_file="$order_status_file.pending"

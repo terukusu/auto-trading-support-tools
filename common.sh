@@ -182,10 +182,44 @@ function atst_abs_path() {
   echo $(cd "$target_dir" && pwd)/$(basename "$1")
 }
 
+# Prints the data folder of the MetaTrader installed in $1 (MQL4/MQL5 with Files and Experts live there).
+# Build 600+ keeps it under AppData when the install folder is not writable for it (e.g. Program Files)
+# and records the install folder in its origin.txt (UTF-16LE, Windows path). Without such a folder
+# (older builds, /portable) the install folder itself is the data folder.
+# winepath would start wine on every cron run, so "X:\..." is mapped to $WINEPREFIX/drive_x/... here.
+function atst_find_mt_data_dir() {
+  local mt_home="$1"
+  local home_upper=$(echo "$mt_home" | atst_to_upper)
+  # same form as mt_home (atst_abs_path)
+  local prefix=$(cd "$WINEPREFIX" && pwd)
+  local origin win_path origin_path data_dir
+
+  for origin in "$prefix"/drive_c/users/*/AppData/Roaming/MetaQuotes/Terminal/*/origin.txt; do
+    [ -f "$origin" ] || continue
+    win_path=$(iconv -f UTF-16LE -t UTF-8 "$origin" 2>/dev/null | tr -d '\r\n')
+    win_path=${win_path#$'\xef\xbb\xbf'}
+    [[ "$win_path" =~ ^[A-Za-z]: ]] || continue
+    origin_path=${win_path:2}
+    origin_path="$prefix/drive_${win_path:0:1}${origin_path//\\//}"
+    if [ "$(echo "${origin_path%/}" | atst_to_upper)" == "$home_upper" ]; then
+      data_dir=$(dirname "$origin")
+      break
+    fi
+  done
+
+  # Both may have been used (e.g. switched to /portable later); MT writes logs/ daily in the one in use.
+  if [ -n "$data_dir" ] && ! [ "$mt_home/logs" -nt "$data_dir/logs" ]; then
+    echo "$data_dir"
+  else
+    echo "$mt_home"
+  fi
+}
+
 # scan wine drive and find terminal.exe. and output lines like below.
 #
 #    mt_term[0]='/Users/teru/.wine/drive_c/Program Files/MetaTrader 5/terminal.exe'
 #    mt_home[0]='/Users/teru/.wine/drive_c/Program Files/MetaTrader 4'
+#    mt_data[0]='/Users/teru/.wine/drive_c/users/teru/AppData/Roaming/MetaQuotes/Terminal/<hash>'
 #    mt_name[0]='METATRADER 4'
 #    mt_type[0]='MT4'
 #    mt_home[1]....
@@ -221,8 +255,11 @@ function atst_gen_mt_list() {
       continue
     fi
 
+    mt_data=$(atst_find_mt_data_dir "$mt_home")
+
     echo mt_term[$i]="'$mt_term'"
     echo mt_home[$i]="'$mt_home'"
+    echo mt_data[$i]="'$mt_data'"
     echo mt_name[$i]="'$mt_name'"
     echo mt_type[$i]="'$mt_type'"
 
@@ -303,9 +340,8 @@ function atst_get_mql_folder_path() {
     return 0;
   fi
 
-  local target_path=${mt_home[$target_index]}
+  local target_path=${mt_data[$target_index]}
   local target_type=${mt_type[$target_index]}
-  local target_fullname=${mt_name[$target_index]}
 
   local target_mql_folder
 

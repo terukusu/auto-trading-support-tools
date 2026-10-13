@@ -100,7 +100,7 @@ function list_mt() {
       fi
     fi
 
-    echo [$(($i + 1))/$num_mt]:$mt_status type=${mt_type[$i]}, name=${mt_name[$i]}, home=${mt_home[$i]}
+    echo [$(($i + 1))/$num_mt]:$mt_status type=${mt_type[$i]}, name=${mt_name[$i]}, home=${mt_home[$i]}, data=${mt_data[$i]}
     let i++
   done
 }
