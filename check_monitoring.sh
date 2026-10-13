@@ -11,21 +11,26 @@ function do_check() {
   local target_fullname="$2"
 
   local monitoring_file alert_status
-  local now elapsed last_timestamp threshold threshold_minute
+  local now elapsed last_timestamp threshold threshold_minute target_pid
 
   local alert_key=MONITORING_${target_fullname// /_}
 
   monitoring_file=$(atst_get_monitoring_csv_path "$target_name")
 
-  # The last line with a numeric timestamp; the EA may be writing the last line right now.
+  # The last complete line (8 fields); the EA may be writing the last one right now.
   if [ -f "$monitoring_file" ]; then
-    last_timestamp=$(tail -n 20 "$monitoring_file" | tr -d '\r' | awk -F, '$1 ~ /^[0-9]+$/ {t = $1} END {print t}')
+    last_timestamp=$(tail -n 20 "$monitoring_file" | tr -d '\r' | awk -F, 'NF >= 8 && $1 ~ /^[0-9]+$/ {t = $1} END {print t}')
   fi
 
   if [ -z "$last_timestamp" ]; then
     # No data at all: the EA is not attached (or was never set up) and the freeze check below would be
     # silently off. A stopped MetaTrader is reported by check_process.sh instead.
-    if [ -z "$(atst_find_pid "$target_name")" ]; then
+    target_pid=$(atst_find_pid "$target_name")
+    if [ -z "$target_pid" ]; then
+      return 0
+    fi
+    # Just started: the EA writes its first line some seconds after the chart opens.
+    if [ "$(ps -o etimes= -p "$target_pid" | tr -d ' ')" -lt "$ATST_MONITORING_THRESHOLD" ] 2>/dev/null; then
       return 0
     fi
     last_timestamp=0
