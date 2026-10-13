@@ -259,16 +259,52 @@ function set_up_locale_and_timezone() {
 }
 
 #####################################################
+# Time synchronization (P8 / P15)
+#####################################################
+function ensure_time_sync() {
+  # In containers (OpenVZ/LXC) the clock belongs to the host and cannot be adjusted from inside.
+  if systemd-detect-virt --container --quiet 2>/dev/null; then
+    echo "Time is managed by the container host ($(systemd-detect-virt --container)); not installing a time daemon."
+    return 0
+  fi
+
+  # Keep whatever time daemon is already there; chrony conflicts with ntp/ntpsec (time-daemon).
+  local p
+  for p in chrony ntp ntpsec systemd-timesyncd; do
+    if systemctl is-active --quiet "$p" 2>/dev/null; then
+      echo "Time sync already provided by $p; not installing chrony."
+      return 0
+    fi
+  done
+  for p in chrony ntp ntpsec systemd-timesyncd; do
+    if dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q 'ok installed'; then
+      # Installed but not running: do not add a conflicting daemon, but do not stay silent either.
+      if [ "$p" = "systemd-timesyncd" ]; then
+        sudo timedatectl set-ntp true >/dev/null 2>&1
+        systemctl is-active --quiet systemd-timesyncd 2>/dev/null && { echo "Enabled systemd-timesyncd."; return 0; }
+      fi
+      echo "[warn] $p is installed but not running; time may not be synchronized. Start it: sudo systemctl enable --now $p" >&2
+      return 0
+    fi
+  done
+
+  # Nothing present: install chrony in its own transaction so a failure here cannot block others.
+  if ! sudo -E apt-get $APT_OPT install chrony; then
+    echo "[warn] failed to install chrony; time synchronization is not configured." >&2
+  fi
+  return 0
+}
+
+#####################################################
 # Install packages required by MetaTrader
 #####################################################
 function install_packages_misc_and_needed_by_mt4() {
   # install misc
-  # Use chrony for time sync (instead of the classic 'ntp'). chrony is the portable, modern
-  # choice across supported distros: Debian 12 dropped classic ntp(ntpd) in favour of ntpsec,
-  # and chrony transparently replaces systemd-timesyncd. (On Ubuntu noble 'ntp' still exists in
-  # universe, so this is a portability/consistency choice, not a fix for a missing package.)
   # gnupg (gpg --dearmor) and wget are needed for the keyring/repo setup below.
-  sudo -E apt $APT_OPT install unattended-upgrades apt-transport-https chrony gnupg wget psmisc file bc vim nano less tmux curl net-tools lsof
+  # (Time sync is handled separately by ensure_time_sync so a conflict there cannot sink this line.)
+  sudo -E apt $APT_OPT install unattended-upgrades apt-transport-https gnupg wget psmisc file bc vim nano less tmux curl net-tools lsof
+
+  ensure_time_sync
 
   # install gui
   sudo -E apt $APT_OPT install tightvncserver fonts-vlgothic xterm wm2
