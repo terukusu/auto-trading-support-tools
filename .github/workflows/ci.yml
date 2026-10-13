@@ -1,0 +1,72 @@
+# PR と master への push で、ローカルと同じ検査（CLAUDE.md「実行・検証」）を走らせる。
+# 版上げは env の定数と uses の sha を手で変える PR で行う。
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SHELLCHECK_VERSION: 0.11.0
+      SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+    steps:
+      - name: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: tools
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends bats bc jq
+          tarball="shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          curl -fsSL --max-time 60 -o "${RUNNER_TEMP}/${tarball}" \
+            "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/${tarball}"
+          echo "${SHELLCHECK_SHA256}  ${RUNNER_TEMP}/${tarball}" | sha256sum -c -
+          tar -xJf "${RUNNER_TEMP}/${tarball}" -C "${RUNNER_TEMP}"
+          scdir="${RUNNER_TEMP}/shellcheck-v${SHELLCHECK_VERSION}"
+          [ "$("${scdir}/shellcheck" --version | sed -n 's/^version: //p')" = "${SHELLCHECK_VERSION}" ]
+          echo "${scdir}" >> "$GITHUB_PATH"
+          bats --version
+          bc --version | sed -n 1p
+          jq --version
+
+      - name: bash -n
+        if: ${{ !cancelled() }}
+        run: |
+          rc=0
+          for f in *.sh tests/test_helper.bash tests/stubs/*; do
+            bash -n "$f" || { echo "::error file=${f}::bash -n failed"; rc=1; }
+          done
+          exit "$rc"
+
+      - name: shellcheck
+        if: ${{ !cancelled() }}
+        run: |
+          [ "$(shellcheck --version | sed -n 's/^version: //p')" = "${SHELLCHECK_VERSION}" ] \
+            || { echo "::error::shellcheck on PATH is not ${SHELLCHECK_VERSION}: $(command -v shellcheck)"; exit 1; }
+          shellcheck -S warning -f gcc *.sh tests/test_helper.bash tests/stubs/curl tests/stubs/winepath
+
+      - name: bats compat
+        if: ${{ !cancelled() }}
+        run: |
+          # bats 1.1.0（Ubuntu 20.04）に無い機能を tests/ で使っていないこと（#88 AC 9）
+          rc=0
+          grep -rnE 'setup_file|teardown_file|BATS_TEST_TMPDIR|BATS_FILE_TMPDIR|bats_load_library|bats_require_minimum_version|run +-[0-9!]|--separate-stderr' tests/ || rc=$?
+          [ "$rc" -eq 1 ] || { echo "::error::tests/ uses features newer than bats 1.1.0 (or grep failed: rc=${rc})"; exit 1; }
+
+      - name: bats
+        if: ${{ !cancelled() }}
+        run: bats tests/
