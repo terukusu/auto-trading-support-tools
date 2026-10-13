@@ -155,6 +155,12 @@ function atst_send_to_line() {
   # 失敗の痕跡を残す (cron は MAILTO="" で出力も捨てるため、ここに書かないと何も残らない)。
   # curl 自体の失敗 (タイムアウト等) は HTTP コード 000 になる。
   atst_log_line_error "$result" "${response%$'\n'*}" "$text"
+
+  # 2: LINE rejected this message itself (400 etc.); sending it again will fail again.
+  # 1: may succeed later (network, timeout=000, 429, 5xx, and 401/403 until the token is fixed).
+  case "$result" in
+    4??) [ "$result" != 401 ] && [ "$result" != 403 ] && [ "$result" != 429 ] && return 2 ;;
+  esac
   return 1
 }
 
@@ -251,9 +257,9 @@ function atst_gen_mt_list() {
 
   i=0
   # Windowsの各ドライブのプログラムフォルダ内からtemrinal.exeを検索する
-  cat <(find "$WINEPREFIX" -maxdepth 1 -type d -name drive_* | sort | while read drive; do
-    find "$drive" -maxdepth 1 -type d -name Program* -maxdepth 1 | sort | while read program_folder; do
-      find "$program_folder" -maxdepth 2 -name terminal*.exe
+  cat <(find "$WINEPREFIX" -maxdepth 1 -type d -name 'drive_*' | sort | while read drive; do
+    find "$drive" -maxdepth 1 -type d -name 'Program*' | sort | while read program_folder; do
+      find "$program_folder" -maxdepth 2 -name 'terminal*.exe'
     done
   done) | sort | while read line; do
     line=$(atst_abs_path "$line")
@@ -322,7 +328,7 @@ function atst_find_pid() {
     return 0
   fi
 
-  local target_win_path=$(winepath -w "$target_mt_path" | sed -e 's/\\/\\\\/g')
+  local target_win_path=$(winepath -w "$target_mt_path" 2>/dev/null | sed -e 's/\\/\\\\/g')
 
   if [ -z "$target_win_path" ]; then
     return 0
