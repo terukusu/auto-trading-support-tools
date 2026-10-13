@@ -66,25 +66,30 @@ function atst_read_file() {
   cat "$1" | sed -re 's/\r//g'
 }
 
-# 画像アップロード関数
-function atst_upload_image_to_0x0() {
+# 画像を一時置き場にアップロードし、公開 URL を出力する。LINE の画像メッセージは公開 HTTPS の URL が要る。
+# Litterbox (catbox.moe の一時置き場) に 72 時間だけ置く。URL は推測困難だが誰でも見られるので、
+# 送る画像に秘匿したいものを含めないこと。(以前の 0x0.st は 2026 年にアップロードを停止した)
+function atst_upload_image() {
   local file="$1"
+  local api="https://litterbox.catbox.moe/resources/internals/api.php"
 
   if [ ! -f "$file" ]; then
     echo "Error: File not found: $file" >&2
     return 1
   fi
 
-  # IPv4を強制的に使用してアップロード（3日間保持）
-  local url=$(curl --max-time 30 --connect-timeout 10 -4 -s -F"file=@$file" -Fexpires=72 https://0x0.st 2>/dev/null)
+  local url
+  url=$(curl --max-time 60 --connect-timeout 10 -s -F reqtype=fileupload -F time=72h -F "fileToUpload=@$file" "$api" 2>/dev/null)
 
-  if [ -n "$url" ] && [[ "$url" =~ ^https?:// ]]; then
+  if [[ "$url" =~ ^https://[^[:space:]]+$ ]]; then
     echo "$url"
     return 0
-  else
-    echo "Error: Upload failed" >&2
-    return 1
   fi
+
+  # cron discards stderr; leave a trace where LINE failures are logged.
+  atst_log_line_error "upload" "$url" "画像アップロード失敗: $(basename "$file")"
+  echo "Error: Upload failed" >&2
+  return 1
 }
 
 # LINE送信関数
@@ -112,7 +117,7 @@ function atst_send_to_line() {
   local image_urls=() image_file image_url upload_failed=0
   for image_file in "${image_files[@]}"; do
     [ -n "$image_file" ] || continue
-    image_url=$(atst_upload_image_to_0x0 "$image_file")
+    image_url=$(atst_upload_image "$image_file")
     if [ $? -ne 0 ] || [ -z "$image_url" ]; then
       upload_failed=$((upload_failed + 1))
     else
