@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. "$(cd "$(dirname "$BASH_SOURCE")"; pwd)/common.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 num_mt=${#mt_home[@]}
 
@@ -20,7 +20,7 @@ while [ $i -lt $num_mt ]; do
     find "$d" -name 'news.dat' -exec rm {} \;
   done
 
-  echo done
+  echo "done"
 
   let i++
 done
@@ -44,6 +44,6 @@ done | while read png; do
   fi
 done
 
-echo done
+echo "done"
 
 exit 0

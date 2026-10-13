@@ -7,7 +7,8 @@ function do_check() {
   local target_fullname="$2"
 
   local alert_key=PROCESS_${target_fullname// /_}
-  local alert_status=$(atst_get_alert_status $alert_key)
+  local alert_status
+  alert_status=$(atst_get_alert_status $alert_key)
 
   target_pid=$(atst_find_pid "$target_name")
 
@@ -34,7 +35,8 @@ function check_target_found() {
   # The name is user-written (crontab); keep only safe chars so the key stays one field of the
   # alert_status file (spaces or commas would split it and the alert would repeat every minute).
   local alert_key=TARGET_${target_name//[^A-Za-z0-9_]/_}
-  local alert_status=$(atst_get_alert_status $alert_key)
+  local alert_status
+  alert_status=$(atst_get_alert_status $alert_key)
 
   if [ -z "$(atst_find_mt_index "$target_name")" ]; then
     if [ "$alert_status" != "1" ]; then
@@ -49,7 +51,7 @@ function check_target_found() {
 
 target_names=("$@")
 
-if [ -z "$target_names" ]; then
+if [ -z "${target_names[0]}" ]; then
   echo "Usage: `basename $0` <MetaTrader Name1> <MetaTrader Name2> ..." 1>&2
   echo -e "\t<MetaTrader Name>: folder name of MetaTrader 4. (ex: "'"MetaTrader 4")'
   exit 1

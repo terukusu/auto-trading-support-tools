@@ -63,3 +63,20 @@ atst_test_source_common() {
   # shellcheck source=/dev/null
   . "${BATS_TEST_DIRNAME:?}/../common.sh"
 }
+
+# atst_test_make_monitoring_csv <name> <secs_ago> <bid> <spread> <pip>
+# Appends one 8-field line "<now-secs_ago>,0,<bid>,<bid>,<spread>,12,<pip>,USDJPY" to
+# MQL4/Files/terminal_monitoring.csv of the MT made by atst_test_make_mt (without a hash).
+atst_test_make_monitoring_csv() {
+  local name="$1" secs_ago="$2" bid="$3" spread="$4" pip="$5"
+  local dir
+
+  [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
+  [ "$#" -eq 5 ] && [ -n "$name" ] || return 1
+  [ -n "${WINEPREFIX:-}" ] || return 1
+
+  dir="$WINEPREFIX/drive_c/Program Files/$name/MQL4/Files"
+  mkdir -p "$dir" || return 1
+  printf '%s,%s,%s,%s,%s,12,%s,USDJPY\n' "$(( $(date +%s) - secs_ago ))" 0 "$bid" "$bid" "$spread" "$pip" \
+    >> "$dir/terminal_monitoring.csv"
+}

@@ -57,3 +57,10 @@ mt_index_of() {
   [ "${mt_type[$idx]}" = MT4 ]
   [ "${mt_data[$idx]}" = "$WINEPREFIX/drive_c/Program Files/A_MT4" ]
 }
+
+@test "atst_log prints its arguments after the timestamp" {
+  atst_test_source_common || return 1
+  run atst_log "a b"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"] a b" ]]
+}

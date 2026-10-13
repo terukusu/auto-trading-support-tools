@@ -10,11 +10,12 @@ function do_check() {
   local target_name="$1"
   local target_fullname="$2"
 
-  local monitoring_file last_price
+  local monitoring_file
   local minmax pip_price minmax_delta_pips sign_upper sign_lower
 
   local alert_key=PRICE_${target_fullname// /_}
-  local alert_status=$(atst_get_alert_status $alert_key)
+  local alert_status
+  alert_status=$(atst_get_alert_status $alert_key)
 
   monitoring_file=$(atst_get_monitoring_csv_path "$target_name")
 
@@ -24,9 +25,9 @@ function do_check() {
   fi
 
   from=$(($(date +%s)- 60 * 10))
-  minmax=($(cat "$monitoring_file" | awk -F, 'BEGIN{min=10000; max=0} NF >= 8 { if ($1 > '$from') { if($3 > max) max=$3; if($3 < min) min=$3 }} END{ printf("%g %g",min ,max) }'))
+  read -ra minmax <<< "$(cat "$monitoring_file" | awk -F, 'BEGIN{min=10000; max=0} NF >= 8 { if ($1 > '$from') { if($3 > max) max=$3; if($3 < min) min=$3 }} END{ printf("%g %g",min ,max) }')"
 
-  if [ ${minmax[0]} == "10000" -o ${minmax[1]} == "0" ]; then
+  if [ ${minmax[0]} == "10000" ] || [ ${minmax[1]} == "0" ]; then
     # no data. nothing todo
     return 0
   fi
@@ -36,7 +37,7 @@ function do_check() {
   if ! [[ "$pip_price" =~ ^[0-9]*\.?[0-9]+$ ]] || [[ "$pip_price" =~ ^[0.]+$ ]]; then
     return 0
   fi
-  minmax_delta_pips=$(printf "%g" $(echo "scale=5; (${minmax[1]} - ${minmax[0]}) / $pip_price" | bc))
+  minmax_delta_pips=$(printf "%g" "$(echo "scale=5; (${minmax[1]} - ${minmax[0]}) / $pip_price" | bc)")
   sign_upper=$(echo $minmax_delta_pips - $ATST_THRESHOLD_PRICE_UPPER | bc | cut -c1)
   sign_lower=$(echo $minmax_delta_pips - $ATST_THRESHOLD_PRICE_LOWER | bc | cut -c1)
 
