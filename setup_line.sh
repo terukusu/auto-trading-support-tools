@@ -5,7 +5,8 @@
 echo "LINEへの通知を送るための設定をします。"
 echo ""
 
-echo "LINE トークンを入力してください。例：n3DganilkwSjpi...."
+echo "LINE Messaging API のチャネルアクセストークン(長期)を入力してください。"
+echo "(LINE Notify のトークンは使えません。手順は Wiki の「LINE への通知設定(LINE 側)」を参照)"
 echo ""
 echo -n "> "
 read -r line_token
@@ -16,7 +17,7 @@ chmod 600 "$ATST_CONFIG_DIR/.line_token"
 
 echo ""
 
-echo "LINE ユーザーIDもしくはグループIDを入力してください。例：Uccf0eb6...."
+echo "LINE の送信先 ID (あなたのユーザー ID。U で始まる文字列。グループに送る場合はグループ ID) を入力してください。"
 echo ""
 echo -n "> "
 read -r line_id
@@ -40,7 +41,8 @@ if [ -f "$ATST_CONFIG_DIR/.line_token" ]; then
         if [ "$?" == "0" ]; then
             echo "送信しました。LINEを確認してください。"
         else
-            echo "失敗しました。設定をやり直してください。"
+            echo "失敗しました。トークンとユーザー ID、公式アカウントを友だちに追加したかを確認して、設定をやり直してください。"
+            echo "詳細: $ATST_CONFIG_DIR/line_error.log"
         fi
     fi
 else
