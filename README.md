@@ -148,6 +148,8 @@ TARGET="('Land Prime')"
 
 ※ 既定のインストーラ(Land Prime)でMT4を入れると、フォルダ名は "Land Prime MetaTrader 4 Terminal" になるので `TARGET` には前方一致する "Land Prime" を指定すればよい。
 
+※ `TARGET` の名前に該当する MT4/5 が見つからない場合は、その MT4/5 の監視と自動起動が効いていないことを LINE に通知します(check_process.sh)。
+
 
 @reboot の行は再起動時のMT4/5の自動起動設定です。
 

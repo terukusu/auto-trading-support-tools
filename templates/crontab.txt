@@ -3,8 +3,8 @@ PATH="%%ATST_HOME%%:/bin:/usr/bin:/usr/local/bin"
 
 # List of MetaTrader which should be Monitored.
 # It consists of space separated, single quoted MetaTrader name.
-# ex. "('Land-FX' 'MetaTrader 5' 'MetaTrader 4')"
-TARGET="('Land-FX')"
+# ex. "('Land Prime' 'MetaTrader 5' 'MetaTrader 4')"
+TARGET="('Land Prime')"
 
 0 9 * * * check_daily.sh
 * * * * * check_reboot.sh
