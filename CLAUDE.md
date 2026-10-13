@@ -35,12 +35,12 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 変更の検証は以下で行う。
 
 - 自動テスト: リポジトリ直下で `bats tests/`。bats は開発者向けの依存で、開発機に `sudo apt-get install bats` で入れる（VPS には不要。`install_required_for_mt.sh` には入れない。vendoring / submodule もしない）。
-  - `tests/test_helper.bash`（`load test_helper`）: `atst_test_setup_sandbox`（`mktemp -d` の sandbox に `HOME` / `WINEPREFIX` / `PATH`（先頭に `tests/stubs`）/ `ATST_TEST_CURL_LOG` を向ける）、`atst_test_teardown_sandbox`（sandbox 削除）、`atst_test_make_mt <name> <MT4|MT5> [<appdata-hash>]`（偽の MT インストールと AppData データフォルダ・`origin.txt`）、`atst_test_source_common`（sandbox 内でのみ `common.sh` を source）。
+  - `tests/test_helper.bash`（`load test_helper`）: `atst_test_setup_sandbox`（`mktemp -d` の sandbox に `HOME` / `WINEPREFIX` / `PATH`（先頭に `tests/stubs`）/ `ATST_TEST_CURL_LOG` を向ける）、`atst_test_teardown_sandbox`（sandbox 削除）、`atst_test_make_mt <name> <MT4|MT5> [<appdata-hash>]`（偽の MT インストールと AppData データフォルダ・`origin.txt`）、`atst_test_source_common`（sandbox 内でのみ `common.sh` を source）、`atst_test_make_monitoring_csv <name> <secs_ago> <bid> <spread> <pip>`（MT4 の `MQL4/Files/terminal_monitoring.csv` に 8 列の行を 1 行追記）。
   - `tests/stubs/curl`（ネットワークに出ず引数を `$ATST_TEST_CURL_LOG` に記録。`-H @<fd>` の Authorization は読まない。応答は `ATST_TEST_CURL_BODY` / `ATST_TEST_CURL_HTTP_CODE` / `ATST_TEST_CURL_EXIT` で指定）、`tests/stubs/winepath`（Wine を起動せずパスを `C:\...` 形式に変換）。
   - テストは必ず `atst_test_setup_sandbox` の後に `common.sh` を読む／スクリプトを実行する（実 `~/.atst`・`~/.wine`・LINE・Wine に触れない）。`check_*.sh` 等は source せずサブプロセスで実行する。
   - bats の下限は 1.1.0（Ubuntu 20.04）。使ってよいのは `@test`、`setup` / `teardown`、`load`、`run`、`$status` / `$output` / `${lines[@]}`、`skip`、`$BATS_TEST_DIRNAME`、`$BATS_TMPDIR` のみ。1.2 以降の機能（`setup_file` / `teardown_file`、`$BATS_TEST_TMPDIR` / `$BATS_FILE_TMPDIR`、`run` のオプション、`bats_load_library` / `bats_require_minimum_version`）と bats-assert / bats-support は使わない（assertion は `[ ]` で書く）。
 - 構文チェック: `bash -n <script>.sh`（必須）。
-- 静的解析: `shellcheck <script>.sh`（推奨。警告は原則つぶす）。
+- 静的解析: `shellcheck -S warning *.sh` が 0 件を保つ（基準版 ShellCheck 0.11.0。抑止するときは同じ行に理由コメントを書く）。
 - 実挙動の確認は **使い捨ての VPS、またはユーザーが指定した MT 非稼働・建玉なしの検証機**で行い、**稼働中の本番 VPS では試さない**（手順は implement-issue の Phase 5.5）。
 - **master へのマージは公開リリース**（Wiki の gist が `archive/master.zip` を取得して実行する）。install / setup / templates / cron 経路の変更はマージ前に実機検証を通す。
 
