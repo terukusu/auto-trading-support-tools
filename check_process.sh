@@ -31,7 +31,9 @@ function do_check() {
 function check_target_found() {
   local target_name="$1"
 
-  local alert_key=TARGET_${target_name// /_}
+  # The name is user-written (crontab); keep only safe chars so the regex-based alert_status helpers
+  # can find the key again (otherwise the alert would repeat every minute).
+  local alert_key=TARGET_${target_name//[^A-Za-z0-9_]/_}
   local alert_status=$(atst_get_alert_status $alert_key)
 
   if [ -z "$(atst_find_mt_index "$target_name")" ]; then
