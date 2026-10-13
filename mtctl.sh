@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. "$(cd "$(dirname "$BASH_SOURCE")"; pwd)/common.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 # checks args
 
@@ -127,7 +127,8 @@ function status_mt() {
 
 function monitor_mt {
   local target_name="$1"
-  local monitoring_file=$(atst_get_monitoring_csv_path "$target_name")
+  local monitoring_file
+  monitoring_file=$(atst_get_monitoring_csv_path "$target_name")
 
   if [ -z "$monitoring_file" ]; then
     echo "MetaTrader muches name not found: $target_name" 1>&2
@@ -163,8 +164,6 @@ do
 done
 
 shift $((OPTIND - 1))
-
-is_arg_valid=true
 
 ope=$(echo "$1" | atst_to_upper)
 shift

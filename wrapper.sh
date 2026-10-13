@@ -13,4 +13,5 @@ eval "target_mt=$1"
 target_cmd="$2"
 shift 2
 
+# shellcheck disable=SC2154  # target_mt is assigned by the eval above
 $target_cmd "$@" "${target_mt[@]}"

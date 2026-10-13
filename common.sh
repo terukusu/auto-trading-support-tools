@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ATST_HOME=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
+ATST_HOME=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ATST_TEMPLATES_DIR="$ATST_HOME/templates"
 ATST_CONFIG_DIR="$HOME/.atst"
 
@@ -13,6 +13,7 @@ if [ ! -e "$ATST_CONFIG_DIR/config" ]; then
 fi
 
 ATST_CONFIG_FILE="$ATST_CONFIG_DIR/config"
+# shellcheck source=/dev/null  # ~/.atst/config lives outside the repository
 . "$ATST_CONFIG_FILE"
 
 # MT4/5 need neither Wine-Mono (.NET) nor Wine-Gecko (embedded IE). Keep both disabled for every
@@ -108,7 +109,8 @@ function atst_send_to_line() {
   local api_endpoint="https://api.line.me/v2/bot/message/push"
 
   # 通知本文。MT 由来の値などが含まれるため JSON へはエスケープして埋め込む (P6)。
-  local text="【$(hostname -s)】$msg"
+  local text
+  text="【$(hostname -s)】$msg"
 
   # LINE のテキストは 5000 文字まで。超えると送信自体が失敗して通知が消えるので切り詰める
   # (絵文字等を 2 文字と数える場合に備えて少し余裕を持たせる)。
@@ -212,8 +214,9 @@ function atst_log_line_error() {
 }
 
 function atst_abs_path() {
-  local target_dir=$(dirname "$1")
-  echo $(cd "$target_dir" && pwd)/$(basename "$1")
+  local target_dir
+  target_dir=$(dirname "$1")
+  echo "$(cd "$target_dir" && pwd)/$(basename "$1")"
 }
 
 # Prints "<install folder in upper case>\t<data folder>" for every MetaTrader data folder in the prefix.
@@ -223,7 +226,8 @@ function atst_abs_path() {
 # $WINEPREFIX/drive_x/... here.
 function atst_gen_mt_origins() {
   # same form as mt_home (atst_abs_path)
-  local prefix=$(cd "$WINEPREFIX" && pwd)
+  local prefix
+  prefix=$(cd "$WINEPREFIX" && pwd)
   local origin win_path origin_path
 
   for origin in "$prefix"/drive_c/users/*/AppData/Roaming/MetaQuotes/Terminal/*/origin.txt; do
@@ -281,7 +285,8 @@ function atst_gen_mt_list() {
     return 0
   fi
 
-  local origins=$(atst_gen_mt_origins)
+  local origins
+  origins=$(atst_gen_mt_origins)
 
   i=0
   # Windowsの各ドライブのプログラムフォルダ内からtemrinal.exeを検索する
@@ -340,7 +345,8 @@ function atst_find_mt_index() {
 function atst_find_terminal() {
   local target_mt_name=$1
 
-  local target_mt_index=$(atst_find_mt_index "$target_mt_name")
+  local target_mt_index
+  target_mt_index=$(atst_find_mt_index "$target_mt_name")
 
   if [ -n "$target_mt_index" ]; then
     echo "${mt_term[$target_mt_index]}"
@@ -350,19 +356,22 @@ function atst_find_terminal() {
 function atst_find_pid() {
   local target_mt_name=$1
 
-  local target_mt_path=$(atst_find_terminal "$target_mt_name")
+  local target_mt_path
+  target_mt_path=$(atst_find_terminal "$target_mt_name")
 
   if [ -z "$target_mt_path" ]; then
     return 0
   fi
 
-  local target_win_path=$(winepath -w "$target_mt_path" 2>/dev/null | sed -e 's/\\/\\\\/g')
+  local target_win_path
+  target_win_path=$(winepath -w "$target_mt_path" 2>/dev/null | sed -e 's/\\/\\\\/g')
 
   if [ -z "$target_win_path" ]; then
     return 0
   fi
 
-  local target_pid=$(ps haxww -o pid,args | grep -v grep | grep "$target_win_path" | head -n 1 | awk '{print $1}')
+  local target_pid
+  target_pid=$(ps haxww -o pid,args | grep -v grep | grep "$target_win_path" | head -n 1 | awk '{print $1}')
 
   if [ -n "$target_pid" ]; then
     echo $target_pid
@@ -371,7 +380,8 @@ function atst_find_pid() {
 
 function atst_get_monitoring_csv_path() {
   local target_name="$1"
-  local target_mt_home=$(atst_get_mql_folder_path "$target_name")
+  local target_mt_home
+  target_mt_home=$(atst_get_mql_folder_path "$target_name")
 
   if [ -z "$target_mt_home" ]; then
     return 0
@@ -383,7 +393,8 @@ function atst_get_monitoring_csv_path() {
 function atst_get_mql_folder_path() {
   local target_name="$1"
 
-  local target_index=$(atst_find_mt_index "$target_name")
+  local target_index
+  target_index=$(atst_find_mt_index "$target_name")
 
   if [ -z "$target_index" ]; then
     return 0;
@@ -469,4 +480,4 @@ function atst_get_alert_status_time() {
   atst_get_alert_status_field "$1" 3 "$2"
 }
 
-eval $(atst_gen_mt_list)
+eval "$(atst_gen_mt_list)"

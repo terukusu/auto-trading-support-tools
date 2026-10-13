@@ -25,7 +25,7 @@ if [ -n "$(echo "$update" | grep -oi mt4clw/terminal.exe)" ]; then
   msg="MetaTrader 4のアップデートが可能です。"
 fi
 
-if [ -n "$(echo "$update" | grep -oi mt5)" -a -n "$(echo "$update" | grep -oi liveupdate)" ]; then
+if [ -n "$(echo "$update" | grep -oi mt5)" ] && [ -n "$(echo "$update" | grep -oi liveupdate)" ]; then
   msg="${msg}MetaTrader 5のアップデートが可能です。"
 fi
 

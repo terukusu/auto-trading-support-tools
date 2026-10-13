@@ -5,7 +5,7 @@
 # URL が設定されていなければ何もしません。
 #
 
-. "$(cd "$(dirname "$BASH_SOURCE")"; pwd)/common.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 if [ -z "$ATST_HEARTBEAT_URL" ]; then
   exit 0
