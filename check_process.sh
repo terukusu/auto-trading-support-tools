@@ -31,8 +31,8 @@ function do_check() {
 function check_target_found() {
   local target_name="$1"
 
-  # The name is user-written (crontab); keep only safe chars so the regex-based alert_status helpers
-  # can find the key again (otherwise the alert would repeat every minute).
+  # The name is user-written (crontab); keep only safe chars so the key stays one field of the
+  # alert_status file (spaces or commas would split it and the alert would repeat every minute).
   local alert_key=TARGET_${target_name//[^A-Za-z0-9_]/_}
   local alert_status=$(atst_get_alert_status $alert_key)
 
