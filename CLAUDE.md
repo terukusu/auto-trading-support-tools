@@ -41,6 +41,7 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
   - bats の下限は 1.1.0（Ubuntu 20.04）。使ってよいのは `@test`、`setup` / `teardown`、`load`、`run`、`$status` / `$output` / `${lines[@]}`、`skip`、`$BATS_TEST_DIRNAME`、`$BATS_TMPDIR` のみ。1.2 以降の機能（`setup_file` / `teardown_file`、`$BATS_TEST_TMPDIR` / `$BATS_FILE_TMPDIR`、`run` のオプション、`bats_load_library` / `bats_require_minimum_version`）と bats-assert / bats-support は使わない（assertion は `[ ]` で書く）。
 - 構文チェック: `bash -n <script>.sh`（必須）。
 - 静的解析: `shellcheck -S warning *.sh` が 0 件を保つ（基準版 ShellCheck 0.11.0。抑止するときは同じ行に理由コメントを書く）。
+- CI: `.github/workflows/ci.yml` が PR（宛先ブランチを問わない）と master への push のたびに、GitHub ホステッドランナー `ubuntu-24.04` で 4 つを走らせる。`bash -n`（`*.sh`・`tests/test_helper.bash`・`tests/stubs/*`）、`shellcheck -S warning -f gcc`（同じ対象。ShellCheck 0.11.0 を GitHub Releases から SHA256 を検証して入れる。apt 版は使わない）、bats 1.1.0 互換 grep（上に挙げた 1.2 以降の機能が `tests/` に無いこと）、`bats tests/`（apt の bats。`--jobs` なし）。ローカルで同じコマンドを打てば同じ結果になる。失敗したテストは再試行しない（flaky なら Issue を起票し、件数を減らしたり assertion を弱めたりしない）。ShellCheck・`actions/checkout`・ランナー image の版上げは ci.yml を変える PR で行う。required check にするかどうか（ブランチ保護）はリポジトリ設定で、ci.yml の外。
 - 実挙動の確認は **使い捨ての VPS、またはユーザーが指定した MT 非稼働・建玉なしの検証機**で行い、**稼働中の本番 VPS では試さない**（手順は implement-issue の Phase 5.5）。
 - **master へのマージは公開リリース**（Wiki の gist が `archive/master.zip` を取得して実行する）。install / setup / templates / cron 経路の変更はマージ前に実機検証を通す。
 
