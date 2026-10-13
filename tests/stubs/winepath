@@ -1,0 +1,16 @@
+#!/bin/bash
+# Test stub for winepath. Never starts Wine.
+# Converts the last argument (a unix path) to a Windows path:
+#   $WINEPREFIX/drive_c/<rest> -> C:\<rest>, anything else -> Z:<path>
+
+[ "$#" -gt 0 ] || exit 0
+path="${!#}"
+prefix="${WINEPREFIX:-}"
+
+if [ -n "$prefix" ] && [ "${path#"$prefix"/drive_c/}" != "$path" ]; then
+  rest="${path#"$prefix"/drive_c/}"
+  printf 'C:\\%s\n' "${rest//\//\\}"
+else
+  printf 'Z:%s\n' "${path//\//\\}"
+fi
+exit 0
