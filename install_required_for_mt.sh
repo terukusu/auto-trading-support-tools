@@ -103,10 +103,16 @@ function create_bash_profile_if_needed() {
 
   if [ ! -f "$bash_profile" ] || [ -z "`cat $bash_profile | grep -o WINEARCH`" ]; then
 
+    # An existing prefix keeps its arch (see setup_wine); write that one, not the default, so a
+    # run that stops halfway never leaves the profile and the prefix disagreeing.
+    local arch
+    arch=$(wineprefix_arch)
+    arch=${arch:-$WINEARCH}
+
     # write WINE param to the .bash_profile
     cat << EOS >> "$bash_profile"
 
-export WINEARCH=$WINEARCH
+export WINEARCH=$arch
 export WINEDEBUG=$WINEDEBUG
 export WINEPREFIX=\$HOME/.wine
 export DISPLAY=$DISPLAY
@@ -227,14 +233,18 @@ function install_wine_packages() {
 
   local versions
   versions=$(for p in $WINE_PKGS; do dpkg-query -W -f='${Version}\n' "$p" 2>/dev/null; done | sort -u)
+  local held
+  held=$(apt-mark showhold 2>/dev/null | grep -E '^(winehq|wine)-stable' | tr '\n' ' ')
   if ! sudo apt-get check >/dev/null 2>&1 || [ "$(printf '%s\n' "$versions" | grep -c .)" -ne 1 ]; then
     echo "[error] wine packages are inconsistent (versions: $(echo $versions)). Try: sudo apt-get -f install -o Dpkg::Options::=--force-overwrite" >&2
+    [ -n "$held" ] && echo "        These wine packages are held: $held— release them first: sudo apt-mark unhold $held" >&2
     return 1
   fi
   # shellcheck disable=SC2254  # WINE_PIN_VERSION is a glob on purpose
   case "$versions" in
     $WINE_PIN_VERSION) ;;
     *) echo "[error] wine $versions is installed, but $WINE_PIN_VERSION is required (pin: $WINE_PIN_FILE)." >&2
+       [ -n "$held" ] && echo "        These wine packages are held: $held— release them first: sudo apt-mark unhold $held" >&2
        return 1 ;;
   esac
 }
@@ -260,12 +270,16 @@ function upgrade_existing_packages {
   done
   [ -n "$WINE_HELD_BY_US" ] && sudo apt-mark hold $WINE_HELD_BY_US >/dev/null
 
-  sudo apt-get update
-  sudo -E apt-get $APT_OPT -f install
-  sudo -E apt-get $APT_OPT --with-new-pkgs upgrade   # same behaviour as "apt upgrade" (P15)
+  # A failed update (e.g. one unreachable mirror) only means older lists; keep going. A failed
+  # install/upgrade means dpkg may be half-configured, so stop instead of piling more on it (P13).
+  sudo apt-get update || echo "[warn] apt-get update reported errors; continuing with the current package lists." >&2
+  local rc=0
+  sudo -E apt-get $APT_OPT -f install || rc=1
+  [ $rc -eq 0 ] && { sudo -E apt-get $APT_OPT --with-new-pkgs upgrade || rc=1; }   # same as "apt upgrade" (P15)
 
   release_wine_hold
   ensure_sshd_alive
+  return $rc
 }
 
 ########################################
@@ -339,12 +353,14 @@ function install_packages_misc_and_needed_by_mt4() {
   # gnupg (gpg --dearmor) and wget are needed for the keyring/repo setup below.
   # (Time sync is handled separately by ensure_time_sync so a conflict there cannot sink this line.)
   # jq lets atst_send_to_line build LINE payloads with full JSON escaping (P6).
-  sudo -E apt-get $APT_OPT install unattended-upgrades apt-transport-https gnupg wget jq psmisc file bc vim nano less tmux curl net-tools lsof
+  sudo -E apt-get $APT_OPT install unattended-upgrades apt-transport-https gnupg wget jq psmisc file bc vim nano less tmux curl net-tools lsof \
+    || { echo "[error] failed to install base packages." >&2; return 1; }
 
   ensure_time_sync
 
   # install gui
-  sudo -E apt-get $APT_OPT install tightvncserver fonts-vlgothic xterm wm2
+  sudo -E apt-get $APT_OPT install tightvncserver fonts-vlgothic xterm wm2 \
+    || { echo "[error] failed to install the VNC server / desktop packages." >&2; return 1; }
 
   # install wine
   sudo dpkg --add-architecture i386
@@ -387,7 +403,7 @@ function install_packages_misc_and_needed_by_mt4() {
   fi
 
   sudo -E apt-get $APT_OPT update
-  install_wine_packages || exit 1   # the EXIT trap still restores sshd / releases holds
+  install_wine_packages || return 1
   ensure_sshd_alive
 }
 
@@ -555,6 +571,12 @@ function wineprefix_arch() {
   echo "$arch"
 }
 
+# True when the WINEPREFIX is fully initialized (registry files written, system32 populated).
+function wineprefix_ok() {
+  [ -s "$WINEPREFIX/system.reg" ] && [ -s "$WINEPREFIX/user.reg" ] \
+    && [ -n "$(ls -A "$WINEPREFIX/drive_c/windows/system32" 2>/dev/null)" ]
+}
+
 #####################################################
 # Setup Wine (initialize WINEPREFIX). Wine-Mono / Wine-Gecko are intentionally NOT installed;
 # they are disabled via WINEDLLOVERRIDES because MetaTrader does not need them.
@@ -607,8 +629,8 @@ function setup_wine {
   fi
   if [ "$prefix_arch" = "win32" ]; then
     echo "[warn] $WINEPREFIX is a 32-bit prefix. MetaTrader already installed in it keeps working, but" >&2
-    echo "       current MT4/MT5 installers are 64-bit and cannot run there. To install MT, re-run and" >&2
-    echo "       recreate the prefix (answer y), or use another WINEPREFIX." >&2
+    echo "       current MT4/MT5 installers are 64-bit and cannot run there, so the installer is not started." >&2
+    echo "       To install MT, re-run in a terminal and recreate the prefix (answer y)." >&2
   fi
 
   # MetaTrader 4/5 are native Win32 apps and need neither Wine-Mono (.NET / mscoree) nor
@@ -628,6 +650,15 @@ function setup_wine {
   else
     unset WINEDLLOVERRIDES
   fi
+  export WINEDEBUG=$WINEDEBUG_OLD
+  export DISPLAY=$DISPLAY_OLD
+
+  # wineboot can fail without a useful exit code (e.g. an X error half-way leaves an empty
+  # system32); check the result instead of writing into a broken prefix.
+  if ! wineprefix_ok; then
+    echo "[error] wine prefix initialization failed: $WINEPREFIX is incomplete. Check 'wine --version' and run 'wineboot -i' to see the error." >&2
+    return 1
+  fi
 
   # setting japanese fonts
   font_replace_exist=$(cat "$WINEPREFIX/user.reg" | tr -d '\r' | grep -o '\[Software\\\\Wine\\\\Fonts\\\\Replacements\]')
@@ -644,9 +675,6 @@ function setup_wine {
     sed -i -e "s/^export WINEARCH=.*/export WINEARCH=$prefix_arch/" "$bash_profile"
     echo "Updated WINEARCH in $bash_profile to $prefix_arch."
   fi
-
-  export WINEDEBUG=$WINEDEBUG_OLD
-  export DISPLAY=$DISPLAY_OLD
 }
 
 #####################################################
@@ -661,8 +689,19 @@ function clean_needless_files {
 #####################################################
 # Download MT4 and start installer
 #####################################################
+# Result of download_and_start_mt4_installer, reported by verify_and_report:
+# running / exited / download-failed / skipped-win32
+INSTALLER_STATUS=""
+
 function download_and_start_mt4_installer() {
-  local installer="$DIR_WINECACHE/$(basename "$MT_INSTALLER_URL")"
+  local name installer
+  name=$(basename "$MT_INSTALLER_URL")
+  installer="$DIR_WINECACHE/$name"
+
+  if [ "$(wineprefix_arch)" = "win32" ]; then
+    INSTALLER_STATUS=skipped-win32
+    return 1
+  fi
 
   echo Downloading MetaTrader installer ...
   if [ -f "$installer" ]; then
@@ -673,12 +712,105 @@ function download_and_start_mt4_installer() {
 
   if [ ! -f "$installer" ]; then
     echo "[error] MT installer download failed: $MT_INSTALLER_URL" >&2
+    INSTALLER_STATUS=download-failed
     return 1
   fi
 
   echo Staring MetaTrader installer...
   # Disable mono/gecko here too so the installer never blocks on a download dialog.
   WINEDLLOVERRIDES="mscoree=;mshtml=" WINEDEBUG=-all wine start /unix "$installer"
+
+  # "wine start" returns at once. An installer that refuses to run (e.g. its anti-debugger check
+  # on an unsupported wine) exits silently within seconds, so confirm it is still alive.
+  sleep 15
+  if pgrep -u "$(id -u)" -f -- "$name" >/dev/null 2>&1; then
+    INSTALLER_STATUS=running
+  else
+    INSTALLER_STATUS=exited
+    return 1
+  fi
+}
+
+#####################################################
+# Reboot recommendation
+#####################################################
+# Prints the reason a reboot is advisable, or nothing.
+function reboot_required_reason() {
+  if [ -f /var/run/reboot-required ]; then
+    echo "updated packages request it (/var/run/reboot-required)"
+    return 0
+  fi
+  # systemd (PID 1) or a library it uses was upgraded on disk but the old one is still running.
+  # Only real files count; PID 1 also maps anonymous memfd regions that are always "(deleted)".
+  if sudo grep -qsE ' /(usr/)?(lib|lib64|bin|sbin)/[^ ]* \(deleted\)$' /proc/1/maps; then
+    echo "the running init (PID 1) still uses replaced files from before the upgrade"
+  fi
+}
+
+#####################################################
+# Final verification and result (P13): report success only when it is true.
+#####################################################
+function verify_and_report() {
+  local ng=0 v
+
+  echo ""
+  echo "====================================================="
+  echo " Result"
+  echo "====================================================="
+
+  if v=$(wine --version 2>/dev/null) && [ -n "$v" ]; then
+    echo "[ OK ] wine: $v"
+  else
+    echo "[ NG ] wine: 'wine --version' failed"; ng=1
+  fi
+
+  if wineprefix_ok; then
+    echo "[ OK ] wine prefix: $WINEPREFIX ($(wineprefix_arch))"
+  else
+    echo "[ NG ] wine prefix: $WINEPREFIX is missing or incomplete"; ng=1
+  fi
+
+  if [ -n "$IS_SYSTEMD" ]; then
+    if systemctl is-active --quiet "vncserver@:1" && ss -tln 2>/dev/null | grep -qE '[:.]5901[[:space:]]'; then
+      echo "[ OK ] VNC: vncserver@:1 is listening on 5901"
+    else
+      echo "[ NG ] VNC: vncserver@:1 is not running / not listening on 5901 (see: systemctl status vncserver@:1)"; ng=1
+    fi
+  fi
+
+  if ensure_sshd_alive; then
+    echo "[ OK ] sshd: listening"
+  else
+    echo "[ NG ] sshd: not listening"; ng=1
+  fi
+
+  case "$INSTALLER_STATUS" in
+    running)         echo "[ OK ] MetaTrader installer: running on VNC (DISPLAY=:1, port 5901)" ;;
+    skipped-win32)   echo "[ NG ] MetaTrader installer: not started ($WINEPREFIX is 32-bit; see the warning above)"; ng=1 ;;
+    download-failed) echo "[ NG ] MetaTrader installer: download failed ($MT_INSTALLER_URL)"; ng=1 ;;
+    exited)          echo "[ NG ] MetaTrader installer: exited right after start (check the wine version: $WINE_PIN_VERSION is required)"; ng=1 ;;
+    *)               echo "[ NG ] MetaTrader installer: not started"; ng=1 ;;
+  esac
+
+  local reboot
+  reboot=$(reboot_required_reason)
+  if [ -n "$reboot" ]; then
+    echo ""
+    echo "[note] A reboot is recommended: $reboot. Reboot when MetaTrader is not trading: sudo reboot"
+  fi
+
+  echo "====================================================="
+  if [ $ng -ne 0 ]; then
+    echo "[error] Setup is NOT complete. Fix the NG items above and re-run this script." >&2
+    return 1
+  fi
+  echo "Now MetaTrader installer is running on VNC(GUI) !!"
+  echo "====================================================="
+}
+
+function die() {
+  echo "[error] $*" >&2
+  exit 1   # the EXIT trap still restores sshd / releases holds
 }
 
 # Whatever happens below (including an early exit), never leave wine packages held by us and
@@ -698,21 +830,18 @@ fi
 setup_root_crontab
 create_bash_profile_if_needed
 create_swap_space_if_needed
-upgrade_existing_packages
+upgrade_existing_packages || die "upgrading packages failed. Fix apt first (sudo apt-get -f install), then re-run."
 set_up_locale_and_timezone
 
 export LANG=$TARGET_LOCALE
 
-install_packages_misc_and_needed_by_mt4
-install_packages_needed_by_graphical_report
+install_packages_misc_and_needed_by_mt4 || die "installing required packages failed (see the messages above)."
+install_packages_needed_by_graphical_report || echo "[warn] graphical report packages were not installed; image reports will not work." >&2
 setup_auto_update_package_list
 setup_vncserver
-setup_wine
+setup_wine || die "setting up wine failed (see the messages above)."
 start_vncserver_service
 clean_needless_files
 download_and_start_mt4_installer
 
-echo ""
-echo "====================================================="
-echo "Now MetaTrader4 installer is running on VNC(GUI) !!"
-echo "====================================================="
+verify_and_report || exit 1
