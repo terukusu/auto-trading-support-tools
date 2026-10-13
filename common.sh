@@ -90,7 +90,9 @@ function atst_upload_image_to_0x0() {
 # LINE送信関数
 function atst_send_to_line() {
   local msg; msg=$(cat -)
-  local image_file="$1"
+  # 画像ファイル (0 〜 4 個)。LINE は 1 回の push を何個のメッセージが入っていても 1 通と数える
+  # (無料プランは月 200 通まで) ので、まとめて送れるものはまとめる。1 回の push は最大 5 メッセージ。
+  local image_files=("${@:1:4}")
 
   local channel_access_token="$ATST_LINE_TOKEN"
   local user_id="$ATST_LINE_ID"
@@ -106,37 +108,36 @@ function atst_send_to_line() {
     text="$(atst_head_chars "$text" "$((max_len - 10))")$omitted"
   fi
 
-  # 画像があればアップロード。失敗時は本文に注記して画像なしで送る。
-  local image_url=""
-  if [ -n "$image_file" ]; then
+  # 画像をアップロード。失敗したものは本文に注記して除く。
+  local image_urls=() image_file image_url upload_failed=0
+  for image_file in "${image_files[@]}"; do
+    [ -n "$image_file" ] || continue
     image_url=$(atst_upload_image_to_0x0 "$image_file")
     if [ $? -ne 0 ] || [ -z "$image_url" ]; then
-      image_url=""
-      text="$text (画像アップロード失敗)"
+      upload_failed=$((upload_failed + 1))
+    else
+      image_urls+=("$image_url")
     fi
+  done
+  if [ "$upload_failed" -gt 0 ]; then
+    text="$text (画像アップロード失敗: ${upload_failed}枚)"
   fi
 
   # ペイロード生成: jq があれば全エスケープを jq に任せる。無ければ atst_escape_text を通す。
   local payload
   if command -v jq >/dev/null 2>&1; then
-    if [ -n "$image_url" ]; then
-      payload=$(jq -cn --arg to "$user_id" --arg t "$text" --arg u "$image_url" \
-        '{to:$to, messages:[{type:"text",text:$t},{type:"image",originalContentUrl:$u,previewImageUrl:$u}]}')
-    else
-      payload=$(jq -cn --arg to "$user_id" --arg t "$text" \
-        '{to:$to, messages:[{type:"text",text:$t}]}')
-    fi
+    payload=$(printf '%s\n' "${image_urls[@]}" | jq -cRn --arg to "$user_id" --arg t "$text" \
+      '{to:$to, messages:([{type:"text",text:$t}] + [inputs | select(length > 0) | {type:"image",originalContentUrl:.,previewImageUrl:.}])}')
   else
     local t_e u_e url_e messages
     t_e=$(printf '%s' "$text" | atst_escape_text)
     u_e=$(printf '%s' "$user_id" | atst_escape_text)
-    if [ -n "$image_url" ]; then
+    messages='{"type":"text","text":"'"$t_e"'"}'
+    for image_url in "${image_urls[@]}"; do
       url_e=$(printf '%s' "$image_url" | atst_escape_text)
-      messages='[{"type":"text","text":"'"$t_e"'"},{"type":"image","originalContentUrl":"'"$url_e"'","previewImageUrl":"'"$url_e"'"}]'
-    else
-      messages='[{"type":"text","text":"'"$t_e"'"}]'
-    fi
-    payload='{"to":"'"$u_e"'","messages":'"$messages"'}'
+      messages+=',{"type":"image","originalContentUrl":"'"$url_e"'","previewImageUrl":"'"$url_e"'"}'
+    done
+    payload='{"to":"'"$u_e"'","messages":['"$messages"']}'
   fi
 
   # メッセージ送信。トークンはコマンドライン引数に載せない (ps で見えるため)。ヘッダはファイル記述子から渡す。
@@ -162,6 +163,24 @@ function atst_send_to_line() {
     4??) [ "$result" != 401 ] && [ "$result" != 403 ] && [ "$result" != 429 ] && return 2 ;;
   esac
   return 1
+}
+
+# 当月の LINE 送信数と上限を "<送信数> <上限>" で出力する (上限なしのプランは上限を "-")。
+# 取得できなければ何も出力せず 1 を返す。
+function atst_line_quota() {
+  local api="https://api.line.me/v2/bot/message/quota" quota usage limit
+
+  quota=$(curl --max-time 30 --connect-timeout 10 -s -f "$api" \
+    -H @<(printf 'Authorization: Bearer %s\n' "$ATST_LINE_TOKEN")) || return 1
+  usage=$(curl --max-time 30 --connect-timeout 10 -s -f "$api/consumption" \
+    -H @<(printf 'Authorization: Bearer %s\n' "$ATST_LINE_TOKEN")) || return 1
+
+  usage=$(printf '%s' "$usage" | grep -o '"totalUsage" *: *[0-9]*' | grep -o '[0-9]*$')
+  [ -n "$usage" ] || return 1
+  if printf '%s' "$quota" | grep -q '"type" *: *"limited"'; then
+    limit=$(printf '%s' "$quota" | grep -o '"value" *: *[0-9]*' | grep -o '[0-9]*$')
+  fi
+  echo "$usage ${limit:--}"
 }
 
 # LINE 送信失敗を $ATST_CONFIG_DIR/line_error.log に記録する。肥大しないよう末尾 1000 行に保つ。
