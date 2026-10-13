@@ -5,11 +5,13 @@
 # URL が設定されていなければ何もしません。
 #
 
-. "$(cd "$(dirname $0)" && pwd)/common.sh"
+. "$(cd "$(dirname "$BASH_SOURCE")"; pwd)/common.sh"
 
 if [ -z "$ATST_HEARTBEAT_URL" ]; then
   exit 0
 fi
 
-# Bounded so a slow service never overlaps the next minute's run.
-curl -fsS --max-time 10 --retry 3 --retry-max-time 40 -o /dev/null "$ATST_HEARTBEAT_URL"
+# Bounded so a slow service never overlaps the next minute's run. The URL is passed through a config
+# fd, not argv, so other processes can't read it from ps (anyone with it can report us alive).
+curl -fsS --max-time 10 --retry 3 --retry-connrefused --retry-max-time 40 -o /dev/null \
+  -K <(printf 'url = "%s"\n' "$ATST_HEARTBEAT_URL")
