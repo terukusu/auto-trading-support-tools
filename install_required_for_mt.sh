@@ -450,10 +450,21 @@ function setup_vncserver {
     # for systemd
     echo Registering VNC Server as systemd service.
 
-    if [ ! -f "/etc/systemd/system/vncserver@:1.service" ]; then
-      sudo install -o root -g root -m 644 -D "$DIR_TEMPLATES/vncserver@:1.service" "/etc/systemd/system/vncserver@:1.service"
-      sudo sed -i -e 's/%%USER_NAME%%/'$ORG_USER'/g' "/etc/systemd/system/vncserver@:1.service"
+    # Install the unit, and also update an existing one that differs from the current template
+    # (so fixes reach already-set-up servers). The previous unit is kept as a backup.
+    local unit="/etc/systemd/system/vncserver@:1.service" rendered
+    rendered=$(mktemp)
+    sed -e 's/%%USER_NAME%%/'"$ORG_USER"'/g' "$DIR_TEMPLATES/vncserver@:1.service" > "$rendered"
+    if ! sudo cmp -s "$rendered" "$unit"; then
+      if [ -f "$unit" ]; then
+        local backup="$unit.bak.$(date +%Y%m%d%H%M%S)"
+        sudo cp -p "$unit" "$backup"
+        echo "Updating $unit from the template (previous unit saved as $backup)."
+      fi
+      sudo install -o root -g root -m 644 -D "$rendered" "$unit"
+      sudo systemctl daemon-reload
     fi
+    rm -f "$rendered"
 
     sudo systemctl enable "vncserver@:1.service"
   else

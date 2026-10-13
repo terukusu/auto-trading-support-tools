@@ -12,6 +12,9 @@ Type=forking
 User=%%USER_NAME%%
 
 ExecStartPre=/bin/sh -c '/usr/bin/vncserver -kill %i > /dev/null 2>&1 || :'
+# Remove a stale X lock/socket left by a dead X server; otherwise vncserver silently picks the next
+# free display (e.g. :2 / port 5902) while atst expects DISPLAY=:1 / port 5901.
+ExecStartPre=/bin/sh -c 'n=%i; n=$${n#:}; pid=$$(tr -d " " < /tmp/.X$${n}-lock 2>/dev/null); if [ -z "$$pid" ] || ! grep -qs "^X" /proc/$$pid/comm; then rm -f /tmp/.X$${n}-lock /tmp/.X11-unix/X$${n} 2>/dev/null || :; fi'
 ExecStart=/usr/bin/vncserver -geometry 1024x640 -depth 16 -alwaysshared -localhost -nolisten tcp %i
 ExecStop=/usr/bin/vncserver -kill %i
 
