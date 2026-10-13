@@ -7,24 +7,19 @@ function do_check() {
   local target_fullname="$2"
 
   local alert_key=PROCESS_${target_fullname// /_}
-  local alert_status
-  alert_status=$(atst_get_alert_status $alert_key)
 
   target_pid=$(atst_find_pid "$target_name")
 
-  if [ "$alert_status" != "1" ]; then
-    if [ -z "$target_pid" ]; then
-      echo "【発生】MetaTraderプロセスが動作していません: $target_name" | atst_send_to_line
-
-      atst_set_alert_status $alert_key "1"
-    fi
-  else
-    if [ -n "$target_pid" ]; then
-      echo "【復帰】MetaTraderプロセスが再開しました: $target_name" | atst_send_to_line
-
-      atst_set_alert_status $alert_key "0"
-    fi
+  local verdict=""
+  if [ -z "$target_pid" ]; then
+    verdict=1
+  elif [ -n "$target_pid" ]; then
+    verdict=0
   fi
+
+  atst_update_alert "$alert_key" "$verdict" \
+    "【発生】MetaTraderプロセスが動作していません: $target_name" \
+    "【復帰】MetaTraderプロセスが再開しました: $target_name"
 }
 
 # A TARGET name that matches no installed MetaTrader silently disables every check for it
@@ -35,18 +30,17 @@ function check_target_found() {
   # The name is user-written (crontab); keep only safe chars so the key stays one field of the
   # alert_status file (spaces or commas would split it and the alert would repeat every minute).
   local alert_key=TARGET_${target_name//[^A-Za-z0-9_]/_}
-  local alert_status
-  alert_status=$(atst_get_alert_status $alert_key)
 
+  local verdict
   if [ -z "$(atst_find_mt_index "$target_name")" ]; then
-    if [ "$alert_status" != "1" ]; then
-      echo "【発生】監視対象のMetaTraderが見つかりません。監視と自動起動が無効になっています。crontab の TARGET とインストール先のフォルダ名を確認してください: $target_name" | atst_send_to_line \
-        && atst_set_alert_status $alert_key "1"
-    fi
-  elif [ "$alert_status" == "1" ]; then
-    echo "【復帰】監視対象のMetaTraderが見つかりました: $target_name" | atst_send_to_line \
-      && atst_set_alert_status $alert_key "0"
+    verdict=1
+  else
+    verdict=0
   fi
+
+  atst_update_alert "$alert_key" "$verdict" \
+    "【発生】監視対象のMetaTraderが見つかりません。監視と自動起動が無効になっています。crontab の TARGET とインストール先のフォルダ名を確認してください: $target_name" \
+    "【復帰】監視対象のMetaTraderが見つかりました: $target_name"
 }
 
 target_names=("$@")

@@ -42,6 +42,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 - MT プロセスの停止 (`mtctl.sh stop`, `kill`)、建玉に影響する操作、`sudo reboot`、cron の無効化/書き換え、`apt` 実行、リポジトリ/鍵の追加、ロケール/TZ 変更を**新規に自動実行**するコードは、承認フロー無しなら **block**。
 - 監視スクリプトが異常時に**通知せず握りつぶす**経路があれば block（例: エラーで `return 0` して無通知）。
 - 「監視が止まったこと自体の検知」(`check_monitoring.sh`, `check_process.sh`) を実質無効化する変更は block。
+- 状態を持つ異常通知（発生/復帰を `~/.atst/alert_status` で重複抑止するもの）は、`check_*.sh` に `atst_set_alert_status` と送信を個別に書かず `atst_update_alert` を使う（送信成功時だけ状態を更新し、失敗した回は次回に再送する）。自前で状態だけ先に更新して通知を取りこぼす実装は block。
 - 破壊的コマンド（`rm -rf`, `sed -i`, `>` リダイレクト, `truncate`）の対象が**変数展開**で、その変数が空になりうる経路があれば block（`rm -rf "$DIR/"` で `$DIR` が空だと `/` を掃く）。
 
 ## P2. 冪等性（install/setup 系・block〜warn）

@@ -64,21 +64,32 @@ atst_test_source_common() {
   . "${BATS_TEST_DIRNAME:?}/../common.sh"
 }
 
-# atst_test_make_monitoring_csv <name> <secs_ago> <bid> <spread> <pip>
-# Appends one 8-field line "<now-secs_ago>,0,<bid>,<bid>,<spread>,12,<pip>,USDJPY" to
+# atst_test_make_monitoring_csv <name> <secs_ago> <bid> <spread> <pip> [<ping>]
+# Appends one 8-field line "<now-secs_ago>,0,<bid>,<bid>,<spread>,<ping>,<pip>,USDJPY" to
 # MQL4/Files/terminal_monitoring.csv of the MT made by atst_test_make_mt (without a hash).
+# <ping> is in microseconds (the 6th field read by check_ping.sh); the default is 12.
 atst_test_make_monitoring_csv() {
-  local name="$1" secs_ago="$2" bid="$3" spread="$4" pip="$5"
+  local name="$1" secs_ago="$2" bid="$3" spread="$4" pip="$5" ping="${6:-12}"
   local dir
 
   [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
-  [ "$#" -eq 5 ] && [ -n "$name" ] || return 1
+  { [ "$#" -eq 5 ] || [ "$#" -eq 6 ]; } && [ -n "$name" ] || return 1
   [ -n "${WINEPREFIX:-}" ] || return 1
 
   dir="$WINEPREFIX/drive_c/Program Files/$name/MQL4/Files"
   mkdir -p "$dir" || return 1
-  printf '%s,%s,%s,%s,%s,12,%s,USDJPY\n' "$(( $(date +%s) - secs_ago ))" 0 "$bid" "$bid" "$spread" "$pip" \
+  printf '%s,%s,%s,%s,%s,%s,%s,USDJPY\n' "$(( $(date +%s) - secs_ago ))" 0 "$bid" "$bid" "$spread" "$ping" "$pip" \
     >> "$dir/terminal_monitoring.csv"
+}
+
+# atst_test_push_count
+# Prints how many LINE pushes the curl stub recorded in $ATST_TEST_CURL_LOG (0 when there is no log).
+atst_test_push_count() {
+  if [ -e "${ATST_TEST_CURL_LOG:?}" ]; then
+    grep -c 'api.line.me/v2/bot/message/push' "$ATST_TEST_CURL_LOG"
+  else
+    echo 0
+  fi
 }
 
 # atst_test_make_order_status <name> <line>...

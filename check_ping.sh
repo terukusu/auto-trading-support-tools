@@ -10,7 +10,7 @@ function do_check() {
   local target_name="$1"
   local target_fullname="$2"
 
-  local monitoring_file last_ping alert_status
+  local monitoring_file last_ping
   local alert_key=PING_${target_fullname// /_}
 
   monitoring_file=$(atst_get_monitoring_csv_path "$target_name")
@@ -26,21 +26,21 @@ function do_check() {
     # missing data is reported by check_monitoring.sh
     return 0
   fi
-  alert_status=$(atst_get_alert_status $alert_key)
 
-  if [ "$alert_status" != "1" ]; then
-    if [ "$last_ping" -ge "$ATST_THRESHOLD_PING_UPPER" ]; then
-      echo "【発生】$target_name のPingが $(($ATST_THRESHOLD_PING_UPPER / 1000))ms 以上の異常値になっています。現在のPing: $(($last_ping / 1000))ms" | atst_send_to_line
-
-      atst_set_alert_status $alert_key "1"
-    fi
-  else
-    if [ "$last_ping" -le "$ATST_THRESHOLD_PING_LOWER" ]; then
-      echo "【復帰】$target_name のPingが $(($ATST_THRESHOLD_PING_LOWER / 1000))ms 以下の正常値に戻りました。現在のPing: $(($last_ping / 1000))ms" | atst_send_to_line
-
-      atst_set_alert_status $alert_key "0"
+  local verdict=""
+  if [ "$last_ping" -ge "$ATST_THRESHOLD_PING_UPPER" ]; then
+    verdict=1
+  fi
+  if [ "$last_ping" -le "$ATST_THRESHOLD_PING_LOWER" ]; then
+    # Both hold only when UPPER <= LOWER (misconfig): keep the old order (recover only while alerted).
+    if [ -z "$verdict" ] || [ "$(atst_get_alert_status "$alert_key")" == "1" ]; then
+      verdict=0
     fi
   fi
+
+  atst_update_alert "$alert_key" "$verdict" \
+    "【発生】$target_name のPingが $(($ATST_THRESHOLD_PING_UPPER / 1000))ms 以上の異常値になっています。現在のPing: $(($last_ping / 1000))ms" \
+    "【復帰】$target_name のPingが $(($ATST_THRESHOLD_PING_LOWER / 1000))ms 以下の正常値に戻りました。現在のPing: $(($last_ping / 1000))ms"
 }
 
 target_names=("$@")

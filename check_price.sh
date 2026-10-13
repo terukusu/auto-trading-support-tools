@@ -14,8 +14,6 @@ function do_check() {
   local minmax pip_price minmax_delta_pips sign_upper sign_lower
 
   local alert_key=PRICE_${target_fullname// /_}
-  local alert_status
-  alert_status=$(atst_get_alert_status $alert_key)
 
   monitoring_file=$(atst_get_monitoring_csv_path "$target_name")
 
@@ -47,21 +45,21 @@ function do_check() {
   # echo minmax_delta_pips=$minmax_delta_pips
   # echo sign_upper=$sign_upper
   # echo sign_lower=$sign_lower
-  # echo alert_status=$alert_status
 
-  if [ "$alert_status" != "1" ]; then
-    if [ "$sign_upper" != "-" ]; then
-      echo "【発生】$target_name の過去10分の値幅が $ATST_THRESHOLD_PRICE_UPPER pips 以上の異常値になっています。高値:${minmax[1]}, 安値:${minmax[0]}, 10分値幅: $minmax_delta_pips pips" | atst_send_to_line
-
-      atst_set_alert_status $alert_key "1"
-    fi
-  else
-    if [ "$sign_lower" == "-" ]; then
-      echo "【復帰】$target_name の過去10分の値幅が $ATST_THRESHOLD_PRICE_LOWER pips 以下の正常値に戻りました。高値: ${minmax[1]}, 安値: ${minmax[0]}, 10分値幅: $minmax_delta_pips pips" | atst_send_to_line
-
-      atst_set_alert_status $alert_key "0"
+  local verdict=""
+  if [ "$sign_upper" != "-" ]; then
+    verdict=1
+  fi
+  if [ "$sign_lower" == "-" ]; then
+    # Both hold only when UPPER < LOWER (misconfig): keep the old order (recover only while alerted).
+    if [ -z "$verdict" ] || [ "$(atst_get_alert_status "$alert_key")" == "1" ]; then
+      verdict=0
     fi
   fi
+
+  atst_update_alert "$alert_key" "$verdict" \
+    "【発生】$target_name の過去10分の値幅が $ATST_THRESHOLD_PRICE_UPPER pips 以上の異常値になっています。高値:${minmax[1]}, 安値:${minmax[0]}, 10分値幅: $minmax_delta_pips pips" \
+    "【復帰】$target_name の過去10分の値幅が $ATST_THRESHOLD_PRICE_LOWER pips 以下の正常値に戻りました。高値: ${minmax[1]}, 安値: ${minmax[0]}, 10分値幅: $minmax_delta_pips pips"
 }
 
 target_names=("$@")
