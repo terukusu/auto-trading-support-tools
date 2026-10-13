@@ -24,14 +24,18 @@ function do_check() {
   fi
 
   from=$(($(date +%s)- 60 * 10))
-  minmax=($(cat "$monitoring_file" | awk -F, 'BEGIN{min=10000; max=0} { if ($1 > '$from') { if($3 > max) max=$3; if($3 < min) min=$3 }} END{ printf("%g %g",min ,max) }'))
+  minmax=($(cat "$monitoring_file" | awk -F, 'BEGIN{min=10000; max=0} NF >= 8 { if ($1 > '$from') { if($3 > max) max=$3; if($3 < min) min=$3 }} END{ printf("%g %g",min ,max) }'))
 
   if [ ${minmax[0]} == "10000" -o ${minmax[1]} == "0" ]; then
     # no data. nothing todo
     return 0
   fi
 
-  pip_price=$(tail -n1 "$monitoring_file" | tr -d '\r' | cut -d',' -f 7)
+  # Only complete lines (8 fields); the EA may be writing the last one right now.
+  pip_price=$(tail -n 20 "$monitoring_file" | tr -d '\r' | awk -F, 'NF >= 8 {p = $7} END {print p}')
+  if ! [[ "$pip_price" =~ ^[0-9]*\.?[0-9]+$ ]] || [[ "$pip_price" =~ ^[0.]+$ ]]; then
+    return 0
+  fi
   minmax_delta_pips=$(printf "%g" $(echo "scale=5; (${minmax[1]} - ${minmax[0]}) / $pip_price" | bc))
   sign_upper=$(echo $minmax_delta_pips - $ATST_THRESHOLD_PRICE_UPPER | bc | cut -c1)
   sign_lower=$(echo $minmax_delta_pips - $ATST_THRESHOLD_PRICE_LOWER | bc | cut -c1)

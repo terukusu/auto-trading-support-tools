@@ -20,7 +20,12 @@ function do_check() {
     return 0
   fi
 
-  last_ping=$(tail -n1 "$monitoring_file" | tr -d '\r' | cut -d',' -f 6)
+  # Only complete lines (8 fields); the EA may be writing the last one right now.
+  last_ping=$(tail -n 20 "$monitoring_file" | tr -d '\r' | awk -F, 'NF >= 8 {p = $6} END {print p}')
+  if ! [[ "$last_ping" =~ ^[0-9]+$ ]]; then
+    # missing data is reported by check_monitoring.sh
+    return 0
+  fi
   alert_status=$(atst_get_alert_status $alert_key)
 
   if [ "$alert_status" != "1" ]; then
