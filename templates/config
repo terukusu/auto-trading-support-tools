@@ -8,6 +8,10 @@ ATST_CHECK_RANDOM_DELAY_MAX=40
 # 0 の場合は通知しない。
 ATST_IMAGE_REPORT_TERM=24
 
+# 外形監視のハートビートを送る URL (Healthchecks.io などの ping URL)。空なら送らない。
+# VPS が止まったときに外部サービスから通知を受けるためのもの。手順は Wiki の「外側からの監視」を参照。
+ATST_HEARTBEAT_URL=
+
 # この秒数モニタリングデータの更新が無ければ通知します
 ATST_MONITORING_THRESHOLD=180
 
