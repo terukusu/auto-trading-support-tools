@@ -175,13 +175,62 @@ function ensure_sshd_alive() {
 }
 
 ########################################
+# Wine package group (P15)
+########################################
+# winehq-stable / wine-stable / wine-stable-amd64 / wine-stable-i386 must always have the same
+# version. Letting the generic "apt upgrade" move them corrupts dpkg: e.g. wine 10 -> 11 moved
+# /opt/wine-stable/bin/wine from wine-stable-i386 to wine-stable without a Replaces:, so dpkg refuses
+# the overwrite and every later apt run fails. Keep them out of the generic upgrade and update them
+# in their own transaction (see install_wine_packages).
+WINE_PKGS="winehq-stable wine-stable wine-stable-amd64 wine-stable-i386:i386"
+
+function installed_wine_pkgs() {
+  local p
+  for p in $WINE_PKGS; do
+    dpkg-query -W -f='${Status}\n' "$p" 2>/dev/null | grep -q '^install ok installed' && echo "$p"
+  done
+}
+
+function install_wine_packages() {
+  # Own transaction; --force-overwrite only here, for the file moved between wine packages.
+  # Note: it also applies to the recommends pulled in by this single command (accepted trade-off;
+  # the generic upgrade and every other install run without it).
+  sudo -E apt-get $APT_OPT -o Dpkg::Options::=--force-overwrite install --install-recommends winehq-stable
+
+  local versions
+  versions=$(for p in $WINE_PKGS; do dpkg-query -W -f='${Version}\n' "$p" 2>/dev/null; done | sort -u)
+  if ! sudo apt-get check >/dev/null 2>&1 || [ "$(printf '%s\n' "$versions" | grep -c .)" -ne 1 ]; then
+    echo "[error] wine packages are inconsistent (versions: $(echo $versions)). Try: sudo apt-get -f install -o Dpkg::Options::=--force-overwrite" >&2
+    return 1
+  fi
+}
+
+########################################
 # Upgrade existing packages
 ########################################
+# Wine packages this script put on hold; released by release_wine_hold (also from the EXIT trap,
+# so an interrupted run never leaves them held). Packages the user had already held are untouched.
+WINE_HELD_BY_US=""
+
+function release_wine_hold() {
+  [ -n "$WINE_HELD_BY_US" ] && sudo apt-mark unhold $WINE_HELD_BY_US >/dev/null
+  WINE_HELD_BY_US=""
+}
+
 function upgrade_existing_packages {
-  # upgrade packages.
+  # upgrade packages, holding the wine group so it is not partially upgraded (P15).
+  local p already
+  already=" $(apt-mark showhold 2>/dev/null | tr '\n' ' ') "
+  for p in $(installed_wine_pkgs); do
+    case "$already" in *" ${p%%:*} "*|*" $p "*) ;; *) WINE_HELD_BY_US="$WINE_HELD_BY_US $p" ;; esac
+  done
+  [ -n "$WINE_HELD_BY_US" ] && sudo apt-mark hold $WINE_HELD_BY_US >/dev/null
+
   sudo apt update
   sudo -E apt $APT_OPT -f install
   sudo -E apt $APT_OPT upgrade
+
+  release_wine_hold
   ensure_sshd_alive
 }
 
@@ -259,7 +308,7 @@ function install_packages_misc_and_needed_by_mt4() {
   fi
 
   sudo -E apt $APT_OPT update
-  sudo -E apt $APT_OPT install --install-recommends winehq-stable
+  install_wine_packages || exit 1   # the EXIT trap still restores sshd / releases holds
   ensure_sshd_alive
 }
 
@@ -506,8 +555,19 @@ function download_and_start_mt4_installer() {
   WINEDLLOVERRIDES="mscoree=;mshtml=" WINEDEBUG=-all wine start /unix "$installer"
 }
 
-# Whatever happens below (including an early exit), never leave the VPS without sshd.
-trap ensure_sshd_alive EXIT
+# Whatever happens below (including an early exit), never leave wine packages held by us and
+# never leave the VPS without sshd.
+function on_exit() {
+  release_wine_hold
+  ensure_sshd_alive
+}
+trap on_exit EXIT
+
+# Upgrading wine / reinitializing the prefix under a running MetaTrader would break live trading (P1).
+if pgrep -u "$(id -u)" -f '\\terminal(64)?\.exe' >/dev/null 2>&1; then
+  echo "[error] MetaTrader is running. Stop it first (e.g. mtctl.sh stop <name>), then re-run this installer." >&2
+  exit 1
+fi
 
 setup_root_crontab
 create_bash_profile_if_needed
