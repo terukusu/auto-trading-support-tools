@@ -52,3 +52,6 @@ if [ -z "$DISPLAY" ]; then
 fi
 
 export WINEARCH WINEPREFIX WINEDEBUG DISPLAY
+
+# Wine-Mono/Gecko are disabled by default in common.sh (WINEDLLOVERRIDES="mscoree=;mshtml=").
+# To change it, set it here, e.g. WINEDLLOVERRIDES="" to re-enable them.

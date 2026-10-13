@@ -13,7 +13,13 @@ if [ ! -e "$ATST_CONFIG_DIR/config" ]; then
 fi
 
 ATST_CONFIG_FILE="$ATST_CONFIG_DIR/config"
-. $ATST_CONFIG_FILE
+. "$ATST_CONFIG_FILE"
+
+# MT4/5 need neither Wine-Mono (.NET) nor Wine-Gecko (embedded IE). Keep both disabled for every
+# wine call made from cron (mtctl start, winepath in atst_find_pid, ...) so Wine never opens a
+# download dialog unattended (P10). cron does not read ~/.bash_profile, so this must live here.
+# A value already set in the environment or ~/.atst/config (even empty, to opt out) wins.
+export WINEDLLOVERRIDES="${WINEDLLOVERRIDES-mscoree=;mshtml=}"
 
 function atst_random_sleep() {
   local max_sleep=${1:-30}

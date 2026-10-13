@@ -111,6 +111,11 @@ if [ -e \$HOME/.bashrc ]; then
 fi
 EOS
   fi
+
+  # Profiles written by older versions have WINEARCH but no WINEDLLOVERRIDES; add just that line.
+  if ! grep -q 'WINEDLLOVERRIDES' "$bash_profile" 2>/dev/null; then
+    echo 'export WINEDLLOVERRIDES="mscoree=;mshtml="' >> "$bash_profile"
+  fi
 }
 
 
