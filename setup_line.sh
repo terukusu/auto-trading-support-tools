@@ -17,7 +17,7 @@ chmod 600 "$ATST_CONFIG_DIR/.line_token"
 
 echo ""
 
-echo "LINE の送信先 ID (あなたのユーザー ID。U で始まる文字列) を入力してください。"
+echo "LINE の送信先 ID (あなたのユーザー ID。U で始まる文字列。グループに送る場合はグループ ID) を入力してください。"
 echo ""
 echo -n "> "
 read -r line_id
