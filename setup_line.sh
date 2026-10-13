@@ -8,18 +8,21 @@ echo ""
 echo "LINE トークンを入力してください。例：n3DganilkwSjpi...."
 echo ""
 echo -n "> "
-read line_token
+read -r line_token
 
-echo $line_token > "$ATST_CONFIG_DIR/.line_token"
+# secrets: readable only by the owner (also fixes files written by older versions)
+( umask 077; printf '%s\n' "$line_token" > "$ATST_CONFIG_DIR/.line_token" )
+chmod 600 "$ATST_CONFIG_DIR/.line_token"
 
 echo ""
 
 echo "LINE ユーザーIDもしくはグループIDを入力してください。例：Uccf0eb6...."
 echo ""
 echo -n "> "
-read line_id
+read -r line_id
 
-echo $line_id > "$ATST_CONFIG_DIR/.line_id"
+( umask 077; printf '%s\n' "$line_id" > "$ATST_CONFIG_DIR/.line_id" )
+chmod 600 "$ATST_CONFIG_DIR/.line_id"
 echo ""
 
 

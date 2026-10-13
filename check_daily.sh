@@ -14,8 +14,10 @@ if [ "$num_upgradable" -gt "0" ]; then
 fi
 
 # check mt update
+# Every user in the prefix: cron does not always set $USER. Newer Wine has AppData/Roaming.
 clwdir=(
-  "$WINEPREFIX/drive_c/users/$USER/Application Data/MetaQuotes"
+  "$WINEPREFIX"/drive_c/users/*/AppData/Roaming/MetaQuotes
+  "$WINEPREFIX"/drive_c/users/*/"Application Data"/MetaQuotes
   "$WINEPREFIX/drive_c/ProgramData/MetaQuotes"
   "$WINEPREFIX/drive_c/Documents and Settings/All Users/Application Data/MetaQuotes"
 )

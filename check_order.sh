@@ -26,6 +26,7 @@ fi
 # and the newest orders lost.)
 function send_pending_orders() {
   local pending_file="$1"
+  local failed_file="${pending_file%.pending}.failed"
   local chunk n line tmp
 
   while [ -s "$pending_file" ]; do
@@ -39,7 +40,17 @@ function send_pending_orders() {
       n=$((n + 1))
     done < "$pending_file"
 
-    printf '%s' "$chunk" | atst_send_to_line || return 1
+    printf '%s' "$chunk" | atst_send_to_line
+    case "${PIPESTATUS[1]}" in
+      0) ;;
+      2)
+        # LINE will never accept this chunk; retrying it would hold back every later order. Keep it in
+        # a file and tell the user (a short message without the content).
+        printf '%s' "$chunk" >> "$failed_file"
+        echo "約定通知 (${n} 行) を LINE が受け付けませんでした。内容は次のファイルに保存しました: $failed_file" | atst_send_to_line
+        ;;
+      *) return 1 ;;
+    esac
 
     tmp=$(mktemp "$pending_file.XXXXXX") || return 1
     tail -n +$((n + 1)) "$pending_file" > "$tmp" && mv "$tmp" "$pending_file"

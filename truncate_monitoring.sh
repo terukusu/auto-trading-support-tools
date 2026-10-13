@@ -13,15 +13,31 @@ function do_check() {
 
   local monitoring_file tmp_monitoring_file now from
 
-  monitoring_file=$(atst_get_monitoring_csv_path $target_name)
-  tmp_monitoring_file=$(basename $monitoring_file .csv)_tmp.csv
+  monitoring_file=$(atst_get_monitoring_csv_path "$target_name")
 
   if [ -s "$monitoring_file" ]; then
     now=$(date +%s)
     from=$(($now - 3600 * 24 * $ATST_MONITORING_TRUNCATE_BEFORE))
-    cat "$monitoring_file" | awk -F, '{if ($1 > '$from') print}' > "$tmp_monitoring_file"
-    mv "$tmp_monitoring_file" "$monitoring_file"
+    # Next to the data (cron's working directory is $HOME, and the same name was shared by every MT).
+    tmp_monitoring_file=$(mktemp "$monitoring_file.XXXXXX") || return 1
+    awk -F, '{if ($1 > '$from') print}' "$monitoring_file" > "$tmp_monitoring_file" \
+      && mv "$tmp_monitoring_file" "$monitoring_file" || rm -f "$tmp_monitoring_file"
   fi
+}
+
+# Wine writes to wine_*.log (mtctl.sh start) for as long as MetaTrader runs, which can be months.
+# Keep the tail of a large one, dropping the preloader warnings every wine start prints on OpenVZ
+# (vm.mmap_min_addr can't be lowered in the container). It is rewritten in place because wine keeps
+# it open for appending.
+function trim_wine_logs() {
+  local log tmp
+  for log in "$ATST_CONFIG_DIR"/wine_*.log; do
+    [ -f "$log" ] && [ "$(stat -c %s "$log")" -gt $((2 * 1024 * 1024)) ] || continue
+    tmp=$(mktemp "$log.XXXXXX") || continue
+    tail -c $((1024 * 1024)) "$log" | grep -av '^preloader: Warning: failed to reserve range' > "$tmp" \
+      && cat "$tmp" > "$log"
+    rm -f "$tmp"
+  done
 }
 
 target_names=("$@")
@@ -33,3 +49,4 @@ if [ "$#" -le 0 ]; then
 fi
 
 atst_traverse_mt do_check "${target_names[@]}"
+trim_wine_logs
