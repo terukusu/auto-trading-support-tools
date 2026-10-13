@@ -418,15 +418,31 @@ function setup_wine {
   export WINEDEBUG=-all
   export DISPLAY=""
 
-  # initialize wineprefix
+  # An existing WINEPREFIX holds the installed MetaTrader, account settings and EAs. Never delete it
+  # by default (P13): keep it while MT is running or when there is no terminal to answer, and only
+  # delete on an explicit "y".
   if [ -d "$WINEPREFIX" ]; then
-    echo "WINEPREFIX($WINEPREFIX) directory already exists. Delete and reinitialize it?(Y/n)"
-    echo -n "> "
-    read line
-    if [ "n" != "${line,,}" ]; then
-      echo -n "Deleteing WINEPREFIX($WINEPREFIX) ... "
-      rm -rf "$WINEPREFIX"
-      echo "Done"
+    # Wine runs MT with a Windows path argument (C:\...\terminal.exe); requiring the backslash and
+    # our own uid avoids matching unrelated command lines that merely contain "terminal.exe".
+    if pgrep -u "$(id -u)" -f '\\terminal(64)?\.exe' >/dev/null 2>&1; then
+      # Continuing would run "wineserver -kw" below and kill the live MetaTrader (P1/P13).
+      echo "[error] MetaTrader is running in $WINEPREFIX. Aborting so it is not stopped." >&2
+      echo "        Stop it explicitly first (e.g. mtctl.sh stop <name>) and re-run if you really intend to." >&2
+      exit 1
+    elif [ ! -t 0 ]; then
+      echo "WINEPREFIX($WINEPREFIX) already exists (non-interactive run); keeping it."
+    else
+      echo "WINEPREFIX($WINEPREFIX) already exists."
+      echo "Delete it and reinitialize? Installed MetaTrader, account settings and EAs in it will be LOST. (y/N)"
+      echo -n "> "
+      read -r line
+      if [ "y" = "${line,,}" ]; then
+        echo -n "Deleting WINEPREFIX($WINEPREFIX) ... "
+        rm -rf "${WINEPREFIX:?}"
+        echo "Done"
+      else
+        echo "Keeping existing WINEPREFIX."
+      fi
     fi
   fi
 
