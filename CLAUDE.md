@@ -25,7 +25,7 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 
 ## 対応環境
 
-- ディストロ: Ubuntu 20.04 / 22.04 / 24.04、Debian 11 / 12（minimal 推奨）。EOL 版（Ubuntu 14〜18 / Debian 8〜10 等）は非サポート。
+- ディストロ: Ubuntu 20.04 / 22.04 / 24.04、Debian 11 / 12 / 13（minimal 推奨）。現行版の実機検証済みは Ubuntu 24.04 / OpenVZ のみ（README に明記）。EOL 版（Ubuntu 14〜18 / Debian 8〜10 等）は非サポート。
 - 仮想化: OpenVZ/Virtuozzo の格安 VPS 〜 KVM。カーネルは共有のことがある（OpenVZ ではカーネル入替・swap 作成不可）。
 - ランタイム: bash（一部 bash 固有構文を使用）、Wine 10 系（WineHQ stable を apt で固定、新規 prefix は `WINEARCH=win64`。理由は `docs/adr/0001-wine10-pin-and-win64.md`）。
 
