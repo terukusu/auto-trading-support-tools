@@ -10,7 +10,7 @@ function do_check() {
   local target_name="$1"
   local target_fullname="$2"
 
-  local monitoring_file last_spread from alert_status
+  local monitoring_file last_spread from
   local alert_key=SPREAD_${target_fullname// /_}
 
   monitoring_file=$(atst_get_monitoring_csv_path "$target_name")
@@ -29,21 +29,20 @@ function do_check() {
     return 0
   fi
 
-  alert_status=$(atst_get_alert_status $alert_key)
-
-  if [ "$alert_status" != "1" ]; then
-    if [ "$last_spread" -ge "$ATST_THRESHOLD_SPREAD_UPPER" ]; then
-      echo "【発生】$target_name の5分間のスプレッド最高値が $ATST_THRESHOLD_SPREAD_UPPER 以上の異常値になっています。5分間のスプレッド最高値: $last_spread" | atst_send_to_line
-
-      atst_set_alert_status $alert_key "1"
-    fi
-  else
-    if [ "$last_spread" -le "$ATST_THRESHOLD_SPREAD_LOWER" ]; then
-      echo "【復帰】$target_name の5分間のスプレッド最高値が $ATST_THRESHOLD_SPREAD_LOWER 以下の正常値に戻りました。5分間のスプレッド最高値: $last_spread" | atst_send_to_line
-
-      atst_set_alert_status $alert_key "0"
+  local verdict=""
+  if [ "$last_spread" -ge "$ATST_THRESHOLD_SPREAD_UPPER" ]; then
+    verdict=1
+  fi
+  if [ "$last_spread" -le "$ATST_THRESHOLD_SPREAD_LOWER" ]; then
+    # Both hold only when UPPER <= LOWER (misconfig): keep the old order (recover only while alerted).
+    if [ -z "$verdict" ] || [ "$(atst_get_alert_status "$alert_key")" == "1" ]; then
+      verdict=0
     fi
   fi
+
+  atst_update_alert "$alert_key" "$verdict" \
+    "【発生】$target_name の5分間のスプレッド最高値が $ATST_THRESHOLD_SPREAD_UPPER 以上の異常値になっています。5分間のスプレッド最高値: $last_spread" \
+    "【復帰】$target_name の5分間のスプレッド最高値が $ATST_THRESHOLD_SPREAD_LOWER 以下の正常値に戻りました。5分間のスプレッド最高値: $last_spread"
 }
 
 target_names=("$@")

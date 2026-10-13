@@ -10,7 +10,7 @@ function do_check() {
   local target_name="$1"
   local target_fullname="$2"
 
-  local monitoring_file alert_status
+  local monitoring_file fire_msg verdict
   local now elapsed last_timestamp threshold threshold_minute target_pid
 
   local alert_key=MONITORING_${target_fullname// /_}
@@ -43,26 +43,21 @@ function do_check() {
   threshold=$ATST_MONITORING_THRESHOLD
   threshold_minute=$(($threshold / 60))
 
-  alert_status=$(atst_get_alert_status $alert_key)
-
-  if [ "$alert_status" != "1" ]; then
-    if [ "$elapsed" -ge "$threshold" ]; then
-      if [ "$last_timestamp" -eq 0 ]; then
-        echo "【発生】$target_name のモニタリングデータがありません。TerminalMonitoring EA がチャートに設定されていない可能性が有ります。フリーズ・Ping・スプレッド・値動きの監視が効いていません。データファイル: $monitoring_file" | atst_send_to_line
-      else
-        echo "【発生】$target_name のモニタリングデータが $threshold_minute 分以上の間更新されていません。 EAが動いていない可能性が有ります。" | atst_send_to_line
-      fi
-
-      atst_set_alert_status $alert_key 1
-    fi
+  if [ "$last_timestamp" -eq 0 ]; then
+    fire_msg="【発生】$target_name のモニタリングデータがありません。TerminalMonitoring EA がチャートに設定されていない可能性が有ります。フリーズ・Ping・スプレッド・値動きの監視が効いていません。データファイル: $monitoring_file"
   else
-    if [ "$elapsed" -lt "$threshold" ]; then
-      echo "【復帰】$target_name のモニタリングデータの更新が再開しました。" | atst_send_to_line
-
-      atst_set_alert_status $alert_key 0
-    fi
+    fire_msg="【発生】$target_name のモニタリングデータが $threshold_minute 分以上の間更新されていません。 EAが動いていない可能性が有ります。"
   fi
 
+  verdict=""
+  if [ "$elapsed" -ge "$threshold" ]; then
+    verdict=1
+  elif [ "$elapsed" -lt "$threshold" ]; then
+    verdict=0
+  fi
+
+  atst_update_alert "$alert_key" "$verdict" "$fire_msg" \
+    "【復帰】$target_name のモニタリングデータの更新が再開しました。"
 }
 
 target_names=("$@")

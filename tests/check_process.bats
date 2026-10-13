@@ -98,3 +98,12 @@ no_line() {
   grep -q '^TARGET_No_Such_MT,1,' "$HOME/.atst/alert_status"
   no_bearer
 }
+
+@test "F2: a failed 【発生】 (500) for a stopped process is not recorded" {
+  atst_test_make_mt A_MT4 MT4
+  ATST_TEST_CURL_HTTP_CODE=500 run bash "$BATS_TEST_DIRNAME/../check_process.sh" A_MT4
+  [ "$(atst_test_push_count)" -eq 1 ]
+  no_line PROCESS_
+  [ -e "$HOME/.atst/line_error.log" ]
+  no_bearer
+}
