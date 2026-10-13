@@ -41,7 +41,7 @@ if [ -z "$WINEARCH" ]; then
     if [ -d "$WINEPREFIX" ]; then
         WINEARCH=$(cat "$WINEPREFIX"/system.reg | grep -m 1 '#arch' | cut -d '=' -f2)
     else
-        WINEARCH=win32
+        WINEARCH=win64
     fi
 fi
 if [ -z "$WINEDEBUG" ]; then
