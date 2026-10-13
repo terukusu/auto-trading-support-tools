@@ -207,9 +207,9 @@ function installed_wine_pkgs() {
 function pin_wine_version() {
   # Pin the wine group to WINE_PIN_VERSION so no later apt run (manual "apt upgrade",
   # unattended-upgrades, ...) moves it. Priority > 1000 also brings an already newer wine back.
+  # Keep the ":i386" qualifier: without it apt applies the pin to the native arch only.
   local pin
-  pin=$(printf 'Package: %s\nPin: version %s\nPin-Priority: 1001\n' \
-    "$(for p in $WINE_PKGS; do printf '%s ' "${p%%:*}"; done | sed 's/ $//')" "$WINE_PIN_VERSION")
+  pin=$(printf 'Package: %s\nPin: version %s\nPin-Priority: 1001\n' "$WINE_PKGS" "$WINE_PIN_VERSION")
   if [ "$(cat "$WINE_PIN_FILE" 2>/dev/null)" != "$pin" ]; then
     printf '%s\n' "$pin" | sudo tee "$WINE_PIN_FILE" > /dev/null
     echo "Pinned wine to $WINE_PIN_VERSION ($WINE_PIN_FILE)."
