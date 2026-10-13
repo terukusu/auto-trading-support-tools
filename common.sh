@@ -52,12 +52,13 @@ function atst_escape_text() {
 
 # 文字数 (バイト数ではない) を数える / 先頭 n 文字を取り出す。cron の既定ロケールでは bash の
 # ${#var} や cut -c がバイト単位になり、日本語を途中で切ってしまうため UTF-8 ロケールで扱う。
+# (サブシェル内でロケールを切り替える。別プロセスに渡すと 128KiB 超の本文で引数長制限に当たる)
 function atst_char_count() {
-  LC_ALL=C.UTF-8 bash -c 'printf %s "${#1}"' _ "$1"
+  ( LC_ALL=C.UTF-8; printf %s "${#1}" )
 }
 
 function atst_head_chars() {
-  LC_ALL=C.UTF-8 bash -c 'printf %s "${1:0:$2}"' _ "$1" "$2"
+  ( LC_ALL=C.UTF-8; printf %s "${1:0:$2}" )
 }
 
 function atst_read_file() {
@@ -162,6 +163,8 @@ function atst_log_line_error() {
   local http_code="$1" body="$2" text="$3"
   local log="$ATST_CONFIG_DIR/line_error.log"
 
+  # 通知本文を含むので本人以外に読ませない。
+  [ -e "$log" ] || ( umask 077; : > "$log" )
   {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] LINE send failed: http=$http_code script=$(basename "$0")"
     echo "  response: $(atst_head_chars "$(printf '%s' "$body" | tr -d '\r\n')" 500)"
