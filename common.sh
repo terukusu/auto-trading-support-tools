@@ -50,6 +50,17 @@ function atst_escape_text() {
   fi
 }
 
+# 文字数 (バイト数ではない) を数える / 先頭 n 文字を取り出す。cron の既定ロケールでは bash の
+# ${#var} や cut -c がバイト単位になり、日本語を途中で切ってしまうため UTF-8 ロケールで扱う。
+# (サブシェル内でロケールを切り替える。別プロセスに渡すと 128KiB 超の本文で引数長制限に当たる)
+function atst_char_count() {
+  ( LC_ALL=C.UTF-8; printf %s "${#1}" )
+}
+
+function atst_head_chars() {
+  ( LC_ALL=C.UTF-8; printf %s "${1:0:$2}" )
+}
+
 function atst_read_file() {
   local path="$1"
   cat "$1" | sed -re 's/\r//g'
@@ -88,6 +99,13 @@ function atst_send_to_line() {
   # 通知本文。MT 由来の値などが含まれるため JSON へはエスケープして埋め込む (P6)。
   local text="【$(hostname -s)】$msg"
 
+  # LINE のテキストは 5000 文字まで。超えると送信自体が失敗して通知が消えるので切り詰める
+  # (絵文字等を 2 文字と数える場合に備えて少し余裕を持たせる)。
+  local max_len=4900 omitted="…(以下省略)"
+  if [ "$(atst_char_count "$text")" -gt "$max_len" ]; then
+    text="$(atst_head_chars "$text" "$((max_len - 10))")$omitted"
+  fi
+
   # 画像があればアップロード。失敗時は本文に注記して画像なしで送る。
   local image_url=""
   if [ -n "$image_file" ]; then
@@ -121,18 +139,41 @@ function atst_send_to_line() {
     payload='{"to":"'"$u_e"'","messages":'"$messages"'}'
   fi
 
-  # メッセージ送信
-  local result
-  result=$(curl --max-time 30 --connect-timeout 10 -X POST "$api_endpoint" \
-    -s -o /dev/null -w "%{http_code}\n" \
-    -H "Authorization: Bearer $channel_access_token" \
+  # メッセージ送信。トークンはコマンドライン引数に載せない (ps で見えるため)。ヘッダはファイル記述子から渡す。
+  local response result
+  response=$(curl --max-time 30 --connect-timeout 10 -X POST "$api_endpoint" \
+    -s -w "\n%{http_code}" \
+    -H @<(printf 'Authorization: Bearer %s\n' "$channel_access_token") \
     -H "Content-Type: application/json" \
     -d "$payload")
+  result=${response##*$'\n'}
 
   if [ "$result" == "200" ]; then
     return 0
-  else
-    return 1
+  fi
+
+  # 失敗の痕跡を残す (cron は MAILTO="" で出力も捨てるため、ここに書かないと何も残らない)。
+  # curl 自体の失敗 (タイムアウト等) は HTTP コード 000 になる。
+  atst_log_line_error "$result" "${response%$'\n'*}" "$text"
+  return 1
+}
+
+# LINE 送信失敗を $ATST_CONFIG_DIR/line_error.log に記録する。肥大しないよう末尾 1000 行に保つ。
+function atst_log_line_error() {
+  local http_code="$1" body="$2" text="$3"
+  local log="$ATST_CONFIG_DIR/line_error.log"
+
+  # 通知本文を含むので本人以外に読ませない。
+  [ -e "$log" ] || ( umask 077; : > "$log" )
+  {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] LINE send failed: http=$http_code script=$(basename "$0")"
+    echo "  response: $(atst_head_chars "$(printf '%s' "$body" | tr -d '\r\n')" 500)"
+    echo "  message: $(atst_head_chars "$(printf '%s' "$text" | tr '\r\n' '  ')" 200)"
+  } >> "$log"
+
+  if [ "$(wc -l < "$log")" -gt 1000 ]; then
+    local tmp
+    tmp=$(mktemp "$ATST_CONFIG_DIR/line_error.log.XXXXXX") && tail -n 1000 "$log" > "$tmp" && mv "$tmp" "$log"
   fi
 }
 
