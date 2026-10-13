@@ -14,6 +14,11 @@ TARGET_LOCALE=ja_JP.UTF-8
 # To use a different broker/platform, replace this URL with that broker's installer.
 MT_INSTALLER_URL='https://download.mql5.com/cdn/web/land.prime.ltd/mt4/landprime4setup.exe'
 
+# WineHQ stable version to install and pin (apt preferences glob). Wine 11 makes the MT4/MT5
+# installers' anti-debugger check fire, so they exit silently; stay on 10 until that is fixed.
+# See docs/adr/0001-wine10-pin-and-win64.md and issue #66.
+WINE_PIN_VERSION='10.0.*'
+
 ABS_PWD=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
 ORG_USER=${SUDO_USER:-$USER}
 IS_SYSTEMD=$(which systemctl)
@@ -22,7 +27,9 @@ DIR_WINECACHE=$HOME/.cache/wine
 APT_OPT='-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'
 
 export DEBIAN_FRONTEND=noninteractive
-export WINEARCH=win32
+# New prefixes are 64-bit: current MT4/MT5 installers are 64-bit (they still install a 32-bit
+# MT4, which runs via WoW64). An existing prefix keeps its own arch (see setup_wine).
+export WINEARCH=win64
 export WINEDEBUG=-all,err+all
 export WINEPREFIX=$HOME/.wine
 export DISPLAY=:1
@@ -53,6 +60,7 @@ WINE_KEYRING=$APT_KEYRINGS_DIR/winehq-archive.gpg
 FAUDIO_KEYRING=$APT_KEYRINGS_DIR/winehq-faudio-archive.gpg
 WINE_LIST=/etc/apt/sources.list.d/winehq.list
 FAUDIO_LIST=/etc/apt/sources.list.d/winehq-faudio.list
+WINE_PIN_FILE=/etc/apt/preferences.d/winehq-stable-pin
 
 WINE_REPOS="deb [signed-by=$WINE_KEYRING arch=amd64,i386] https://dl.winehq.org/wine-builds/$ID/ $VERSION_CODENAME main"
 
@@ -196,11 +204,26 @@ function installed_wine_pkgs() {
   done
 }
 
+function pin_wine_version() {
+  # Pin the wine group to WINE_PIN_VERSION so no later apt run (manual "apt upgrade",
+  # unattended-upgrades, ...) moves it. Priority > 1000 also brings an already newer wine back.
+  local pin
+  pin=$(printf 'Package: %s\nPin: version %s\nPin-Priority: 1001\n' \
+    "$(for p in $WINE_PKGS; do printf '%s ' "${p%%:*}"; done | sed 's/ $//')" "$WINE_PIN_VERSION")
+  if [ "$(cat "$WINE_PIN_FILE" 2>/dev/null)" != "$pin" ]; then
+    printf '%s\n' "$pin" | sudo tee "$WINE_PIN_FILE" > /dev/null
+    echo "Pinned wine to $WINE_PIN_VERSION ($WINE_PIN_FILE)."
+  fi
+}
+
 function install_wine_packages() {
+  pin_wine_version
+
   # Own transaction; --force-overwrite only here, for the file moved between wine packages.
   # Note: it also applies to the recommends pulled in by this single command (accepted trade-off;
   # the generic upgrade and every other install run without it).
-  sudo -E apt-get $APT_OPT -o Dpkg::Options::=--force-overwrite install --install-recommends winehq-stable
+  # --allow-downgrades: a newer wine already installed is brought back to the pinned version.
+  sudo -E apt-get $APT_OPT -o Dpkg::Options::=--force-overwrite install --allow-downgrades --install-recommends winehq-stable
 
   local versions
   versions=$(for p in $WINE_PKGS; do dpkg-query -W -f='${Version}\n' "$p" 2>/dev/null; done | sort -u)
@@ -208,6 +231,12 @@ function install_wine_packages() {
     echo "[error] wine packages are inconsistent (versions: $(echo $versions)). Try: sudo apt-get -f install -o Dpkg::Options::=--force-overwrite" >&2
     return 1
   fi
+  # shellcheck disable=SC2254  # WINE_PIN_VERSION is a glob on purpose
+  case "$versions" in
+    $WINE_PIN_VERSION) ;;
+    *) echo "[error] wine $versions is installed, but $WINE_PIN_VERSION is required (pin: $WINE_PIN_FILE)." >&2
+       return 1 ;;
+  esac
 }
 
 ########################################
@@ -514,6 +543,19 @@ function start_vncserver_service() {
 }
 
 #####################################################
+# Architecture of the existing WINEPREFIX (win32 / win64), empty if there is none.
+#####################################################
+function wineprefix_arch() {
+  local arch
+  arch=$(sed -n 's/^#arch=//p' "$WINEPREFIX/system.reg" 2>/dev/null | head -n 1 | tr -d '\r')
+  # Some wine versions do not write "#arch" for a 32-bit prefix; fall back to its layout.
+  if [ -z "$arch" ] && [ -d "$WINEPREFIX/drive_c/windows" ]; then
+    if [ -d "$WINEPREFIX/drive_c/windows/syswow64" ]; then arch=win64; else arch=win32; fi
+  fi
+  echo "$arch"
+}
+
+#####################################################
 # Setup Wine (initialize WINEPREFIX). Wine-Mono / Wine-Gecko are intentionally NOT installed;
 # they are disabled via WINEDLLOVERRIDES because MetaTrader does not need them.
 #####################################################
@@ -556,6 +598,19 @@ function setup_wine {
     fi
   fi
 
+  # A kept prefix stays in its own arch (wine refuses to open a 32-bit prefix with WINEARCH=win64
+  # and vice versa); only a new prefix gets the default from the top of this script.
+  local prefix_arch
+  prefix_arch=$(wineprefix_arch)
+  if [ -n "$prefix_arch" ]; then
+    export WINEARCH=$prefix_arch
+  fi
+  if [ "$prefix_arch" = "win32" ]; then
+    echo "[warn] $WINEPREFIX is a 32-bit prefix. MetaTrader already installed in it keeps working, but" >&2
+    echo "       current MT4/MT5 installers are 64-bit and cannot run there. To install MT, re-run and" >&2
+    echo "       recreate the prefix (answer y), or use another WINEPREFIX." >&2
+  fi
+
   # MetaTrader 4/5 are native Win32 apps and need neither Wine-Mono (.NET / mscoree) nor
   # Wine-Gecko (embedded IE / mshtml). Disabling both stops wineboot from prompting for or
   # downloading them, which keeps this headless install unattended, lighter and free of a
@@ -578,6 +633,16 @@ function setup_wine {
   font_replace_exist=$(cat "$WINEPREFIX/user.reg" | tr -d '\r' | grep -o '\[Software\\\\Wine\\\\Fonts\\\\Replacements\]')
   if [ -z "$font_replace_exist" ]; then
     cat "$DIR_TEMPLATES/font_replace.reg" >> "$WINEPREFIX/user.reg"
+  fi
+
+  # ~/.bash_profile may still export the arch of a previous (e.g. deleted 32-bit) prefix; a
+  # mismatch makes every wine call from a login shell fail, so keep it in line with the prefix.
+  local bash_profile=$HOME/.bash_profile
+  prefix_arch=$(wineprefix_arch)
+  if [ -n "$prefix_arch" ] && grep -q '^export WINEARCH=' "$bash_profile" 2>/dev/null \
+      && ! grep -qx "export WINEARCH=$prefix_arch" "$bash_profile"; then
+    sed -i -e "s/^export WINEARCH=.*/export WINEARCH=$prefix_arch/" "$bash_profile"
+    echo "Updated WINEARCH in $bash_profile to $prefix_arch."
   fi
 
   export WINEDEBUG=$WINEDEBUG_OLD
