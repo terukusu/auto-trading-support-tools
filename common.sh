@@ -29,7 +29,7 @@ function atst_random_sleep() {
 }
 
 function atst_log() {
-  echo "["`date "+%Y-%m-%d %H:%M:%S"`"] "$@
+  echo "[$(date "+%Y-%m-%d %H:%M:%S")] $*"
 }
 
 function atst_to_upper() {

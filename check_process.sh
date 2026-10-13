@@ -49,7 +49,7 @@ function check_target_found() {
 
 target_names=("$@")
 
-if [ -z "$target_names" ]; then
+if [ -z "${target_names[0]}" ]; then
   echo "Usage: `basename $0` <MetaTrader Name1> <MetaTrader Name2> ..." 1>&2
   echo -e "\t<MetaTrader Name>: folder name of MetaTrader 4. (ex: "'"MetaTrader 4")'
   exit 1

@@ -25,7 +25,7 @@ function print_usage_exit() {
 
 function pm () {
   if [ $FLAG_QUIET -eq 0 ]; then
-    echo $@
+    echo "$*"
   fi
 }
 

@@ -24,7 +24,7 @@ function do_check() {
   fi
 
   from=$(($(date +%s)- 60 * 10))
-  minmax=($(cat "$monitoring_file" | awk -F, 'BEGIN{min=10000; max=0} NF >= 8 { if ($1 > '$from') { if($3 > max) max=$3; if($3 < min) min=$3 }} END{ printf("%g %g",min ,max) }'))
+  read -ra minmax <<< "$(cat "$monitoring_file" | awk -F, 'BEGIN{min=10000; max=0} NF >= 8 { if ($1 > '$from') { if($3 > max) max=$3; if($3 < min) min=$3 }} END{ printf("%g %g",min ,max) }')"
 
   if [ ${minmax[0]} == "10000" -o ${minmax[1]} == "0" ]; then
     # no data. nothing todo

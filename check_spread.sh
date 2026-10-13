@@ -22,7 +22,7 @@ function do_check() {
 
   # 過去5分高値が異常判定対象
   from=$(($(date +%s) - 60 * 5))
-  last_spread=($(cat "$monitoring_file" | awk -F, 'BEGIN{max=0} NF >= 8 { if ($1 > '$from') { if($5 > max) max=$5; n++ }} END{ if (n) printf("%g ",max) }'))
+  read -r last_spread <<< "$(cat "$monitoring_file" | awk -F, 'BEGIN{max=0} NF >= 8 { if ($1 > '$from') { if($5 > max) max=$5; n++ }} END{ if (n) printf("%g ",max) }')"
 
   if ! [[ "$last_spread" =~ ^[0-9]+$ ]]; then
     # missing data is reported by check_monitoring.sh
