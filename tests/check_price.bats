@@ -35,3 +35,32 @@ teardown() {
   [ "$status" -eq 0 ]
   [ ! -e "$ATST_TEST_CURL_LOG" ] || [ "$(grep -c 'api.line.me' "$ATST_TEST_CURL_LOG")" -eq 0 ]
 }
+
+@test "R1: with UPPER < LOWER and no state, a range matching both sends one 【発生】" {
+  command -v bc >/dev/null || skip "bc not installed"
+  atst_test_make_mt A_MT4 MT4
+  atst_test_set_config ATST_THRESHOLD_PRICE_LOWER 200
+  atst_test_make_monitoring_csv A_MT4 500 150.0 10 0.01
+  atst_test_make_monitoring_csv A_MT4 60 151.5 10 0.01
+  run bash "$BATS_TEST_DIRNAME/../check_price.sh" A_MT4
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(grep -c '【発生】' "$ATST_TEST_CURL_LOG")" -eq 1 ]
+  grep -q '^PRICE_A_MT4,1,' "$HOME/.atst/alert_status"
+  [ "$(grep -c Bearer "$ATST_TEST_CURL_LOG")" -eq 0 ]
+}
+
+@test "R2: with UPPER < LOWER and alert 1, a range matching both sends one 【復帰】" {
+  command -v bc >/dev/null || skip "bc not installed"
+  atst_test_make_mt A_MT4 MT4
+  atst_test_set_config ATST_THRESHOLD_PRICE_LOWER 200
+  printf 'PRICE_A_MT4,1,0\n' > "$HOME/.atst/alert_status"
+  atst_test_make_monitoring_csv A_MT4 500 150.0 10 0.01
+  atst_test_make_monitoring_csv A_MT4 60 151.5 10 0.01
+  run bash "$BATS_TEST_DIRNAME/../check_price.sh" A_MT4
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(grep -c '【復帰】' "$ATST_TEST_CURL_LOG")" -eq 1 ]
+  grep -q '^PRICE_A_MT4,0,' "$HOME/.atst/alert_status"
+  [ "$(grep -c Bearer "$ATST_TEST_CURL_LOG")" -eq 0 ]
+}
