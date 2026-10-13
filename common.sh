@@ -341,6 +341,9 @@ function atst_traverse_mt() {
   done
 }
 
+# alert_status は "キー,値,更新時刻(epoch)" の行の集まり。check_* が毎分並行して更新するので、
+# 更新は flock で排他し、一時ファイル経由で置き換える (sed -i と >> の競合で行が重複・欠落しないように)。
+# キーは正規表現ではなく先頭列の完全一致で探す (PROCESS_X が PROCESS_X_2 に当たらないように)。
 function atst_set_alert_status() {
   local key=$1
   local value=$2
@@ -350,33 +353,35 @@ function atst_set_alert_status() {
     return 1
   fi
 
-  if [ -e "$ATST_ALERT_STATUS_FILE" ] && [ -n "$(cat "$ATST_ALERT_STATUS_FILE" | grep -o "${key}," )" ]; then
-    sed -i -e "s/$key,.*/$key,$value,$(date +%s)/" "$ATST_ALERT_STATUS_FILE"
-  else
-    echo $key,$value,$(date +%s) >> "$ATST_ALERT_STATUS_FILE"
+  (
+    flock -w 10 9 || { echo "cannot lock $ATST_ALERT_STATUS_FILE" 1>&2; exit 1; }
+    local tmp
+    tmp=$(mktemp "$ATST_ALERT_STATUS_FILE.XXXXXX") || exit 1
+    touch "$ATST_ALERT_STATUS_FILE"
+    awk -F, -v OFS=, -v k="$key" -v v="$value" -v t="$(date +%s)" '
+      $1 == k { if (!done) print k, v, t; done = 1; next }
+      { print }
+      END { if (!done) print k, v, t }
+    ' "$ATST_ALERT_STATUS_FILE" > "$tmp" && mv "$tmp" "$ATST_ALERT_STATUS_FILE" || { rm -f "$tmp"; exit 1; }
+  ) 9>> "$ATST_ALERT_STATUS_FILE.lock"
+}
+
+# 指定キーの列 (2: 値, 3: 更新時刻) を返す。キーが無ければ default。
+function atst_get_alert_status_field() {
+  local key="$1" field="$2" default="$3" found
+
+  if [ -e "$ATST_ALERT_STATUS_FILE" ]; then
+    found=$(awk -F, -v k="$key" -v f="$field" '$1 == k { print $f; exit }' "$ATST_ALERT_STATUS_FILE")
   fi
+  echo "${found:-$default}"
 }
 
 function atst_get_alert_status() {
-  local key="$1"
-  local default="$2"
-
-  if [ -e "$ATST_ALERT_STATUS_FILE" ]; then
-    echo "$(cat "$ATST_ALERT_STATUS_FILE" | grep -oE "${key},.*" | cut -d',' -f 2)"
-  else
-    echo "$default"
-  fi
+  atst_get_alert_status_field "$1" 2 "$2"
 }
 
 function atst_get_alert_status_time() {
-  local key="$1"
-  local default="$2"
-
-  if [ -e "$ATST_ALERT_STATUS_FILE" ]; then
-    echo "$(cat "$ATST_ALERT_STATUS_FILE" | grep -oE "${key},.*" | cut -d',' -f 3)"
-  else
-    echo "$default"
-  fi
+  atst_get_alert_status_field "$1" 3 "$2"
 }
 
 eval $(atst_gen_mt_list)
