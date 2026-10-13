@@ -76,7 +76,7 @@ mkdir -p "$DIR_WINECACHE"
 function setup_root_crontab() {
   # For old OpenVZ kernel. SSHD doesn't start after updating systemd without this.
 
-  sudo -E apt $APT_OPT install cron
+  sudo -E apt-get $APT_OPT install cron
 
   cron_line=$(sudo bash -c "crontab -l 2>/dev/null" | grep -o "mkdir -p -m0755 /var/run/sshd")
 
@@ -231,9 +231,9 @@ function upgrade_existing_packages {
   done
   [ -n "$WINE_HELD_BY_US" ] && sudo apt-mark hold $WINE_HELD_BY_US >/dev/null
 
-  sudo apt update
-  sudo -E apt $APT_OPT -f install
-  sudo -E apt $APT_OPT upgrade
+  sudo apt-get update
+  sudo -E apt-get $APT_OPT -f install
+  sudo -E apt-get $APT_OPT --with-new-pkgs upgrade   # same behaviour as "apt upgrade" (P15)
 
   release_wine_hold
   ensure_sshd_alive
@@ -243,20 +243,22 @@ function upgrade_existing_packages {
 # Install and setup Japanese locale, Timezone
 ########################################
 function set_up_locale_and_timezone() {
-  sudo -E apt $APT_OPT install dbus
+  sudo -E apt-get $APT_OPT install dbus
 
   # setting local and timezone.
-  sudo -E apt $APT_OPT install tzdata
+  sudo -E apt-get $APT_OPT install tzdata
 
   if [ "$ID" == "debian" ]; then
     # for debian
-    sudo -E apt $APT_OPT install task-japanese locales
+    sudo -E apt-get $APT_OPT install task-japanese locales
   else
-    sudo -E apt $APT_OPT install language-pack-ja
+    sudo -E apt-get $APT_OPT install language-pack-ja
   fi
 
-  # 1 locale only
-  sudo bash -c 'echo "'$TARGET_LOCALE' UTF-8" > /etc/locale.gen'
+  # Add the target locale without wiping locales the system already generates.
+  if ! grep -qE "^${TARGET_LOCALE} UTF-8" /etc/locale.gen 2>/dev/null; then
+    echo "${TARGET_LOCALE} UTF-8" | sudo tee -a /etc/locale.gen > /dev/null
+  fi
 
   sudo locale-gen
   sudo update-locale LANG=$TARGET_LOCALE
@@ -307,12 +309,13 @@ function install_packages_misc_and_needed_by_mt4() {
   # install misc
   # gnupg (gpg --dearmor) and wget are needed for the keyring/repo setup below.
   # (Time sync is handled separately by ensure_time_sync so a conflict there cannot sink this line.)
-  sudo -E apt $APT_OPT install unattended-upgrades apt-transport-https gnupg wget psmisc file bc vim nano less tmux curl net-tools lsof
+  # jq lets atst_send_to_line build LINE payloads with full JSON escaping (P6).
+  sudo -E apt-get $APT_OPT install unattended-upgrades apt-transport-https gnupg wget jq psmisc file bc vim nano less tmux curl net-tools lsof
 
   ensure_time_sync
 
   # install gui
-  sudo -E apt $APT_OPT install tightvncserver fonts-vlgothic xterm wm2
+  sudo -E apt-get $APT_OPT install tightvncserver fonts-vlgothic xterm wm2
 
   # install wine
   sudo dpkg --add-architecture i386
@@ -321,7 +324,8 @@ function install_packages_misc_and_needed_by_mt4() {
   # WineHQ repository (keyring + signed-by instead of the removed apt-key).
   # Skip entirely if WineHQ is already configured in any form — adding a second definition with a
   # different signed-by keyring makes apt fail with "Conflicting values set for option Signed-By".
-  if grep -rqsE 'winehq|wine-builds' /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null; then
+  # Only real apt source files count (not *.save / *.distUpgrade backups left in the directory).
+  if grep -qsE 'winehq|wine-builds' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null; then
     echo "WineHQ repository already configured; skipping key/list setup."
   elif [ ! -e "$WINE_LIST" ]; then
     wget -q --timeout=30 --tries=3 -O - "$WINE_KEY_URL" | sudo gpg --dearmor --yes -o "$WINE_KEYRING"
@@ -340,15 +344,20 @@ function install_packages_misc_and_needed_by_mt4() {
   # don't provide it. (The opensuse repo exists for 24.04 too, so we must decide by distro
   # availability, not by whether the repo URL exists.)
   if [ ! -e "$FAUDIO_LIST" ] && ! LC_ALL=C apt-cache policy libfaudio0 2>/dev/null | grep -q 'Candidate: [0-9]'; then
-    WEB_REPOS_EXITS=$(curl -s --head "$FAUDIO_REPOS/" | head -n1 | cut -d' ' -f2 | grep -oe '^2')
+    WEB_REPOS_EXITS=$(curl -s --max-time 30 --head "$FAUDIO_REPOS/" | head -n1 | cut -d' ' -f2 | grep -oe '^2')
     if [ -n "$WEB_REPOS_EXITS" ]; then
-      wget -q -O - "$FAUDIO_REPOS/Release.key" | sudo gpg --dearmor -o "$FAUDIO_KEYRING"
+      wget -q --timeout=30 --tries=3 -O - "$FAUDIO_REPOS/Release.key" | sudo gpg --dearmor --yes -o "$FAUDIO_KEYRING"
       sudo chmod 0644 "$FAUDIO_KEYRING"
-      echo "deb [signed-by=$FAUDIO_KEYRING] $FAUDIO_REPOS ./" | sudo tee "$FAUDIO_LIST" > /dev/null
+      # Same rule as the WineHQ key: never leave a list behind without a usable key.
+      if [ -s "$FAUDIO_KEYRING" ]; then
+        echo "deb [signed-by=$FAUDIO_KEYRING] $FAUDIO_REPOS ./" | sudo tee "$FAUDIO_LIST" > /dev/null
+      else
+        echo "[error] failed to fetch/import FAudio key from $FAUDIO_REPOS; not writing $FAUDIO_LIST" >&2
+      fi
     fi
   fi
 
-  sudo -E apt $APT_OPT update
+  sudo -E apt-get $APT_OPT update
   install_wine_packages || exit 1   # the EXIT trap still restores sshd / releases holds
   ensure_sshd_alive
 }
@@ -357,7 +366,7 @@ function install_packages_misc_and_needed_by_mt4() {
 # Install packages required by graphical report
 #####################################################
 install_packages_needed_by_graphical_report() {
-  sudo -E apt $APT_OPT install gnuplot-nox vncsnapshot
+  sudo -E apt-get $APT_OPT install gnuplot-nox vncsnapshot
 }
 
 #####################################################
