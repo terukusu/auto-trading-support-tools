@@ -19,7 +19,7 @@ MT_INSTALLER_URL='https://download.mql5.com/cdn/web/land.prime.ltd/mt4/landprime
 # See docs/adr/0001-wine10-pin-and-win64.md and issue #66.
 WINE_PIN_VERSION='10.0.*'
 
-ABS_PWD=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
+ABS_PWD=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ORG_USER=${SUDO_USER:-$USER}
 IS_SYSTEMD=$(which systemctl)
 DIR_TEMPLATES="$ABS_PWD/templates"
@@ -503,7 +503,8 @@ function setup_vncserver {
     sed -e 's/%%USER_NAME%%/'"$ORG_USER"'/g' "$DIR_TEMPLATES/vncserver@:1.service" > "$rendered"
     if ! sudo cmp -s "$rendered" "$unit"; then
       if [ -f "$unit" ]; then
-        local backup="$unit.bak.$(date +%Y%m%d%H%M%S)"
+        local backup
+        backup="$unit.bak.$(date +%Y%m%d%H%M%S)"
         sudo cp -p "$unit" "$backup"
         echo "Updating $unit from the template (previous unit saved as $backup)."
       fi
@@ -534,7 +535,7 @@ function setup_vncserver {
   # setting default password for vncserver
   if [ ! -e "$HOME/.vnc/passwd" ]; then
     echo 'Setting default password '123123' to VNC. Please change this yourself later :-)'
-    echo "123123" | vncpasswd -f > "$HOME/.vnc/passwd"
+    echo "$VNC_PASSWORD" | vncpasswd -f > "$HOME/.vnc/passwd"
     chmod 600 "$HOME/.vnc/passwd"
   fi
 }
