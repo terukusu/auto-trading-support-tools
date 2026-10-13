@@ -111,7 +111,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 ## P12. 命名・構成の一貫性（warn）
 
 - 公開関数・共通変数は `atst_*` / `ATST_*`。新規共通処理は `common.sh` に置く。
-  - 例外: `mt_home` / `mt_name` / `mt_type` / `mt_term` は `atst_gen_mt_list` が `eval` で生成するグローバル配列で、`ATST_*` 命名の意図的な例外（この 4 つ以外の新規共通変数は `ATST_*` にする）。
+  - 例外: `mt_home` / `mt_data` / `mt_name` / `mt_type` / `mt_term` は `atst_gen_mt_list` が `eval` で生成するグローバル配列で、`ATST_*` 命名の意図的な例外（これら以外の新規共通変数は `ATST_*` にする）。
 - 1 スクリプト 1 責務。cron から叩く監視は `check_*.sh`、セットアップは `setup_*.sh` の命名に合わせる。
 - テンプレート化すべき設定ファイルは `templates/` に置き、`%%PLACEHOLDER%%` 置換の既存流儀に合わせる。
 - usage を持つスクリプトは引数不足時に usage を出して非 0 終了する（`wrapper.sh` の `print_usage_exit` 参照）。
