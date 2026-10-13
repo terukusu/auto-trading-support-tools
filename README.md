@@ -99,8 +99,8 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 [<img src="../../wiki/images/install_thumb.png" width="280px">](https://youtu.be/6kdOmCvU9ZU)
 
 ### おまけ
-* [Stackdriver で外側からの監視](../../wiki/setup_stackdriver)
-    * サーバーそのものやネットワークのダウンを検知する
+* [外側からの監視(ハートビート)](../../wiki/setup_heartbeat)
+    * サーバーそのものやネットワークのダウンを検知する。VPS が毎分外部サービスへ生存を知らせ、途絶えたら外部サービスが通知する
 * 不正アクセス防止のところは GCP がよしなにやってくれてるので気にしなくてOK
     * 他の格安VPSの場合はちゃんとしないと驚くほど攻撃を受けるので注意。 [設定例](../../wiki/setup_iptables)
 * [スマートフォンで口座を操作する](../../wiki/setup_mobile_mt)
@@ -128,6 +128,7 @@ TARGET="('Land Prime')"
 
 0 9 * * * check_daily.sh
 * * * * * check_reboot.sh
+* * * * * heartbeat.sh
 
 @reboot    wrapper.sh                  "$TARGET" mtctl.sh start
 30 6 * * * wrapper.sh                  "$TARGET" truncate_monitoring.sh

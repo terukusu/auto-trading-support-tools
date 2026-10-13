@@ -8,6 +8,7 @@ TARGET="('Land Prime')"
 
 0 9 * * * check_daily.sh
 * * * * * check_reboot.sh
+* * * * * heartbeat.sh
 
 @reboot    wrapper.sh                  "$TARGET" mtctl.sh start
 30 6 * * * wrapper.sh                  "$TARGET" truncate_monitoring.sh

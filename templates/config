@@ -14,6 +14,11 @@ ATST_IMAGE_REPORT_TERM=24
 # (画像 4 枚ごとに 1 通。デスクトップ + MT 1 台につき 2 枚)。
 ATST_DAILY_REPORT=1
 
+# 外形監視のハートビートを送る URL (Healthchecks.io などの ping URL)。空なら送らない。
+# VPS が止まったときに外部サービスから通知を受けるためのもの。手順は Wiki の「外側からの監視」を参照。
+# 値はダブルクォートで囲む。
+ATST_HEARTBEAT_URL=""
+
 # この秒数モニタリングデータの更新が無ければ通知します
 ATST_MONITORING_THRESHOLD=180
 
