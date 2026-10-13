@@ -80,3 +80,55 @@ atst_test_make_monitoring_csv() {
   printf '%s,%s,%s,%s,%s,12,%s,USDJPY\n' "$(( $(date +%s) - secs_ago ))" 0 "$bid" "$bid" "$spread" "$pip" \
     >> "$dir/terminal_monitoring.csv"
 }
+
+# atst_test_make_order_status <name> <line>...
+# Appends each <line> to MQL4/Files/order_status of the MT made by atst_test_make_mt (without a hash,
+# the same folder as atst_test_make_monitoring_csv).
+atst_test_make_order_status() {
+  local name="$1"
+  local dir
+
+  [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
+  [ "$#" -ge 2 ] && [ -n "$name" ] || return 1
+  [ -n "${WINEPREFIX:-}" ] || return 1
+  shift
+
+  dir="$WINEPREFIX/drive_c/Program Files/$name/MQL4/Files"
+  mkdir -p "$dir" || return 1
+  printf '%s\n' "$@" >> "$dir/order_status"
+}
+
+# atst_test_fake_mt_process <name>
+# Starts "sleep 30" shown in the process table as "C:\Program Files\<name>\terminal.exe" (what
+# atst_find_pid looks for) and prints its pid. Call it as
+#   ATST_TEST_FAKE_PID=$(atst_test_fake_mt_process ATSTTEST_MT4)
+# and kill that pid in teardown. Use a name no real MetaTrader can start with.
+atst_test_fake_mt_process() {
+  local name="$1"
+
+  [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
+  [ "$#" -eq 1 ] && [ -n "$name" ] || return 1
+
+  ( exec -a "C:\\Program Files\\$name\\terminal.exe" sleep 30 ) >/dev/null 2>&1 </dev/null 3>&- &
+  echo "$!"
+}
+
+# atst_test_set_config <KEY> <value>
+# Appends KEY=<value> to the sandbox ~/.atst/config (copied from templates/config first), so it wins
+# over the template value. common.sh sources the config on every run, so environment variables cannot
+# override it. KEY must be a shell variable name; the value is quoted with %q.
+atst_test_set_config() {
+  local key="$1" value="$2"
+  local conf
+
+  [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
+  [ "$#" -eq 2 ] || return 1
+  [[ "$key" =~ ^[A-Z_][A-Z0-9_]*$ ]] || return 1
+
+  conf="$HOME/.atst/config"
+  mkdir -p "$HOME/.atst" || return 1
+  if [ ! -e "$conf" ]; then
+    cp "${BATS_TEST_DIRNAME:?}/../templates/config" "$conf" || return 1
+  fi
+  printf '%s=%q\n' "$key" "$value" >> "$conf"
+}
