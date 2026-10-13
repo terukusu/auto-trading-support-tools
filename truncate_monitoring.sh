@@ -34,8 +34,11 @@ function trim_wine_logs() {
   for log in "$ATST_CONFIG_DIR"/wine_*.log; do
     [ -f "$log" ] && [ "$(stat -c %s "$log")" -gt $((2 * 1024 * 1024)) ] || continue
     tmp=$(mktemp "$log.XXXXXX") || continue
-    tail -c $((1024 * 1024)) "$log" | grep -av '^preloader: Warning: failed to reserve range' > "$tmp" \
-      && cat "$tmp" > "$log"
+    # grep exits 1 when every line was a warning; that is still a result to write back.
+    tail -c $((1024 * 1024)) "$log" | grep -av '^preloader: Warning: failed to reserve range' > "$tmp"
+    if [ "${PIPESTATUS[1]}" -le 1 ]; then
+      cat "$tmp" > "$log"
+    fi
     rm -f "$tmp"
   done
 }

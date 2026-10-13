@@ -45,9 +45,11 @@ function send_pending_orders() {
       0) ;;
       2)
         # LINE will never accept this chunk; retrying it would hold back every later order. Keep it in
-        # a file and tell the user (a short message without the content).
-        printf '%s' "$chunk" >> "$failed_file"
-        echo "約定通知 (${n} 行) を LINE が受け付けませんでした。内容は次のファイルに保存しました: $failed_file" | atst_send_to_line
+        # a file and tell the user (a short message without the content). If even that is refused, the
+        # cause is not this chunk (e.g. a wrong .line_id, also a 400): keep it pending for a retry.
+        echo "約定通知 (${n} 行) を LINE が受け付けませんでした。内容は次のファイルに保存しました: $failed_file" | atst_send_to_line \
+          || return 1
+        printf '%s' "$chunk" >> "$failed_file" || return 1
         ;;
       *) return 1 ;;
     esac
