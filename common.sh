@@ -67,7 +67,7 @@ function atst_read_file() {
 }
 
 # 画像を一時置き場にアップロードし、公開 URL を出力する。LINE の画像メッセージは公開 HTTPS の URL が要る。
-# Litterbox (catbox.moe の一時置き場) に 72 時間だけ置く。URL は推測困難だが誰でも見られるので、
+# Litterbox (catbox.moe の一時置き場) に 72 時間だけ置く。URL を知っていれば誰でも見られるので、
 # 送る画像に秘匿したいものを含めないこと。(以前の 0x0.st は 2026 年にアップロードを停止した)
 function atst_upload_image() {
   local file="$1"
@@ -78,16 +78,20 @@ function atst_upload_image() {
     return 1
   fi
 
-  local url
-  url=$(curl --max-time 60 --connect-timeout 10 -s -F reqtype=fileupload -F time=72h -F "fileToUpload=@$file" "$api" 2>/dev/null)
+  local response url code
+  # IPv4: some VPS have a broken IPv6 route (kept from the 0x0.st version).
+  response=$(curl --max-time 60 --connect-timeout 10 -4 -s -w "\n%{http_code}" \
+    -F reqtype=fileupload -F time=72h -F "fileToUpload=@$file" "$api" 2>/dev/null)
+  code=${response##*$'\n'}
+  url=${response%$'\n'*}
 
-  if [[ "$url" =~ ^https://[^[:space:]]+$ ]]; then
+  if [ "$code" == "200" ] && [[ "$url" =~ ^https://[^[:space:]]+$ ]]; then
     echo "$url"
     return 0
   fi
 
-  # cron discards stderr; leave a trace where LINE failures are logged.
-  atst_log_line_error "upload" "$url" "画像アップロード失敗: $(basename "$file")"
+  # cron discards stderr; leave a trace where LINE failures are logged (000 = timeout etc.).
+  atst_log_line_error "upload:$code" "$url" "画像アップロード失敗: $(basename "$file")"
   echo "Error: Upload failed" >&2
   return 1
 }
