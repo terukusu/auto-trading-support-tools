@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# atst_gen_mt_list (common.sh): which data folder mt_data[] points to, from origin.txt and the
+# atst_load_mt_list (common.sh): which data folder mt_data[] points to, from origin.txt and the
 # mtime of logs/ (PR #75, #76).
 
 load test_helper
@@ -30,7 +30,7 @@ teardown() {
   atst_test_source_common
   [ "${mt_data[0]}" = "$other" ]
   touch -d '1 hour ago' "$T/ZZZ/logs"
-  eval "$(atst_gen_mt_list)"
+  atst_load_mt_list
   [ "${mt_data[0]}" = "$T/ZZZ" ]
 }
 

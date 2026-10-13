@@ -267,59 +267,48 @@ function atst_find_mt_data_dir() {
   fi
 }
 
-# scan wine drive and find terminal.exe. and output lines like below.
+# Detects the MetaTrader installs under $WINEPREFIX/drive_*/Program*/ (terminal*.exe up to 2 levels
+# deep) and fills the global arrays mt_term / mt_home / mt_data / mt_name / mt_type, index 0.. in the
+# sort order of the terminal*.exe paths. The arrays are emptied first, so calling it again reloads.
+# Folder names are never run as shell code (#93). Starts neither wine nor winepath. Always returns 0.
 #
-#    mt_term[0]='/Users/teru/.wine/drive_c/Program Files/MetaTrader 5/terminal.exe'
-#    mt_home[0]='/Users/teru/.wine/drive_c/Program Files/MetaTrader 4'
-#    mt_data[0]='/Users/teru/.wine/drive_c/users/teru/AppData/Roaming/MetaQuotes/Terminal/<hash>'
+#    mt_term[0]='/home/user/.wine/drive_c/Program Files/MetaTrader 4/terminal.exe'
+#    mt_home[0]='/home/user/.wine/drive_c/Program Files/MetaTrader 4'
+#    mt_data[0]='/home/user/.wine/drive_c/users/user/AppData/Roaming/MetaQuotes/Terminal/<hash>'
 #    mt_name[0]='METATRADER 4'
 #    mt_type[0]='MT4'
-#    mt_home[1]....
-#    mt_name[1]....
-#    mt_type[1]....
 #
-# Evaluating like this, you can use them as valiable.
-#    eval $(atst_gen_mt_list)
-#
-function atst_gen_mt_list() {
-  if [ ! -d "$WINEPREFIX" ]; then
-    return 0
-  fi
+function atst_load_mt_list() {
+  mt_term=(); mt_home=(); mt_data=(); mt_name=(); mt_type=()
+  [ -d "$WINEPREFIX" ] || return 0
 
-  local origins
+  local origins line home type n=0
   origins=$(atst_gen_mt_origins)
 
-  i=0
-  # Windowsの各ドライブのプログラムフォルダ内からtemrinal.exeを検索する
-  cat <(find "$WINEPREFIX" -maxdepth 1 -type d -name 'drive_*' | sort | while read drive; do
-    find "$drive" -maxdepth 1 -type d -name 'Program*' | sort | while read program_folder; do
-      find "$program_folder" -maxdepth 2 -name 'terminal*.exe'
-    done
-  done) | sort | while read line; do
+  # NUL-delimited so that any byte in a folder name survives; only the last sort decides the order
+  while IFS= read -r -d '' line; do
     line=$(atst_abs_path "$line")
-    mt_term="$line"
-    mt_home=$(dirname "$line")
-    mt_name=$(basename "$mt_home" | atst_to_upper)
-
-    if [ -d "$mt_home/MQL4" ]; then
-      mt_type=MT4
-    elif [ -d "$mt_home/MQL5" ]; then
-      mt_type=MT5
+    home=$(dirname "$line")
+    if [ -d "$home/MQL4" ]; then
+      type=MT4
+    elif [ -d "$home/MQL5" ]; then
+      type=MT5
     else
-      echo "cannot determine MT4/MT5. bcause it don't have MQL4/ML5 folder: '$mt_home'" 1>&2
+      echo "cannot determine MT4/MT5. bcause it don't have MQL4/ML5 folder: '$home'" 1>&2
       continue
     fi
-
-    mt_data=$(atst_find_mt_data_dir "$mt_home" "$origins")
-
-    echo mt_term[$i]="'$mt_term'"
-    echo mt_home[$i]="'$mt_home'"
-    echo mt_data[$i]="'$mt_data'"
-    echo mt_name[$i]="'$mt_name'"
-    echo mt_type[$i]="'$mt_type'"
-
-    i=`expr $i + 1`
-  done
+    mt_term[n]=$line
+    mt_home[n]=$home
+    mt_data[n]=$(atst_find_mt_data_dir "$home" "$origins")
+    mt_name[n]=$(basename "$home" | atst_to_upper)
+    mt_type[n]=$type
+    n=$((n + 1))
+  done < <(find "$WINEPREFIX" -maxdepth 1 -type d -name 'drive_*' -print0 | while IFS= read -r -d '' drive; do
+    find "$drive" -maxdepth 1 -type d -name 'Program*' -print0 | while IFS= read -r -d '' program_folder; do
+      find "$program_folder" -maxdepth 2 -name 'terminal*.exe' -print0
+    done
+  done | sort -z)
+  return 0
 }
 
 # return the index of MetaTrader which folder has specified prefix
@@ -546,4 +535,4 @@ function atst_update_alert() {
   return 0
 }
 
-eval "$(atst_gen_mt_list)"
+atst_load_mt_list
