@@ -37,7 +37,7 @@ fi
 quota_warning=""
 quota=($(atst_line_quota))
 if [ -n "${quota[0]}" ]; then
-  if [ "${quota[1]}" == "-" ]; then
+  if ! [[ "${quota[1]}" =~ ^[1-9][0-9]*$ ]]; then
     quota_msg="LINE 送信数(今月): ${quota[0]}通"
   else
     quota_msg="LINE 送信数(今月): ${quota[0]}/${quota[1]}通"
