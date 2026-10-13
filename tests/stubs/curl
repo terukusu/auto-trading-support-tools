@@ -1,0 +1,22 @@
+#!/bin/bash
+# Test stub for curl (tests/test_helper.bash puts tests/stubs first in PATH).
+# Never touches the network and never runs the real curl.
+# - Appends its arguments as one line to $ATST_TEST_CURL_LOG. Files given as "-H @<path>"
+#   (the Authorization header) are neither opened nor recorded.
+# - Prints $ATST_TEST_CURL_BODY, then "\n$ATST_TEST_CURL_HTTP_CODE" (default 200) when -w is given.
+# - Exits with $ATST_TEST_CURL_EXIT (default 0).
+
+# Outside a sandbox: do nothing (and send nothing).
+[ -n "${ATST_TEST_CURL_LOG:-}" ] || exit 1
+
+printf '%s\n' "$*" >> "$ATST_TEST_CURL_LOG"
+
+printf '%s' "${ATST_TEST_CURL_BODY-}"
+for a in "$@"; do
+  if [ "$a" = "-w" ]; then
+    printf '\n%s' "${ATST_TEST_CURL_HTTP_CODE:-200}"
+    break
+  fi
+done
+
+exit "${ATST_TEST_CURL_EXIT:-0}"
