@@ -140,6 +140,41 @@ function create_swap_space_if_needed() {
 }
 
 ########################################
+# Keep sshd reachable (P14)
+########################################
+function ensure_sshd_alive() {
+  # On OpenVZ containers, upgrading systemd / openssh-server can stop ssh.service, and /run/sshd
+  # (tmpfs) is not recreated, so sshd never comes back and the VPS is locked out. The @reboot
+  # crontab entry only helps after a reboot, so restore sshd right after every package operation.
+  [ -n "$IS_SYSTEMD" ] || return 0
+  dpkg -s openssh-server >/dev/null 2>&1 || return 0
+
+  # The privilege separation dir must exist even if a unit is already "active" (socket-activated
+  # sshd fails per connection without it).
+  sudo install -d -m 0755 /run/sshd
+
+  # Start only what is missing. On focal/jammy/Debian ssh.socket conflicts with ssh.service, so
+  # blindly starting the socket would stop a healthy sshd; use the socket only where it is enabled.
+  if ! systemctl is-active --quiet ssh.socket && ! systemctl is-active --quiet ssh; then
+    if systemctl is-enabled --quiet ssh.socket 2>/dev/null; then
+      sudo systemctl start ssh.socket >/dev/null 2>&1
+    else
+      sudo systemctl start ssh >/dev/null 2>&1
+    fi
+  fi
+
+  local port
+  port=$(sudo sshd -T 2>/dev/null | awk '$1 == "port" {print $2; exit}')
+  port=${port:-22}
+  if ss -tln 2>/dev/null | grep -qE "[:.]${port}[[:space:]]"; then
+    return 0
+  fi
+
+  echo "[error] sshd is not listening on port ${port}. Keep your current SSH session open and run: sudo install -d -m0755 /run/sshd && sudo systemctl start ssh" >&2
+  return 1
+}
+
+########################################
 # Upgrade existing packages
 ########################################
 function upgrade_existing_packages {
@@ -147,6 +182,7 @@ function upgrade_existing_packages {
   sudo apt update
   sudo -E apt $APT_OPT -f install
   sudo -E apt $APT_OPT upgrade
+  ensure_sshd_alive
 }
 
 ########################################
@@ -224,6 +260,7 @@ function install_packages_misc_and_needed_by_mt4() {
 
   sudo -E apt $APT_OPT update
   sudo -E apt $APT_OPT install --install-recommends winehq-stable
+  ensure_sshd_alive
 }
 
 #####################################################
@@ -452,6 +489,9 @@ function download_and_start_mt4_installer() {
   # Disable mono/gecko here too so the installer never blocks on a download dialog.
   WINEDLLOVERRIDES="mscoree=;mshtml=" WINEDEBUG=-all wine start /unix "$installer"
 }
+
+# Whatever happens below (including an early exit), never leave the VPS without sshd.
+trap ensure_sshd_alive EXIT
 
 setup_root_crontab
 create_bash_profile_if_needed
