@@ -10,7 +10,7 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 
 ## 構成（主要ファイルの役割）
 
-- `common.sh` — 全スクリプトが source する共通ライブラリ。`atst_*` 関数と設定ロード。source 時に `eval $(atst_gen_mt_list)` で MT 一覧を検出し、グローバル配列 `mt_home/mt_data/mt_name/mt_type/mt_term` に展開する（`mt_data` は MQL4/MQL5 の Files・Experts がある MT のデータフォルダ。AppData 側か、無ければインストール先）。`~/.atst/alert_status` は「LINE に送れた状態」で、`check_*.sh` は判定結果（verdict）を `atst_update_alert` に渡し、`atst_update_alert` が `atst_alert_transition` で送るべき通知を決めて送信に成功したときだけ状態を更新する（失敗した回は記録せず次の回に再送。通知の文面は呼び出し側が持つ）。
+- `common.sh` — 全スクリプトが source する共通ライブラリ。`atst_*` 関数と設定ロード。source 時に `atst_load_mt_list` で MT 一覧を検出し、グローバル配列 `mt_home/mt_data/mt_name/mt_type/mt_term` へ直接読み込む（フォルダ名をシェルコードとして評価しない。再呼び出しで再読込できる。`mt_data` は MQL4/MQL5 の Files・Experts がある MT のデータフォルダ。AppData 側か、無ければインストール先）。`~/.atst/alert_status` は「LINE に送れた状態」で、`check_*.sh` は判定結果（verdict）を `atst_update_alert` に渡し、`atst_update_alert` が `atst_alert_transition` で送るべき通知を決めて送信に成功したときだけ状態を更新する（失敗した回は記録せず次の回に再送。通知の文面は呼び出し側が持つ）。
 - `install_required_for_mt.sh` — まっさらな VPS に GUI(VNC+wm2) / Wine / MT インストーラ一式を導入するメインスクリプト。
 - `mtctl.sh` — 複数 MT の list/start/status/stop/monitor。
 - `check_*.sh` — cron から定期実行される監視（reboot / process / order / ping / price / spread / monitoring / daily）。
