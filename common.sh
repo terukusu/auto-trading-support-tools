@@ -16,12 +16,22 @@ ATST_CONFIG_FILE="$ATST_CONFIG_DIR/config"
 # These settings come from ~/.atst/config only. A value left in the environment (a manual run, a test)
 # would hide that an existing user's config lacks them (check_all.sh reports unset ATST_TARGETS).
 unset ATST_TARGETS ATST_CHECK_TIMEOUT ATST_ORDER_CHECK_INTERVAL
+# ATST_NOTIFY_SPOOL (the spool of one check_all.sh run, see atst_spool_begin) comes from the
+# environment only: a value written in ~/.atst/config would make every check keep its notices in a
+# spool nobody sends (P1). Keep the inherited value across the source and drop the config's.
+_atst_spool_env=${ATST_NOTIFY_SPOOL-}
 # shellcheck source=/dev/null  # ~/.atst/config lives outside the repository
 if ! . "$ATST_CONFIG_FILE"; then
   # A syntax error (an unclosed quote or parenthesis) stops reading the config at that line, so the
   # settings after it are missing. Say so; the caller goes on as before.
   echo "[warn] ~/.atst/config may not have been read completely (syntax error or a failing line)" 1>&2
 fi
+if [ -n "$_atst_spool_env" ]; then
+  export ATST_NOTIFY_SPOOL="$_atst_spool_env" 2>/dev/null
+else
+  unset ATST_NOTIFY_SPOOL 2>/dev/null
+fi
+unset _atst_spool_env
 
 # MT4/5 need neither Wine-Mono (.NET) nor Wine-Gecko (embedded IE). Keep both disabled for every
 # wine call made from cron (mtctl start, ...) so Wine never opens a download dialog unattended
@@ -112,9 +122,7 @@ function atst_send_to_line() {
   # (無料プランは月 200 通まで) ので、まとめて送れるものはまとめる。1 回の push は最大 5 メッセージ。
   local image_files=("${@:1:4}")
 
-  local channel_access_token="$ATST_LINE_TOKEN"
   local user_id="$ATST_LINE_ID"
-  local api_endpoint="https://api.line.me/v2/bot/message/push"
 
   # 通知本文。MT 由来の値などが含まれるため JSON へはエスケープして埋め込む (P6)。
   local text
@@ -159,11 +167,23 @@ function atst_send_to_line() {
     payload='{"to":"'"$u_e"'","messages":['"$messages"']}'
   fi
 
+  atst_line_post "$payload" "$text"
+}
+
+# atst_line_post <payload> <log_text>
+# Sends one push with the finished JSON <payload>. On anything but 200 writes <log_text> (what was
+# meant to be sent) to line_error.log. Returns 0 on 200, 2 when LINE rejected this message itself
+# (4xx except 401/403/429; sending it again will fail again), 1 otherwise (network, timeout=000, 429,
+# 5xx, and 401/403 until the token is fixed).
+function atst_line_post() {
+  local payload="$1" log_text="$2"
+  local api_endpoint="https://api.line.me/v2/bot/message/push"
+
   # メッセージ送信。トークンはコマンドライン引数に載せない (ps で見えるため)。ヘッダはファイル記述子から渡す。
   local response result
   response=$(curl --max-time 30 --connect-timeout 10 -X POST "$api_endpoint" \
     -s -w "\n%{http_code}" \
-    -H @<(printf 'Authorization: Bearer %s\n' "$channel_access_token") \
+    -H @<(printf 'Authorization: Bearer %s\n' "$ATST_LINE_TOKEN") \
     -H "Content-Type: application/json" \
     -d "$payload")
   result=${response##*$'\n'}
@@ -174,14 +194,43 @@ function atst_send_to_line() {
 
   # 失敗の痕跡を残す (cron は MAILTO="" で出力も捨てるため、ここに書かないと何も残らない)。
   # curl 自体の失敗 (タイムアウト等) は HTTP コード 000 になる。
-  atst_log_line_error "$result" "${response%$'\n'*}" "$text"
+  atst_log_line_error "$result" "${response%$'\n'*}" "$log_text"
 
-  # 2: LINE rejected this message itself (400 etc.); sending it again will fail again.
-  # 1: may succeed later (network, timeout=000, 429, 5xx, and 401/403 until the token is fixed).
   case "$result" in
     4??) [ "$result" != 401 ] && [ "$result" != 403 ] && [ "$result" != 429 ] && return 2 ;;
   esac
   return 1
+}
+
+# atst_line_texts_payload <to> <text1> [<text2> .. <text5>]
+# Prints the push JSON with one text message per argument, in order (LINE takes up to 5 messages per
+# push and counts the push as one, however many it holds). Returns 2 (printing nothing) unless there
+# are 1 to 5 texts. The texts are passed to jq as --arg data, never as part of the filter (P6).
+function atst_line_texts_payload() {
+  if [ "$#" -lt 2 ] || [ "$#" -gt 6 ]; then
+    echo "atst_line_texts_payload: 1 to 5 texts are needed ($(( $# > 0 ? $# - 1 : 0 )) given)" 1>&2
+    return 2
+  fi
+  local to="$1" t i=1
+  shift
+
+  if command -v jq >/dev/null 2>&1; then
+    local args=() list=""
+    for t in "$@"; do
+      args+=(--arg "t$i" "$t")
+      list+="${list:+,}\$t$i"
+      i=$((i + 1))
+    done
+    jq -cn --arg to "$to" "${args[@]}" "{to:\$to, messages:([$list] | map({type:\"text\",text:.}))}"
+  else
+    local to_e t_e messages=""
+    to_e=$(printf '%s' "$to" | atst_escape_text)
+    for t in "$@"; do
+      t_e=$(printf '%s' "$t" | atst_escape_text)
+      messages+="${messages:+,}"'{"type":"text","text":"'"$t_e"'"}'
+    done
+    printf '%s\n' '{"to":"'"$to_e"'","messages":['"$messages"']}'
+  fi
 }
 
 # 当月の LINE 送信数と上限を "<送信数> <上限>" で出力する (上限なしのプランは上限を "-")。
@@ -606,9 +655,19 @@ function atst_alert_transition() {
   return 0
 }
 
+# atst_alert_lock_file <key>
+# Prints the per-key lock file shared by atst_update_alert and atst_spool_flush. Creates nothing.
+function atst_alert_lock_file() {
+  local lock_key="${1//[^A-Za-z0-9_]/_}"
+  printf '%s\n' "$ATST_CONFIG_DIR/alert_update.${lock_key:0:200}.lock"
+}
+
 # atst_update_alert <key> <verdict> <fire_msg> <recover_msg>
 # Sends fire_msg or recover_msg (one push) when atst_alert_transition says so, and records the new
 # state only when the send succeeded, so a failed send is tried again on the next run.
+# Inside a check_all.sh run (a valid ATST_NOTIFY_SPOOL, see atst_spool_dir) a due notice is added to
+# the run's spool instead (no lock, no send, no record; returns 0) and atst_spool_flush decides again,
+# sends it with the other notices of the run in one push and records it when that push succeeded.
 # Returns 0 when nothing was due or both the send and the record succeeded, 1 when the send or the
 # record failed or the per-key lock was not free within 35 seconds, 2 on invalid arguments (nothing
 # sent, nothing recorded).
@@ -626,12 +685,23 @@ function atst_update_alert() {
     return 0
   fi
 
+  # Inside a check_all.sh run (#96) the notice goes to the run's spool and atst_spool_flush decides
+  # again, sends and records it. When it cannot be spooled, go on and send it now (P1).
+  if [ "$transition" == "1" ]; then
+    msg="$fire_msg"
+  else
+    msg="$recover_msg"
+  fi
+  if atst_spool_add "$key" "$verdict" "$msg"; then
+    return 0
+  fi
+
   # An old-style crontab line and check_all.sh (#95) can see the same transition at the same time and
   # would both send it. Serialise decide-send-record per key and decide again inside the lock, so the
   # later run reads the state the first one recorded. Only a due transition takes the lock: the usual
   # "nothing to send" path stays as cheap as before, and other keys are never held up.
-  local lock_key="${key//[^A-Za-z0-9_]/_}"
-  local lock="$ATST_CONFIG_DIR/alert_update.${lock_key:0:200}.lock"
+  local lock
+  lock=$(atst_alert_lock_file "$key")
 
   (
     if { exec 8>> "$lock"; } 2>/dev/null; then
@@ -660,6 +730,314 @@ function atst_update_alert() {
     fi
     atst_set_alert_status "$key" "$transition" || exit 1
     exit 0
+  )
+}
+
+# Notices of one check_all.sh run (#96)
+# LINE counts one push as one message however many texts it holds (the free plan has 200 a month), so
+# check_all.sh collects the notices of a run in a spool and sends them together:
+#   atst_spool_begin -> the checks (atst_update_alert / atst_notify_text add items) -> atst_spool_flush
+#   -> atst_spool_end.
+# The spool is $ATST_CONFIG_DIR/check_all.spool/run.<epoch>.<runner pid>/, one file per notice named
+# <6-digit sequence>.<random>: line 1 = key (empty for a text-only notice), line 2 = verdict (1/0,
+# empty for a text-only notice), the rest = the text. Only check_all.sh sets ATST_NOTIFY_SPOOL; any
+# other run (a check started directly or by wrapper.sh, send_to_line.sh) sends at once as before.
+# atst_send_to_line always sends at once (check_order.sh needs its result to clear .pending).
+
+# atst_spool_dir
+# Prints ATST_NOTIFY_SPOOL and returns 0 when it is the spool of a running check_all.sh: exactly
+# "$ATST_CONFIG_DIR/check_all.spool/run.<digits>.<digits>", an existing directory owned by us, neither
+# it nor check_all.spool a symlink. Otherwise prints nothing and returns 1 (the caller sends at once).
+function atst_spool_dir() {
+  local dir="${ATST_NOTIFY_SPOOL-}" root="$ATST_CONFIG_DIR/check_all.spool"
+
+  [ -n "$dir" ] && [ -n "$ATST_CONFIG_DIR" ] || return 1
+  case "$dir" in
+    "$root"/*) ;;
+    *) return 1 ;;
+  esac
+  [[ "${dir#"$root"/}" =~ ^run\.[0-9]+\.[0-9]+$ ]] || return 1
+  [ -d "$root" ] && [ ! -L "$root" ] || return 1
+  [ -d "$dir" ] && [ ! -L "$dir" ] && [ -O "$dir" ] || return 1
+  printf '%s\n' "$dir"
+}
+
+# atst_spool_add <key> <verdict> <text>
+# Adds one notice to the spool (key and verdict both empty for a text-only notice). Written to a
+# temporary ".tmp.*" file and renamed, so a check killed half way leaves no broken item.
+# Returns 0 when added, 1 when not (no valid spool: silently; a bad key or verdict or a failed write:
+# with one line on stderr). On 1 the caller sends the notice at once.
+function atst_spool_add() {
+  local key="$1" verdict="$2" text="$3"
+  local dir tmp f n last=0
+
+  dir=$(atst_spool_dir) || return 1
+  if [ "$#" -ne 3 ]; then
+    echo "Usage: atst_spool_add <key> <verdict> <text>" 1>&2
+    return 1
+  fi
+  case "$key" in
+    *$'\n'*|*$'\r'*)
+      echo "atst_spool_add: the key has a line break; not spooled" 1>&2
+      return 1
+      ;;
+  esac
+  case "$verdict" in
+    1|0|'') ;;
+    *)
+      echo "atst_spool_add: invalid verdict: $verdict; not spooled" 1>&2
+      return 1
+      ;;
+  esac
+  if [ -z "$key" ] && [ -n "$verdict" ]; then
+    echo "atst_spool_add: a verdict without a key; not spooled" 1>&2
+    return 1
+  fi
+
+  if ! tmp=$(mktemp "$dir/.tmp.XXXXXX" 2>/dev/null); then
+    echo "atst_spool_add: cannot write to $dir; not spooled" 1>&2
+    return 1
+  fi
+  if ! printf '%s\n%s\n%s' "$key" "$verdict" "$text" > "$tmp"; then
+    rm -f -- "$tmp"
+    echo "atst_spool_add: cannot write $tmp; not spooled" 1>&2
+    return 1
+  fi
+
+  # The next number after the largest one. 10#: "000008" is not octal.
+  for f in "$dir"/[0-9]*; do
+    n=${f##*/}
+    n=${n%%.*}
+    [[ "$n" =~ ^[0-9]{1,9}$ ]] || continue
+    if [ "$(( 10#$n ))" -gt "$last" ]; then
+      last=$(( 10#$n ))
+    fi
+  done
+  if ! mv -- "$tmp" "$dir/$(printf '%06d' $(( last + 1 ))).${tmp##*/.tmp.}" 2>/dev/null; then
+    rm -f -- "$tmp"
+    echo "atst_spool_add: cannot rename $tmp; not spooled" 1>&2
+    return 1
+  fi
+  return 0
+}
+
+# atst_notify_text
+# Sends the text read from stdin like atst_send_to_line (without images), or adds it to the spool of the
+# running check_all.sh run. Returns 0 when spooled, otherwise atst_send_to_line's return value.
+function atst_notify_text() {
+  local msg
+  msg=$(cat -)
+  if atst_spool_add '' '' "$msg"; then
+    return 0
+  fi
+  printf '%s\n' "$msg" | atst_send_to_line
+}
+
+# atst_spool_begin
+# For check_all.sh, holding its lock: removes what an earlier run left (it never sends that), creates
+# this run's spool (mode 700) and exports ATST_NOTIFY_SPOOL for the checks. Returns 1 with one line on
+# stderr and ATST_NOTIFY_SPOOL unset when the spool cannot be made (every notice is then sent at once).
+function atst_spool_begin() {
+  local root="${ATST_CONFIG_DIR:?}/check_all.spool" run
+
+  run="$root/run.$(date +%s).$$"
+  rm -rf -- "${root:?}" 2>/dev/null
+  if ! ( umask 077; mkdir -p -- "$root" && mkdir -- "$run" ) 2>/dev/null; then
+    echo "atst_spool_begin: cannot create $run; notices of this run are sent one by one" 1>&2
+    unset ATST_NOTIFY_SPOOL
+    return 1
+  fi
+  export ATST_NOTIFY_SPOOL="$run"
+  if ! atst_spool_dir >/dev/null; then
+    echo "atst_spool_begin: $run is not usable; notices of this run are sent one by one" 1>&2
+    unset ATST_NOTIFY_SPOOL
+    return 1
+  fi
+  return 0
+}
+
+# atst_spool_end
+# For check_all.sh at the end of a run: removes the spool and unsets ATST_NOTIFY_SPOOL. Returns 0 (a
+# spool left behind is removed by the next run's atst_spool_begin).
+function atst_spool_end() {
+  local root="${ATST_CONFIG_DIR:?}/check_all.spool"
+
+  if ! rm -rf -- "${root:?}"; then
+    echo "atst_spool_end: cannot remove $root; the next run removes it" 1>&2
+  fi
+  unset ATST_NOTIFY_SPOOL
+  return 0
+}
+
+# atst_spool_flush <max_pushes>
+# For check_all.sh: sends the notices in the spool, in the order they were added, in as few pushes as
+# LINE allows, and records the keyed ones of each push that succeeded. In order:
+# - The last notice of a key wins; earlier ones of the same key are dropped.
+# - Takes the per-key locks of atst_update_alert (in spool order, each lock file once), waiting 10
+#   seconds in all for every lock of this flush. A key whose lock is not free is left for the next run
+#   (not sent, not recorded). Decides again inside the lock: a transition another run (an old-style
+#   crontab line) has sent and recorded meanwhile is not sent again.
+# - Joins the texts with an empty line under one "【host】" heading, up to 4900 characters per message
+#   and never splitting a notice (a notice longer than that alone is cut like atst_send_to_line), and
+#   up to 5 messages per push. At most <max_pushes> pushes; the rest is not sent nor recorded.
+# - Records the keys of a push only when it returned 200; stops at the first failed push.
+# - Removes every item it read, sent or not (a keyed notice still due is spooled again next run).
+# Holds the locks until the records are written. Returns 0 when everything due was sent and recorded
+# (or nothing was due, or there is no valid spool), 1 when something was left out or failed (one line
+# on stderr each), 2 on an invalid <max_pushes> (does nothing).
+function atst_spool_flush() {
+  local max_pushes="$1" dir
+
+  if ! [[ "$max_pushes" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Usage: atst_spool_flush <max_pushes: 1 or more>" 1>&2
+    return 2
+  fi
+  dir=$(atst_spool_dir) || return 0
+
+  (
+    local rc=0 f name i n key verdict text transition lockf fd deadline remain
+    local -a files=() keys=() verdicts=() texts=() send=() trans=()
+    local -A last_of=() lock_state=()
+
+    # Items in spool order. "[0-9]*" only: a ".tmp.*" file is a write that never finished.
+    for f in "$dir"/[0-9]*; do
+      [ -e "$f" ] || [ -L "$f" ] || continue
+      files+=("$f")
+    done
+    [ "${#files[@]}" -gt 0 ] || exit 0
+    mapfile -t files < <(printf '%s\n' "${files[@]}" | LC_ALL=C sort)
+
+    for f in "${files[@]}"; do
+      name=${f##*/}
+      key="" verdict="" text=""
+      if ! [[ "$name" =~ ^[0-9]+\.[A-Za-z0-9]+$ ]] || [ ! -f "$f" ] || [ -L "$f" ] \
+        || ! { IFS= read -r key && IFS= read -r verdict && text=$(cat); } < "$f" \
+        || { [ -n "$key" ] && [ "$verdict" != 1 ] && [ "$verdict" != 0 ]; } \
+        || { [ -z "$key" ] && [ -n "$verdict" ]; }; then
+        echo "atst_spool_flush: skipping a broken item: $name" 1>&2
+        rc=1
+        continue
+      fi
+      i=${#keys[@]}
+      keys+=("$key")
+      verdicts+=("$verdict")
+      texts+=("$text")
+      send+=(1)
+      trans+=("")
+      [ -z "$key" ] || last_of["$key"]=$i
+    done
+
+    # Locks and the decision again, in spool order.
+    deadline=$(( $(date +%s%3N) + 10000 ))
+    for i in "${!keys[@]}"; do
+      key=${keys[$i]}
+      [ -n "$key" ] || continue
+      if [ "${last_of[$key]}" != "$i" ]; then
+        send[$i]=0
+        continue
+      fi
+      lockf=$(atst_alert_lock_file "$key")
+      if [ -z "${lock_state[$lockf]+x}" ]; then
+        if { exec {fd}>> "$lockf"; } 2>/dev/null; then
+          remain=$(( deadline - $(date +%s%3N) ))
+          if [ "$remain" -gt 0 ]; then
+            flock -w "$(( remain / 1000 )).$(printf '%03d' $(( remain % 1000 )))" "$fd"
+          else
+            flock -n "$fd"
+          fi
+          if [ $? -eq 0 ]; then
+            lock_state["$lockf"]=held
+          else
+            lock_state["$lockf"]=busy
+          fi
+        else
+          # A duplicate notice is better than none (P1).
+          echo "atst_spool_flush: cannot open $lockf; sending $key without the lock" 1>&2
+          lock_state["$lockf"]=none
+        fi
+      fi
+      if [ "${lock_state[$lockf]}" == busy ]; then
+        echo "atst_spool_flush: cannot lock $lockf; $key is left for the next run" 1>&2
+        send[$i]=0
+        rc=1
+        continue
+      fi
+      if ! transition=$(atst_alert_transition "$key" "${verdicts[$i]}"); then
+        send[$i]=0
+        rc=1
+        continue
+      fi
+      if [ -z "$transition" ]; then
+        send[$i]=0
+        continue
+      fi
+      trans[$i]=$transition
+    done
+
+    # Messages: the texts joined with an empty line, a notice never split.
+    local head max_len=4900 omitted="…(以下省略)" cur="" cur_items="" one
+    local -a msgs=() msg_items=()
+    head="【$(hostname -s)】"
+    for i in "${!keys[@]}"; do
+      [ "${send[$i]}" == 1 ] || continue
+      one="$head${texts[$i]}"
+      if [ "$(atst_char_count "$one")" -gt "$max_len" ]; then
+        if [ -n "$cur_items" ]; then
+          msgs+=("$cur")
+          msg_items+=("$cur_items")
+        fi
+        msgs+=("$(atst_head_chars "$one" "$((max_len - 10))")$omitted")
+        msg_items+=("$i")
+        cur="" cur_items=""
+      elif [ -z "$cur_items" ]; then
+        cur=$one
+        cur_items=$i
+      elif [ "$(atst_char_count "$cur"$'\n\n'"${texts[$i]}")" -le "$max_len" ]; then
+        cur+=$'\n\n'"${texts[$i]}"
+        cur_items+=" $i"
+      else
+        msgs+=("$cur")
+        msg_items+=("$cur_items")
+        cur=$one
+        cur_items=$i
+      fi
+    done
+    if [ -n "$cur_items" ]; then
+      msgs+=("$cur")
+      msg_items+=("$cur_items")
+    fi
+
+    # Pushes of up to 5 messages each.
+    local p=0 first payload log_text item
+    local -a group=()
+    for (( first = 0; first < ${#msgs[@]}; first += 5 )); do
+      if [ "$p" -ge "$max_pushes" ]; then
+        echo "atst_spool_flush: more than $max_pushes push(es) of notices; the rest is left for the next run" 1>&2
+        rc=1
+        break
+      fi
+      p=$(( p + 1 ))
+      group=("${msgs[@]:first:5}")
+      log_text=$(printf '%s\n\n' "${group[@]}")
+      if ! payload=$(atst_line_texts_payload "$ATST_LINE_ID" "${group[@]}"); then
+        rc=1
+        break
+      fi
+      if ! atst_line_post "$payload" "$log_text"; then
+        echo "atst_spool_flush: sending the notices failed; they are left for the next run" 1>&2
+        rc=1
+        break
+      fi
+      for (( n = first; n < first + ${#group[@]}; n++ )); do
+        for item in ${msg_items[$n]}; do
+          [ -n "${keys[$item]}" ] || continue
+          atst_set_alert_status "${keys[$item]}" "${trans[$item]}" || rc=1
+        done
+      done
+    done
+
+    rm -f -- "${files[@]}"
+    exit "$rc"
   )
 }
 

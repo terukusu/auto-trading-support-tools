@@ -28,7 +28,7 @@ if [ -f "$uptime_file" ]; then
 fi
 
 if [ -n "$uptime_sec_prev" ] && [ "$uptime_sec" -lt "$uptime_sec_prev" ]; then
-  echo "サーバーの再起動を検出しました。再起動日時: `uptime -s`" | atst_send_to_line
+  echo "サーバーの再起動を検出しました。再起動日時: `uptime -s`" | atst_notify_text
 fi
 
 cat /proc/uptime > "$uptime_file"

@@ -4,6 +4,8 @@
 # - Appends its arguments as one line to $ATST_TEST_CURL_LOG. Files given as "-H @<path>"
 #   (the Authorization header) are neither opened nor recorded.
 # - Prints $ATST_TEST_CURL_BODY, then "\n$ATST_TEST_CURL_HTTP_CODE" (default 200) when -w is given.
+# - With $ATST_TEST_CURL_HTTP_CODE_SEQ (space-separated HTTP codes), the n-th call (n = the number of
+#   lines in $ATST_TEST_CURL_LOG after appending) prints the n-th code instead; past its end, as above.
 # - Exits with $ATST_TEST_CURL_EXIT (default 0).
 
 # Outside a sandbox: do nothing (and send nothing).
@@ -11,10 +13,19 @@
 
 printf '%s\n' "$*" >> "$ATST_TEST_CURL_LOG"
 
+code="${ATST_TEST_CURL_HTTP_CODE:-200}"
+if [ -n "${ATST_TEST_CURL_HTTP_CODE_SEQ:-}" ]; then
+  read -r -a seq <<< "$ATST_TEST_CURL_HTTP_CODE_SEQ"
+  n=$(wc -l < "$ATST_TEST_CURL_LOG")
+  if [ "$n" -ge 1 ] && [ "$n" -le "${#seq[@]}" ]; then
+    code=${seq[$(( n - 1 ))]}
+  fi
+fi
+
 printf '%s' "${ATST_TEST_CURL_BODY-}"
 for a in "$@"; do
   if [ "$a" = "-w" ]; then
-    printf '\n%s' "${ATST_TEST_CURL_HTTP_CODE:-200}"
+    printf '\n%s' "$code"
     break
   fi
 done

@@ -8,6 +8,8 @@
 # - 各チェックは ATST_CHECK_TIMEOUT 秒 (ハートビートは 60 秒) で打ち切り、打ち切ったことを LINE に通知します。
 # - 前の回が終わっていなければ何もせずに終わります (積み重ならない)。止まったままなら LINE に通知します。
 # - 約定のチェックは 1 回目の開始から ATST_ORDER_CHECK_INTERVAL 秒後にもう一度実行します (毎分 2 回)。
+# - その回の通知 (発生・復帰・再起動の検出・打ち切り) は 1 通にまとめて LINE に送ります
+#   (1 回目のチェック群の後に 1 回、後から出た打ち切りの通知は回の最後にもう 1 回)。約定通知は従来どおり即時です。
 #
 
 if [ "$#" -ne 0 ]; then
@@ -16,6 +18,10 @@ if [ "$#" -ne 0 ]; then
 fi
 
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+# Only atst_spool_begin below sets the spool of this run. A value inherited from the calling shell must
+# not put our notices (RUNNER_STUCK when the lock is busy) into another run's spool.
+unset ATST_NOTIFY_SPOOL
 
 # Only plain decimal numbers in range are used ("040" would be octal in bash arithmetic, "08" an error).
 cap=40
@@ -36,12 +42,21 @@ if [ -n "${ATST_ORDER_CHECK_INTERVAL+x}" ]; then
 fi
 heartbeat_cap=60
 
-# The longest one run can take while the timeouts work: 8 check runs x (cap + 5 s to KILL), the
-# heartbeat (65 s), the wait for the second check_order (50 s) and up to 10 notices of our own
-# (35 s lock wait + 30 s send each), plus 60 s. A run still holding the lock after this is stuck
-# outside the timeouts. A shorter threshold would fire and recover every few runs while every check
-# hangs (the timeouts are reported separately), using up the monthly LINE quota.
-stuck_after=$(( 8 * cap + 865 ))
+# The longest one run can take while the timeouts work:
+# - 8 check runs x (cap + 5 s to KILL): 8 * cap + 40
+# - the heartbeat (60 + 5 s): 65
+# - the wait for the second check_order (ATST_ORDER_CHECK_INTERVAL, at most 50 s): 50
+# - up to 10 notices of our own sent at once when they cannot be spooled (35 s lock wait + 30 s send
+#   each): 650
+# - the two flushes of the spool: the first (10 s for all its key locks + 2 pushes x 30 s) and the
+#   last (10 s + 1 push x 30 s): 110
+# - a margin: 60
+# 40 + 65 + 50 + 650 + 110 + 60 = 975. The alert_status lock (flock -w 10 in atst_set_alert_status)
+# is held for one awk only and is not counted (as before).
+# A run still holding the lock after this is stuck outside the timeouts. A shorter threshold would
+# fire and recover every few runs while every check hangs (the timeouts are reported separately),
+# using up the monthly LINE quota.
+stuck_after=$(( 8 * cap + 975 ))
 
 lock_file="$ATST_CONFIG_DIR/check_all.lock"
 started_file="$ATST_CONFIG_DIR/check_all.started"
@@ -72,6 +87,9 @@ fi
 if ! { date +%s > "$started_file"; } 2>/dev/null; then
   echo "cannot write $started_file" 1>&2
 fi
+# The notices of this run go to the spool and are sent together (atst_spool_flush below). When the
+# spool cannot be made, they are sent one by one as before.
+atst_spool_begin
 atst_update_alert RUNNER_STUCK 0 "" "$stuck_recover"
 
 # run_check <cap> <name> [args...]
@@ -132,20 +150,12 @@ if [ "$has_targets" -eq 1 ]; then
   run_check "$cap" check_ping "${ATST_TARGETS[@]}" || cut_ping=1
   run_check "$cap" check_price "${ATST_TARGETS[@]}" || cut_price=1
   run_check "$cap" check_spread "${ATST_TARGETS[@]}" || cut_spread=1
-
-  # check_order runs twice a minute about 30 seconds apart, as the old crontab did (:10 and :40),
-  # so a new order is never noticed later than before. When the checks above were slow, go now.
-  remain=$(( interval * 1000 - ($(now_ms) - order_start) ))
-  if [ "$remain" -gt 0 ]; then
-    sleep "$(( remain / 1000 )).$(printf '%03d' $(( remain % 1000 )))"
-  fi
-  run_check "$cap" check_order "${ATST_TARGETS[@]}" || cut_order=1
 fi
 
-# Reported after the checks, so a slow send never delays the second check_order.
+# Added to the spool (no send here), so reporting them before the second check_order delays nothing.
+# CHECK_ORDER is reported after its second run, which its cut-off flag also covers.
 notify_timeout CHECK_REBOOT check_reboot "$cut_reboot" "$cap"
 if [ "$has_targets" -eq 1 ]; then
-  notify_timeout CHECK_ORDER check_order "$cut_order" "$cap"
   notify_timeout CHECK_PROCESS check_process "$cut_process" "$cap"
   notify_timeout CHECK_MONITORING check_monitoring "$cut_monitoring" "$cap"
   notify_timeout CHECK_PING check_ping "$cut_ping" "$cap"
@@ -153,8 +163,27 @@ if [ "$has_targets" -eq 1 ]; then
   notify_timeout CHECK_SPREAD check_spread "$cut_spread" "$cap"
 fi
 
+# Every notice so far in one push, before the wait for the second check_order, so a usual run's
+# notices are not delayed by that wait (and the time this send takes comes out of the wait).
+atst_spool_flush 2
+
+if [ "$has_targets" -eq 1 ]; then
+  # check_order runs twice a minute about 30 seconds apart, as the old crontab did (:10 and :40),
+  # so a new order is never noticed later than before. When the checks above were slow, go now.
+  remain=$(( interval * 1000 - ($(now_ms) - order_start) ))
+  if [ "$remain" -gt 0 ]; then
+    sleep "$(( remain / 1000 )).$(printf '%03d' $(( remain % 1000 )))"
+  fi
+  run_check "$cap" check_order "${ATST_TARGETS[@]}" || cut_order=1
+  notify_timeout CHECK_ORDER check_order "$cut_order" "$cap"
+fi
+
 # Last, so the outside monitoring also notices a runner that stops before getting here.
 run_check "$heartbeat_cap" heartbeat || cut_heartbeat=1
 notify_timeout HEARTBEAT heartbeat "$cut_heartbeat" "$heartbeat_cap"
+
+# What came after the first flush (a cut-off second check_order or heartbeat); empty in a usual run.
+atst_spool_flush 1
+atst_spool_end
 
 exit 0
