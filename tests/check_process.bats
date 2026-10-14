@@ -51,6 +51,7 @@ no_line() {
 @test "P2: a running (fake) process with PROCESS_<NAME>,1 sends one 【復帰】 and records 0" {
   atst_test_make_mt ATSTTEST_MT4 MT4
   set_status 'PROCESS_ATSTTEST_MT4,1,0'
+  export ATST_PROC_ROOT=/proc
   ATST_TEST_FAKE_PID=$(atst_test_fake_mt_process ATSTTEST_MT4)
   run bash "$BATS_TEST_DIRNAME/../check_process.sh" ATSTTEST_MT4
   [ "$status" -eq 0 ]
@@ -77,6 +78,7 @@ no_line() {
 @test "T2: a TARGET found again with TARGET_<NAME>,1 sends one 【復帰】 and no PROCESS push" {
   atst_test_make_mt ATSTTEST_MT4 MT4
   set_status 'TARGET_ATSTTEST_MT4,1,0'
+  export ATST_PROC_ROOT=/proc
   ATST_TEST_FAKE_PID=$(atst_test_fake_mt_process ATSTTEST_MT4)
   run bash "$BATS_TEST_DIRNAME/../check_process.sh" ATSTTEST_MT4
   [ "$status" -eq 0 ]

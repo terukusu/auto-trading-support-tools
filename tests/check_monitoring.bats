@@ -51,6 +51,7 @@ make_csv_with_half_line() {
 @test "M2: no csv while MetaTrader runs sends one 【発生】 and only once" {
   atst_test_make_mt ATSTTEST_MT4 MT4
   atst_test_set_config ATST_MONITORING_THRESHOLD 1
+  export ATST_PROC_ROOT=/proc
   ATST_TEST_FAKE_PID=$(atst_test_fake_mt_process ATSTTEST_MT4)
   # ps reports the elapsed time in whole seconds; let it reach the threshold (1).
   sleep 2
