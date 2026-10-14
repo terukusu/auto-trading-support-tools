@@ -188,3 +188,79 @@ atst_test_set_config() {
   fi
   printf '%s=%q\n' "$key" "$value" >> "$conf"
 }
+
+# atst_test_set_targets [<name>...]
+# Appends ATST_TARGETS=(<names quoted with %q>) to the sandbox ~/.atst/config (copied from
+# templates/config first), so it wins over the template value. No name gives ATST_TARGETS=(). To test
+# an unset ATST_TARGETS, delete the ^ATST_TARGETS= lines from the config in the test itself.
+atst_test_set_targets() {
+  local conf name list=""
+
+  [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
+
+  conf="$HOME/.atst/config"
+  mkdir -p "$HOME/.atst" || return 1
+  if [ ! -e "$conf" ]; then
+    cp "${BATS_TEST_DIRNAME:?}/../templates/config" "$conf" || return 1
+  fi
+  for name in "$@"; do
+    list+="$(printf '%q' "$name") "
+  done
+  printf 'ATST_TARGETS=(%s)\n' "${list% }" >> "$conf"
+}
+
+# atst_test_make_runner_home
+# Copies the repository's *.sh and templates/ (keeping the exec bits) to $ATST_TEST_SANDBOX/atst and
+# prints that path. check_all.sh / run_with_targets.sh run the scripts next to themselves, so a test
+# replaces some of them in the copy (atst_test_stub_script) without touching the repository.
+atst_test_make_runner_home() {
+  local repo dir
+
+  [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
+
+  repo="${BATS_TEST_DIRNAME:?}/.."
+  dir="$ATST_TEST_SANDBOX/atst"
+  mkdir -p "$dir" || return 1
+  cp -p "$repo"/*.sh "$dir/" || return 1
+  cp -Rp "$repo/templates" "$dir/" || return 1
+  echo "$dir"
+}
+
+# atst_test_stub_script <dir> <name> <mode>
+# Writes <dir>/<name> (mode 755): a bash script that appends "<name> <epoch> [arg1] [arg2] ..." to
+# $ATST_TEST_SANDBOX/calls.log, then by <mode>: record = exit 0, fail = exit 3, exit1 = exit 1,
+# hang = exec sleep 300, hang_ignore_term = ignore TERM and sleep 300 (only KILL ends it),
+# slow = sleep 3 and exit 0. <dir> must be an existing directory in the sandbox and <name> a plain file
+# name; otherwise nothing is written and it returns 1. The stub does not read common.sh.
+atst_test_stub_script() {
+  local dir="$1" name="$2" mode="$3"
+  local sandbox real action
+
+  [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
+  [ "$#" -eq 3 ] || return 1
+  [[ "$name" =~ ^[A-Za-z0-9_.-]+$ ]] && [ "$name" != . ] && [ "$name" != .. ] || return 1
+  case "$mode" in
+    record) action='exit 0' ;;
+    fail) action='exit 3' ;;
+    exit1) action='exit 1' ;;
+    hang) action='exec sleep 300' ;;
+    hang_ignore_term) action=$'trap \'\' TERM\nsleep 300' ;;
+    slow) action=$'sleep 3\nexit 0' ;;
+    *) return 1 ;;
+  esac
+  [ -d "$dir" ] || return 1
+  sandbox=$(cd "$ATST_TEST_SANDBOX" && pwd -P) || return 1
+  real=$(cd "$dir" && pwd -P) || return 1
+  case "$real" in
+    "$sandbox"|"$sandbox"/*) ;;
+    *) return 1 ;;
+  esac
+
+  {
+    printf '#!/bin/bash\n'
+    printf '{ printf %%s %q; printf " %%s" "$(date +%%s)"; for a in "$@"; do printf " [%%s]" "$a"; done; echo; } >> %q\n' \
+      "$name" "$ATST_TEST_SANDBOX/calls.log"
+    printf '%s\n' "$action"
+  } > "$real/$name" || return 1
+  chmod 755 "$real/$name"
+}

@@ -13,8 +13,15 @@ if [ ! -e "$ATST_CONFIG_DIR/config" ]; then
 fi
 
 ATST_CONFIG_FILE="$ATST_CONFIG_DIR/config"
+# These settings come from ~/.atst/config only. A value left in the environment (a manual run, a test)
+# would hide that an existing user's config lacks them (check_all.sh reports unset ATST_TARGETS).
+unset ATST_TARGETS ATST_CHECK_TIMEOUT ATST_ORDER_CHECK_INTERVAL
 # shellcheck source=/dev/null  # ~/.atst/config lives outside the repository
-. "$ATST_CONFIG_FILE"
+if ! . "$ATST_CONFIG_FILE"; then
+  # A syntax error (an unclosed quote or parenthesis) stops reading the config at that line, so the
+  # settings after it are missing. Say so; the caller goes on as before.
+  echo "[warn] ~/.atst/config may not have been read completely (syntax error or a failing line)" 1>&2
+fi
 
 # MT4/5 need neither Wine-Mono (.NET) nor Wine-Gecko (embedded IE). Keep both disabled for every
 # wine call made from cron (mtctl start, ...) so Wine never opens a download dialog unattended
@@ -603,7 +610,8 @@ function atst_alert_transition() {
 # Sends fire_msg or recover_msg (one push) when atst_alert_transition says so, and records the new
 # state only when the send succeeded, so a failed send is tried again on the next run.
 # Returns 0 when nothing was due or both the send and the record succeeded, 1 when the send or the
-# record failed, 2 on invalid arguments (nothing sent, nothing recorded).
+# record failed or the per-key lock was not free within 35 seconds, 2 on invalid arguments (nothing
+# sent, nothing recorded).
 function atst_update_alert() {
   if [ "$#" -ne 4 ]; then
     echo "Usage: atst_update_alert <key> <verdict> <fire_msg> <recover_msg>" 1>&2
@@ -618,16 +626,53 @@ function atst_update_alert() {
     return 0
   fi
 
-  if [ "$transition" == "1" ]; then
-    msg="$fire_msg"
-  else
-    msg="$recover_msg"
-  fi
+  # An old-style crontab line and check_all.sh (#95) can see the same transition at the same time and
+  # would both send it. Serialise decide-send-record per key and decide again inside the lock, so the
+  # later run reads the state the first one recorded. Only a due transition takes the lock: the usual
+  # "nothing to send" path stays as cheap as before, and other keys are never held up.
+  local lock_key="${key//[^A-Za-z0-9_]/_}"
+  local lock="$ATST_CONFIG_DIR/alert_update.${lock_key:0:200}.lock"
 
-  if ! printf '%s\n' "$msg" | atst_send_to_line; then
-    return 1
-  fi
-  atst_set_alert_status "$key" "$transition" || return 1
+  (
+    if { exec 8>> "$lock"; } 2>/dev/null; then
+      if ! flock -w 35 8; then
+        # The holder is handling this very key; leave it to the next run (nothing sent or recorded).
+        echo "atst_update_alert: cannot lock $lock; $key is left for the next run" 1>&2
+        exit 1
+      fi
+      transition=$(atst_alert_transition "$key" "$verdict") || exit 2
+      if [ -z "$transition" ]; then
+        exit 0
+      fi
+    else
+      # A duplicate notice is better than none (P1).
+      echo "atst_update_alert: cannot open $lock; sending without the lock" 1>&2
+    fi
+
+    if [ "$transition" == "1" ]; then
+      msg="$fire_msg"
+    else
+      msg="$recover_msg"
+    fi
+
+    if ! printf '%s\n' "$msg" | atst_send_to_line; then
+      exit 1
+    fi
+    atst_set_alert_status "$key" "$transition" || exit 1
+    exit 0
+  )
+}
+
+# atst_has_targets
+# Returns 0 when ATST_TARGETS (~/.atst/config) has at least one element and none of them is empty,
+# 1 otherwise (unset, (), ('') or ('a' '')). A scalar counts as one element. Prints nothing.
+function atst_has_targets() {
+  local t
+
+  [ "${#ATST_TARGETS[@]}" -ge 1 ] || return 1
+  for t in "${ATST_TARGETS[@]}"; do
+    [ -n "$t" ] || return 1
+  done
   return 0
 }
 

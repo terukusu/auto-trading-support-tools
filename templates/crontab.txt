@@ -1,22 +1,12 @@
 MAILTO=""
 PATH="%%ATST_HOME%%:/bin:/usr/bin:/usr/local/bin"
 
-# List of MetaTrader which should be Monitored.
-# It consists of space separated, single quoted MetaTrader name.
-# ex. "('Land Prime' 'MetaTrader 5' 'MetaTrader 4')"
-TARGET="('Land Prime')"
+# 監視する MetaTrader の名前は ~/.atst/config の ATST_TARGETS に書きます。
+# 毎分の監視 (再起動・約定・プロセス・監視データ・Ping・値動き・スプレッド・ハートビート) は check_all.sh がまとめて実行します。
 
 0 9 * * * check_daily.sh
-* * * * * check_reboot.sh
-* * * * * heartbeat.sh
+* * * * * check_all.sh
 
-@reboot    wrapper.sh                  "$TARGET" mtctl.sh start
-30 6 * * * wrapper.sh                  "$TARGET" truncate_monitoring.sh
-30 8 * * * wrapper.sh                  "$TARGET" report_image.sh
-*  * * * * sleep 10; wrapper.sh        "$TARGET" check_order.sh
-*  * * * * sleep 40; wrapper.sh        "$TARGET" check_order.sh
-*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_monitoring.sh
-*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_process.sh
-*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_ping.sh
-*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_price.sh
-*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_spread.sh
+@reboot    run_with_targets.sh mtctl.sh start
+30 6 * * * run_with_targets.sh truncate_monitoring.sh
+30 8 * * * run_with_targets.sh report_image.sh

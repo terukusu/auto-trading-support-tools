@@ -1,7 +1,7 @@
 # この日数以上前のモニタリングデータは破棄します
 ATST_MONITORING_TRUNCATE_BEFORE=3
 
-# チェックが動くタイミングを散らすためのスリープの最大値
+# チェックが動くタイミングを散らすためのスリープの最大値 (旧形式の crontab (sleep_random.sh) 用)
 ATST_CHECK_RANDOM_DELAY_MAX=40
 
 # 過去 n 時間の値動きとスプレッド、現在のデスクトップの画像を通知します
@@ -66,3 +66,23 @@ export WINEARCH WINEPREFIX WINEDEBUG DISPLAY
 
 # Wine-Mono/Gecko are disabled by default in common.sh (WINEDLLOVERRIDES="mscoree=;mshtml=").
 # To change it, set it here, e.g. WINEDLLOVERRIDES="" to re-enable them.
+
+# 以下の 3 項目は、毎分の監視 (check_all.sh) と run_with_targets.sh 用です。ファイルの末尾に置いてください。
+# (書き間違えた行より後は読み込まれないため。末尾なら上の LINE の設定などは読み込み済みで、通知が届きます)
+
+# 毎分の監視 (check_all.sh) で、1 つのチェックに許す最長の秒数 (1〜300)。超えたチェックは打ち切り、LINE に通知します。
+ATST_CHECK_TIMEOUT=40
+
+# 毎分の監視 (check_all.sh) で、約定のチェック (check_order.sh) の 1 回目の開始から 2 回目の開始までの秒数 (0〜50)。
+ATST_ORDER_CHECK_INTERVAL=30
+
+# 監視する MetaTrader の名前 (インストール先のフォルダ名) の一覧。bash の配列で、名前ごとに ' か " で囲み、
+# 空白で区切ります。例: ATST_TARGETS=('Land Prime' 'MetaTrader 5')
+# 名前はフォルダ名との前方一致で、大文字小文字は区別しません。
+# 毎分の監視 (check_all.sh) と、起動・監視データの整理・画像通知のジョブ (run_with_targets.sh) が使います。
+# 未設定・空のときは LINE に通知します (MetaTrader ごとの監視と約定通知、再起動時の自動起動は止まります)。
+# 引用符や括弧の閉じ忘れなどで書き間違えると、この行は読み込まれず、LINE に
+# 「監視対象が設定されていません」が届きます。そのときはこの行を見直してください。
+# 旧形式の crontab (TARGET="(...)" と wrapper.sh の行) はこの値を使いません。
+# 旧形式の crontab の TARGET="('Land Prime')" の ('...') の部分は、そのまま ATST_TARGETS=('Land Prime') と書けます。
+ATST_TARGETS=('Land Prime')
