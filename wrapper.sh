@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# For the old-style crontab (TARGET="(...)" and wrapper.sh "$TARGET" <script>), kept so it keeps working.
+# The current crontab uses check_all.sh / run_with_targets.sh, which take the names from ATST_TARGETS in
+# ~/.atst/config as an array, without eval.
+#
 
 function print_usage_exit() {
   echo "Usage $(basename $0) <mt_names in 1 arg> <script_name> [args for script...]"

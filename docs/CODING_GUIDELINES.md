@@ -42,7 +42,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 - MT プロセスの停止 (`mtctl.sh stop`, `kill`)、建玉に影響する操作、`sudo reboot`、cron の無効化/書き換え、`apt` 実行、リポジトリ/鍵の追加、ロケール/TZ 変更を**新規に自動実行**するコードは、承認フロー無しなら **block**。
 - 監視スクリプトが異常時に**通知せず握りつぶす**経路があれば block（例: エラーで `return 0` して無通知）。
 - 「監視が止まったこと自体の検知」(`check_monitoring.sh`, `check_process.sh`) を実質無効化する変更は block。
-- 状態を持つ異常通知（発生/復帰を `~/.atst/alert_status` で重複抑止するもの）は、`check_*.sh` に `atst_set_alert_status` と送信を個別に書かず `atst_update_alert` を使う（送信成功時だけ状態を更新し、失敗した回は次回に再送する）。自前で状態だけ先に更新して通知を取りこぼす実装は block。
+- 状態を持つ異常通知（発生/復帰を `~/.atst/alert_status` で重複抑止するもの）は、`check_*.sh` に `atst_set_alert_status` と送信を個別に書かず `atst_update_alert` を使う（送信成功時だけ状態を更新し、失敗した回は次回に再送する。判定〜送信〜記録はキー単位のロックで直列化され、同じ遷移を複数のプロセスが同時に見ても通知は 1 回になる）。自前で状態だけ先に更新して通知を取りこぼす実装は block。
 - 破壊的コマンド（`rm -rf`, `sed -i`, `>` リダイレクト, `truncate`）の対象が**変数展開**で、その変数が空になりうる経路があれば block（`rm -rf "$DIR/"` で `$DIR` が空だと `/` を掃く）。
 
 ## P2. 冪等性（install/setup 系・block〜warn）
@@ -80,7 +80,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 ## P7. eval の安全性（block〜warn）
 
 - `eval` は入力が**信頼できる文字列**（管理者が書いたもの等）に限る。外部・ネットワーク由来を `eval` するのは block。
-  - 許容例: `wrapper.sh` の `eval "target_mt=$1"`（crontab 管理者が書いた配列リテラル）。入力元が**信頼できる管理者の記述**である前提で、#95 まで残す。
+  - 許容例: `wrapper.sh` の `eval "target_mt=$1"`（crontab 管理者が書いた配列リテラル）。入力元が**信頼できる管理者の記述**である前提で、旧形式の crontab（`wrapper.sh "$TARGET" ...`）を動かし続けるためだけに残している。新しい経路（`check_all.sh` / `run_with_targets.sh`）は `~/.atst/config` の `ATST_TARGETS` 配列をそのまま渡し、eval を使わない。新規コードで `wrapper.sh` を使わない。
   - ファイルシステム由来の値（フォルダ名など）は `eval` しない。`common.sh` の MT 一覧は `atst_load_mt_list` が配列へ直接代入する（#93）。
 
 ## P8. apt / 鍵 / リポジトリ（block）
@@ -108,7 +108,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 ## P11. cron / wrapper の堅牢性（warn）
 
 - cron から動く前提のスクリプトは `PATH`・`cwd`・環境変数に依存しない（`common.sh` を絶対パス解決で source する既存パターン `. "$(cd "$(dirname "$BASH_SOURCE")"; pwd)/common.sh"` を踏襲）。
-- 1 分毎ジョブは `sleep_random.sh` / `atst_random_sleep` で実行タイミングを散らし、同時多発の負荷を避ける既存設計を壊さない。
+- 毎分の監視は `check_all.sh` が固定の順で 1 つずつ実行する（同時多発の負荷を避ける設計。実行タイミングを散らす `sleep_random.sh` / `atst_random_sleep` は旧形式の crontab の行用）。毎分の監視を足すときは crontab に行を足さず `check_all.sh` の固定リストに足し、`run_check` の `timeout` の対象にして、打ち切りの通知（`RUNNER_TIMEOUT_*`）も付ける。
 - デバッグ用の固定パスへの出力・残骸（例: `>> $HOME/hoge` のような一時リダイレクト）を**残さない**。発見したら指摘。
 
 ## P12. 命名・構成の一貫性（warn）

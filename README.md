@@ -116,43 +116,79 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 
 ## 既にLinux + Wine + MetaTrader4/5 で自動売買をしている人向けの紹介
 
-まずは crontab.
+まずは crontab と、監視する MT4/5 を書く設定ファイル `~/.atst/config` です。
+
+crontab (`templates/crontab.txt` と同じ内容)
 ```
 MAILTO=""
 PATH="%%ATST_HOME%%:/bin:/usr/bin:/usr/local/bin" ← %%ATST_HOME%% の部分はインストール時に auto-trading-support-tools のパスに置換される
 
-# List of MetaTrader which should be Monitored.
-# It consists of space separated, single quoted MetaTrader name.
-# ex. "('Land Prime' 'MetaTrader 5' 'MetaTrader 4')"
-TARGET="('Land Prime')"
-
 0 9 * * * check_daily.sh
-* * * * * check_reboot.sh
-* * * * * heartbeat.sh
+* * * * * check_all.sh
 
-@reboot    wrapper.sh                  "$TARGET" mtctl.sh start
-30 6 * * * wrapper.sh                  "$TARGET" truncate_monitoring.sh
-30 8 * * * wrapper.sh                  "$TARGET" report_image.sh
-*  * * * * sleep 10; wrapper.sh        "$TARGET" check_order.sh
-*  * * * * sleep 40; wrapper.sh        "$TARGET" check_order.sh
-*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_monitoring.sh
-*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_process.sh
-*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_ping.sh
-*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_price.sh
-*  * * * * sleep_random.sh; wrapper.sh "$TARGET" check_spread.sh
+@reboot    run_with_targets.sh mtctl.sh start
+30 6 * * * run_with_targets.sh truncate_monitoring.sh
+30 8 * * * run_with_targets.sh report_image.sh
+```
+
+`~/.atst/config` (ファイルの末尾に書きます)
+```
+# 監視する MetaTrader の名前 (インストール先のフォルダ名)。bash の配列で、名前ごとに ' か " で囲み、空白で区切る。
+ATST_TARGETS=('Land Prime')
 ```
 
 こんな感じで設定しておけば、再起動時とMT4/5プロセスが落ちたときや、ポジションの新規や決済、値動きやスプレッド、Pingに異常が有った時ににLINEへ通知してくれます。  
 
-
-「Land Prime」となっている部分はMT4/5がインストールされているフォルダ名なら何でもよく、複数指定可能。  指定された名前に該当するMT4/5のインストールフォルダを前方一致で検索するのでフォルダ名の先頭の一部を記載しておけばOK.
-
-※ 既定のインストーラ(Land Prime)でMT4を入れると、フォルダ名は "Land Prime MetaTrader 4 Terminal" になるので `TARGET` には前方一致する "Land Prime" を指定すればよい。
-
-※ `TARGET` の名前に該当する MT4/5 が見つからない場合は、その MT4/5 の監視と自動起動が効いていないことを LINE に通知します(check_process.sh)。
+* `check_all.sh` は毎分の監視(再起動・約定・プロセス・監視データ・Ping・値動き・スプレッド・ハートビート)を 1 回ずつ順番に実行します。crontab の毎分の行はこの 1 行だけです。
+* `run_with_targets.sh` は、`@reboot` のMT4/5の自動起動、監視データの整理、画像の通知のジョブに、`ATST_TARGETS` の名前を付けて実行します。
 
 
-@reboot の行は再起動時のMT4/5の自動起動設定です。
+### 監視するMT4/5の指定 (ATST_TARGETS)
+
+* 「Land Prime」となっている部分はMT4/5がインストールされているフォルダ名なら何でもよく、複数指定可能です。例: `ATST_TARGETS=('Land Prime' 'MetaTrader 5' 'MetaTrader 4')`
+* 指定された名前に該当するMT4/5のインストールフォルダを前方一致で検索するので、フォルダ名の先頭の一部を記載しておけばOKです。
+    * 既定のインストーラ(Land Prime)でMT4を入れると、フォルダ名は "Land Prime MetaTrader 4 Terminal" になるので、前方一致する "Land Prime" を指定すればよい。
+* 名前に `'` を含むときは、その名前を `"` で囲みます。例: `ATST_TARGETS=("Bob's MT4" 'MetaTrader 5')`
+* `ATST_TARGETS` に該当する MT4/5 が見つからない場合は、その MT4/5 の監視と自動起動が効いていないことを LINE に通知します(check_process.sh)。
+* `ATST_TARGETS` が未設定・空のときや、書き間違えて読み込めなかったときは、LINE に「監視対象が設定されていません」が届きます(MT4/5ごとの監視と約定の通知、再起動時のMT4/5の自動起動が止まります)。この通知が来たら、`~/.atst/config` の `ATST_TARGETS` の行の引用符と括弧の閉じ忘れを確認してください。通知が届いていた場合は、設定が読み込まれると復帰の通知が 1 回届きます。
+* 旧形式の crontab (`TARGET="('Land Prime')"` と `wrapper.sh "$TARGET" ...` の行)は `ATST_TARGETS` を使わず、従来どおり crontab の `TARGET` を使います。
+
+
+### 毎分の監視 (check_all.sh) の動き
+
+* 1 つのチェックが失敗しても、残りのチェックは実行します。
+* 1 つのチェックは `ATST_CHECK_TIMEOUT` 秒(1〜300、既定 40。`~/.atst/config` の末尾に `ATST_CHECK_TIMEOUT=60` のように書いて変更できます。範囲外の値は既定値になります)で打ち切り、「チェックが ... 秒で終わらず打ち切りました」と LINE に通知します(時間内に終わるようになると復帰を通知します)。
+* 前の回がまだ終わっていないときは、その分は何もしないで終わります(重なって動きません)。前の回が約 20 分(既定。`ATST_CHECK_TIMEOUT` に応じて変わります)以上終わらないと、「毎分の監視 (check_all.sh) が ... 止まっています」(RUNNER_STUCK)と LINE に通知します。
+* 約定のチェックは 1 回目の開始から `ATST_ORDER_CHECK_INTERVAL` 秒(0〜50、既定 30。こちらも `~/.atst/config` の末尾に書きます)後にもう一度実行するので、従来どおり毎分 2 回です。
+* ハートビート(`heartbeat.sh`)は `check_all.sh` の最後に送ります。外部サービス側の猶予(grace)は **3 分以上**を推奨します。
+
+
+### 既存の crontab からの移行
+
+旧形式の crontab (`TARGET="(...)"` と `wrapper.sh "$TARGET" check_*.sh` の行を並べたもの)のままでも、これまでどおり動きます。急いで移行する必要はありません。新形式に変えるときは、次の順で行います。
+
+1. `~/.atst/config` の**末尾に** `ATST_TARGETS=(...)` を 1 行追記します。括弧の中身は旧 crontab の `TARGET="(...)"` の括弧の中身をそのまま使います(`TARGET="('Land Prime')"` なら `ATST_TARGETS=('Land Prime')`)。先頭や途中に書くと、書き間違えたときにそれより後の設定(LINE の設定など)が読まれず、通知も届かなくなるので、必ず末尾に書きます。
+2. `crontab -e` で旧形式の行を消し、新しい行を書きます。
+    * 消す行: `TARGET=` の行、`wrapper.sh "$TARGET"` の行すべて(`sleep 10;` `sleep 40;` `sleep_random.sh;` が付いたものも含む)、`check_reboot.sh` の行、`heartbeat.sh` の行。
+    * 書く行: `* * * * * check_all.sh` の 1 行と、`@reboot` / `30 6 * * *` / `30 8 * * *` の `run_with_targets.sh` の 3 行(上の crontab の例のとおり)。`check_daily.sh` の行はそのままです。
+    * 独自に追加した行が無ければ、手で直す代わりに `setup_cron.sh` を実行し、「Overwrite it? (Y/n)」に `Y` と答えて新しいテンプレートに上書きしてもかまいません(`n` では追記されず、何も変わりません)。ただし crontab 全体が置き換わります。
+3. `crontab -l` で内容を確認します。1〜2 分後に `ls -l ~/.atst/check_all.started` で更新時刻が直近になっていて、「監視対象が設定されていません」の通知が来ていなければ完了です。
+
+注意:
+* 移行の途中で旧行と新行が同時にあっても、毎分の監視の通知は重複しません。ただし共存は短い間にしてください(同じチェックが 1 分に 2 回動くため、しきい値付近で発生・復帰の通知が出やすくなります。LINE の応答が遅いと、打ち切りの通知が出ることもあります)。
+* `@reboot`、`truncate_monitoring.sh`、`report_image.sh`、`check_daily.sh` の行は、旧形式と新形式の両方に残すと 2 回動きます。旧形式の行は必ず消してください。
+* 元に戻すときは、新しい行を消して旧形式の行に戻せばかまいません。
+* `ATST_TARGETS` が未設定のままだと、再起動時のMT4/5の自動起動(`@reboot` の行)も動きません。移行の前に必ず設定してください。
+
+`setup_cron.sh` の動き:
+* crontab が空のときは、確認なしで新しいテンプレートを登録します。
+* 旧形式の行があれば、移行の案内と、旧 `TARGET` の値(`~/.atst/config` に書く 1 行の形)を表示します。旧形式の行は自動では消しません。
+* atst の行(`check_*.sh`、`heartbeat.sh`、`wrapper.sh` など)がある crontab には、二重登録になるため追記しません。atst 以外の `check_*.sh` の行も atst の行とみなします。
+* 入力がない(標準入力が閉じている)ときは、crontab を変更しません。
+* crontab の書き込みやテンプレートの読み込みに失敗したときは、終了コード 2 で終わります。
+
+
+`@reboot` の行は再起動時のMT4/5の自動起動設定です。
 
 mtctl.sh は 複数の MT4/5 の一覧・起動・終了・状態確認ができるスクリプトです。使い方は↓こん感じ。
 ```

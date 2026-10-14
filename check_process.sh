@@ -22,13 +22,15 @@ function do_check() {
     "【復帰】MetaTraderプロセスが再開しました: $target_name"
 }
 
-# A TARGET name that matches no installed MetaTrader silently disables every check for it
-# (atst_traverse_mt skips it), so report that here; this check runs every minute.
+# A name in ATST_TARGETS (the crontab TARGET in the old style) that matches no installed MetaTrader
+# silently disables every check for it (atst_traverse_mt skips it), so report that here; this check
+# runs every minute.
 function check_target_found() {
   local target_name="$1"
 
-  # The name is user-written (crontab); keep only safe chars so the key stays one field of the
-  # alert_status file (spaces or commas would split it and the alert would repeat every minute).
+  # The name is user-written (ATST_TARGETS, or the crontab TARGET in the old style); keep only safe
+  # chars so the key stays one field of the alert_status file (spaces or commas would split it and
+  # the alert would repeat every minute).
   local alert_key=TARGET_${target_name//[^A-Za-z0-9_]/_}
 
   local verdict
@@ -39,7 +41,7 @@ function check_target_found() {
   fi
 
   atst_update_alert "$alert_key" "$verdict" \
-    "【発生】監視対象のMetaTraderが見つかりません。監視と自動起動が無効になっています。crontab の TARGET とインストール先のフォルダ名を確認してください: $target_name" \
+    "【発生】監視対象のMetaTraderが見つかりません。監視と自動起動が無効になっています。~/.atst/config の ATST_TARGETS (旧形式の crontab では TARGET) とインストール先のフォルダ名を確認してください: $target_name" \
     "【復帰】監視対象のMetaTraderが見つかりました: $target_name"
 }
 
