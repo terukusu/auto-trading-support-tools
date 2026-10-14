@@ -3,8 +3,10 @@
 # Tests must call atst_test_setup_sandbox before reading common.sh so that the real ~/.atst,
 # ~/.wine, LINE and Wine are never touched.
 
-# Creates a sandbox and points HOME / WINEPREFIX / PATH / ATST_TEST_CURL_LOG into it.
-# WINEPREFIX itself is not created here (atst_test_make_mt creates it).
+# Creates a sandbox and points HOME / WINEPREFIX / PATH / ATST_TEST_CURL_LOG / ATST_PROC_ROOT into it.
+# WINEPREFIX itself is not created here (atst_test_make_mt creates it). ATST_PROC_ROOT is an empty fake
+# /proc (atst_test_make_proc fills it), so atst_find_pid sees no real process; a test that needs a real
+# one (atst_test_fake_mt_process) runs "export ATST_PROC_ROOT=/proc" in its body.
 atst_test_setup_sandbox() {
   ATST_TEST_SANDBOX=$(mktemp -d "${BATS_TMPDIR:-/tmp}/atst-test.XXXXXX") || return 1
   HOME="$ATST_TEST_SANDBOX/home"
@@ -13,7 +15,9 @@ atst_test_setup_sandbox() {
   unset WINEARCH
   PATH="${BATS_TEST_DIRNAME:?}/stubs:$PATH"
   ATST_TEST_CURL_LOG="$ATST_TEST_SANDBOX/curl.log"
-  export ATST_TEST_SANDBOX HOME WINEPREFIX PATH ATST_TEST_CURL_LOG
+  ATST_PROC_ROOT="$ATST_TEST_SANDBOX/proc"
+  mkdir -p "$ATST_PROC_ROOT" || return 1
+  export ATST_TEST_SANDBOX HOME WINEPREFIX PATH ATST_TEST_CURL_LOG ATST_PROC_ROOT
 }
 
 # Removes the sandbox. Refuses anything that is not a sandbox made by atst_test_setup_sandbox.
@@ -109,11 +113,52 @@ atst_test_make_order_status() {
   printf '%s\n' "$@" >> "$dir/order_status"
 }
 
+# atst_test_make_proc <pid> <uid> <environ> [<argv>...]
+# Creates the fake process entry $ATST_PROC_ROOT/<pid>/ read by atst_find_pid: cmdline (<argv>...,
+# NUL-terminated; none gives an empty cmdline like a kernel thread), status (Uid: line with <uid> for
+# all four ids; - means $EUID) and environ (<environ> is newline-separated KEY=VALUE written
+# NUL-terminated; - creates no environ file, an empty string an empty one). <pid> may be any
+# alphanumeric name (e.g. self). Only writes under a sandbox ATST_PROC_ROOT.
+atst_test_make_proc() {
+  local pid="$1" uid="$2" env="$3"
+  local dir kv
+
+  [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
+  case "${ATST_PROC_ROOT:-}" in
+    "$ATST_TEST_SANDBOX"/*) ;;
+    *) return 1 ;;
+  esac
+  [ "$#" -ge 3 ] || return 1
+  [[ "$pid" =~ ^[A-Za-z0-9]+$ ]] || return 1
+  [ "$uid" = - ] && uid=$EUID
+  [[ "$uid" =~ ^[0-9]+$ ]] || return 1
+  shift 3
+
+  dir="$ATST_PROC_ROOT/$pid"
+  mkdir -p "$dir" || return 1
+  if [ "$#" -gt 0 ]; then
+    printf '%s\0' "$@" > "$dir/cmdline" || return 1
+  else
+    : > "$dir/cmdline" || return 1
+  fi
+  printf 'Name:\tsleep\nUid:\t%s\t%s\t%s\t%s\n' "$uid" "$uid" "$uid" "$uid" > "$dir/status" || return 1
+  if [ "$env" != - ]; then
+    : > "$dir/environ" || return 1
+    if [ -n "$env" ]; then
+      while IFS= read -r kv; do
+        printf '%s\0' "$kv" >> "$dir/environ" || return 1
+      done <<< "$env"
+    fi
+  fi
+}
+
 # atst_test_fake_mt_process <name>
 # Starts "sleep 30" shown in the process table as "C:\Program Files\<name>\terminal.exe" (what
 # atst_find_pid looks for) and prints its pid. Call it as
 #   ATST_TEST_FAKE_PID=$(atst_test_fake_mt_process ATSTTEST_MT4)
-# and kill that pid in teardown. Use a name no real MetaTrader can start with.
+# and kill that pid in teardown. Use a name no real MetaTrader can start with. atst_find_pid only sees
+# it through the real /proc, so the test must "export ATST_PROC_ROOT=/proc" first (the sandbox default
+# is a fake one).
 atst_test_fake_mt_process() {
   local name="$1"
 

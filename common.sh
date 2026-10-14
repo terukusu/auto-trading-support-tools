@@ -17,8 +17,8 @@ ATST_CONFIG_FILE="$ATST_CONFIG_DIR/config"
 . "$ATST_CONFIG_FILE"
 
 # MT4/5 need neither Wine-Mono (.NET) nor Wine-Gecko (embedded IE). Keep both disabled for every
-# wine call made from cron (mtctl start, winepath in atst_find_pid, ...) so Wine never opens a
-# download dialog unattended (P10). cron does not read ~/.bash_profile, so this must live here.
+# wine call made from cron (mtctl start, ...) so Wine never opens a download dialog unattended
+# (P10). cron does not read ~/.bash_profile, so this must live here.
 # A value already set in the environment or ~/.atst/config (even empty, to opt out) wins.
 export WINEDLLOVERRIDES="${WINEDLLOVERRIDES-mscoree=;mshtml=}"
 
@@ -343,29 +343,125 @@ function atst_find_terminal() {
   fi
 }
 
+# atst_to_win_path <unix path> <prefix>
+# Prints the Windows form of <unix path> when it is <prefix>/drive_<x>/<rest>: "<X>:\<rest>" with every
+# / turned into \ and the drive letter in upper case. Prints nothing for any other path. <prefix> is
+# the logical path without a trailing / (cd "$WINEPREFIX" && pwd, the form of mt_term). Pure string
+# work (no winepath, no sed/grep on the path), so ', blanks, [, * and \ survive. Always returns 0.
+function atst_to_win_path() {
+  local rest drive
+
+  [ "$#" -ge 2 ] && [ -n "$1" ] && [ -n "$2" ] || return 0
+  rest=${1#"$2"/drive_}
+  [ "$rest" != "$1" ] && [ "${rest:1:1}" = / ] || return 0
+  drive=${rest:0:1}
+  rest=${rest:1}
+  printf '%s\n' "${drive^^}:${rest//\//\\}"
+}
+
+# atst_find_pid <MT name>
+# Prints the pid of the running MetaTrader whose folder name starts with <MT name> (atst_find_terminal),
+# or nothing. Several matches print the smallest pid. Always returns 0 and never writes to stderr.
+# Reads $ATST_PROC_ROOT/<pid>/ (default /proc; tests point it elsewhere) with bash builtins only:
+# neither winepath (it starts Wine) nor ps/grep is run. A process matches when all of these hold:
+#  - its effective uid (status, Uid:) is ours. Processes of other users are ignored on purpose:
+#    mtctl stop can only kill our own, and WINEPREFIX lives under our HOME.
+#  - argv[0] (argv[1] when argv[0] is wine/wine64/wine-preloader/wine64-preloader), without
+#    surrounding ", equals mt_term or its Windows form (atst_to_win_path) ignoring case. Exact match
+#    only: "...\MT AB\terminal.exe" or "...\terminal.exe.bak" is not "...\MT A\terminal.exe".
+#  - for the Windows form only, its prefix (environ WINEPREFIX, else environ HOME/.wine, else our
+#    HOME/.wine) is our WINEPREFIX, both compared as physical paths (cd && pwd -P). A process whose
+#    environ cannot be read, or whose prefix is relative, does not match.
+# comm, exe and maps are not used: a process started with "exec -a" keeps the comm/exe of the real
+# program, and the tests start one so.
 function atst_find_pid() {
-  local target_mt_name=$1
+  local root=${ATST_PROC_ROOT:-/proc}
+  local term prefix_l win t_unix t_win my_prefix_p best
+  local d pid a0 a1 x u form euid k e rest kv ewp ehome env_ok p cand_p
 
-  local target_mt_path
-  target_mt_path=$(atst_find_terminal "$target_mt_name")
+  term=$(atst_find_terminal "$1")
+  [ -n "$term" ] || return 0
+  # same logical form as mt_term (atst_abs_path), as in atst_gen_mt_origins
+  prefix_l=$(cd "$WINEPREFIX" 2>/dev/null && pwd)
+  win=""
+  [ -n "$prefix_l" ] && win=$(atst_to_win_path "$term" "$prefix_l")
+  t_unix=${term^^}
+  t_win=${win^^}
+  my_prefix_p=""
+  best=""
 
-  if [ -z "$target_mt_path" ]; then
-    return 0
-  fi
+  for d in "$root"/[0-9]*/; do
+    pid=${d%/}
+    pid=${pid##*/}
+    case $pid in ''|*[!0-9]*) continue ;; esac
+    [ -n "$best" ] && [ "$pid" -ge "$best" ] && continue
 
-  local target_win_path
-  target_win_path=$(winepath -w "$target_mt_path" 2>/dev/null | sed -e 's/\\/\\\\/g')
+    # 2>/dev/null comes before < so that a vanished or unreadable file prints nothing
+    a0=""
+    a1=""
+    { IFS= read -r -d '' a0; IFS= read -r -d '' a1; } 2>/dev/null < "$d/cmdline"
+    [ -n "$a0" ] || continue
 
-  if [ -z "$target_win_path" ]; then
-    return 0
-  fi
+    form=""
+    for x in "$a0" "$a1"; do
+      [[ $x == \"*\" ]] && [ "${#x}" -ge 2 ] && x=${x:1:${#x}-2}
+      u=${x^^}
+      if [ "$u" = "$t_unix" ]; then
+        form=unix
+        break
+      fi
+      if [ -n "$t_win" ] && [ "$u" = "$t_win" ]; then
+        form=win
+        break
+      fi
+      # argv[1] is looked at only when argv[0] is the wine loader
+      case ${x##*/} in
+        wine|wine64|wine-preloader|wine64-preloader) ;;
+        *) break ;;
+      esac
+    done
+    [ -n "$form" ] || continue
 
-  local target_pid
-  target_pid=$(ps haxww -o pid,args | grep -v grep | grep "$target_win_path" | head -n 1 | awk '{print $1}')
+    euid=""
+    { while IFS=$'\t' read -r k _ e rest; do
+        if [ "$k" = Uid: ]; then
+          euid=$e
+          break
+        fi
+      done; } 2>/dev/null < "$d/status"
+    [ "$euid" = "$EUID" ] || continue
 
-  if [ -n "$target_pid" ]; then
-    echo $target_pid
-  fi
+    # a unix path already contains the prefix; a Windows path does not
+    if [ "$form" = win ]; then
+      ewp=""
+      ehome=""
+      env_ok=0
+      { while IFS= read -r -d '' kv || [ -n "$kv" ]; do
+          case $kv in
+            WINEPREFIX=*) ewp=${kv#WINEPREFIX=} ;;
+            HOME=*) ehome=${kv#HOME=} ;;
+          esac
+        done
+        env_ok=1; } 2>/dev/null < "$d/environ"
+      [ "$env_ok" = 1 ] || continue
+      if [ -n "$ewp" ]; then
+        p=$ewp
+      elif [ -n "$ehome" ]; then
+        p=$ehome/.wine
+      else
+        p=$HOME/.wine
+      fi
+      case $p in /*) ;; *) continue ;; esac
+      [ -n "$my_prefix_p" ] || my_prefix_p=$(cd "$WINEPREFIX" 2>/dev/null && pwd -P)
+      [ -n "$my_prefix_p" ] || continue
+      cand_p=$(cd "$p" 2>/dev/null && pwd -P)
+      [ -n "$cand_p" ] && [ "$cand_p" = "$my_prefix_p" ] || continue
+    fi
+    best=$pid
+  done
+
+  [ -n "$best" ] && printf '%s\n' "$best"
+  return 0
 }
 
 function atst_get_monitoring_csv_path() {
