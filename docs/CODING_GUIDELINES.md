@@ -103,6 +103,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 - Wine を使うコードは `WINEARCH` / `WINEPREFIX` / `DISPLAY` を**明示**して実行する（cron の最小環境では未定義になりうる）。
 - **無人実行で GUI プロンプト・ダウンロードダイアログを誘発しない**: `wineboot` 等は `WINEDLLOVERRIDES="mscoree=;mshtml="` 等で mono/gecko の自動取得を抑止する。MT4/5 は .NET も埋め込み IE も不要。ブロッキングを招く変更は block。
 - MT の検出・特定は `common.sh` の `atst_find_mt_index`（フォルダ名の前方一致・大文字小文字無視）に合わせる。独自の照合ロジックを増やさない。
+- MT プロセスの特定は `common.sh` の `atst_find_pid`（`/proc` 走査）に合わせる。`ps | grep` や `winepath` で独自に探さない。
 
 ## P11. cron / wrapper の堅牢性（warn）
 
