@@ -369,21 +369,28 @@ function atst_load_mt_list() {
   return 0
 }
 
-# return the index of MetaTrader which folder has specified prefix
-# return empty when it's not found.
+# Prints the index of the first MetaTrader whose folder name (mt_name) starts with the
+# argument, ignoring the case of ASCII letters; prints nothing when none matches or the
+# argument is empty. The argument is plain text, not a pattern: spaces, quotes and
+# characters such as . * ? [ ] ( ) | \ match only themselves.
 #
 function atst_find_mt_index() {
   local target_mt_name="$1"
+  local upper_target i
 
-  i=0
-  while [ $i -lt ${#mt_home[@]} ]; do
-    match="$(echo ${mt_name[$i]} | grep -ioE "^$target_mt_name")"
-    if [ -n "$match" ]; then
-      echo $i
-      break
+  [ -n "$target_mt_name" ] || return 0
+
+  # Same ASCII-only upper-casing as mt_name (atst_load_mt_list).
+  upper_target=$(printf '%s' "$target_mt_name" | atst_to_upper)
+
+  for i in "${!mt_name[@]}"; do
+    # The quoted right-hand side is compared literally; only the trailing * is a pattern.
+    if [[ ${mt_name[i]} == "$upper_target"* ]]; then
+      echo "$i"
+      return 0
     fi
-    let i++
   done
+  return 0
 }
 
 # return absolute path of the terminal.exe
