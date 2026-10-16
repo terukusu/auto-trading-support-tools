@@ -184,7 +184,8 @@ heartbeat.sh"
   [ "$(calls_of heartbeat.sh)" -eq 1 ]
 }
 
-@test "RUN-07: check_order exiting 1 (#101) is not a cut-off" {
+# run_check treats only 124/137 as a cut-off (#95); exit 1 here stands for any other failure.
+@test "RUN-07: a check exiting 1 (not 124/137) is not a cut-off: check_order still runs twice" {
   atst_test_stub_script "$home" check_order.sh exit1
   run bash "$home/check_all.sh"
   [ "$status" -eq 0 ]
