@@ -252,8 +252,10 @@ function atst_line_quota() {
 }
 
 # LINE 送信失敗を $ATST_CONFIG_DIR/line_error.log に記録する。肥大しないよう末尾 1000 行に保つ。
+# ATST_CONFIG_DIR が空なら何も書かずに 1 を返す ("/line_error.log" を作らない。#110)。
 function atst_log_line_error() {
   local http_code="$1" body="$2" text="$3"
+  [ -n "$ATST_CONFIG_DIR" ] || return 1
   local log="$ATST_CONFIG_DIR/line_error.log"
 
   # 通知本文を含むので本人以外に読ませない。
@@ -582,12 +584,21 @@ function atst_traverse_mt() {
 # alert_status は "キー,値,更新時刻(epoch)" の行の集まり。check_* が毎分並行して更新するので、
 # 更新は flock で排他し、一時ファイル経由で置き換える (sed -i と >> の競合で行が重複・欠落しないように)。
 # キーは正規表現ではなく先頭列の完全一致で探す (PROCESS_X が PROCESS_X_2 に当たらないように)。
+# atst_set_alert_status <key> <value>
+# Returns 0 when recorded, 1 on an empty key, an empty ATST_ALERT_STATUS_FILE, or a lock/write failure.
+# With an empty ATST_ALERT_STATUS_FILE (a broken ~/.atst/config) it does nothing: no stdin is read and
+# no file is created (#110).
 function atst_set_alert_status() {
   local key=$1
   local value=$2
 
   if [ -z "$key" ]; then
     echo "alert status key should not be empty" 1>&2
+    return 1
+  fi
+  # Before the subshell: its "9>>" redirection would create ".lock" in the current directory.
+  if [ -z "$ATST_ALERT_STATUS_FILE" ]; then
+    echo "atst_set_alert_status: ATST_ALERT_STATUS_FILE is empty (~/.atst/config may be broken); $key is not recorded" 1>&2
     return 1
   fi
 
@@ -657,7 +668,9 @@ function atst_alert_transition() {
 
 # atst_alert_lock_file <key>
 # Prints the per-key lock file shared by atst_update_alert and atst_spool_flush. Creates nothing.
+# Prints nothing and returns 1 when ATST_CONFIG_DIR is empty (#110).
 function atst_alert_lock_file() {
+  [ -n "$ATST_CONFIG_DIR" ] || return 1
   local lock_key="${1//[^A-Za-z0-9_]/_}"
   printf '%s\n' "$ATST_CONFIG_DIR/alert_update.${lock_key:0:200}.lock"
 }
@@ -669,8 +682,9 @@ function atst_alert_lock_file() {
 # the run's spool instead (no lock, no send, no record; returns 0) and atst_spool_flush decides again,
 # sends it with the other notices of the run in one push and records it when that push succeeded.
 # Returns 0 when nothing was due or both the send and the record succeeded, 1 when the send or the
-# record failed or the per-key lock was not free within 35 seconds, 2 on invalid arguments (nothing
-# sent, nothing recorded).
+# record failed or the per-key lock was not free within 35 seconds, or a notice was due while
+# ATST_ALERT_STATUS_FILE is empty (nothing sent, nothing recorded, one line in line_error.log; #110),
+# 2 on invalid arguments (nothing sent, nothing recorded).
 function atst_update_alert() {
   if [ "$#" -ne 4 ]; then
     echo "Usage: atst_update_alert <key> <verdict> <fire_msg> <recover_msg>" 1>&2
@@ -691,6 +705,13 @@ function atst_update_alert() {
     msg="$fire_msg"
   else
     msg="$recover_msg"
+  fi
+  # The state cannot be recorded (#110): sending would repeat the same notice every run. Leave a trace
+  # in line_error.log, as cron drops stderr (P1).
+  if [ -z "$ATST_ALERT_STATUS_FILE" ]; then
+    echo "atst_update_alert: ATST_ALERT_STATUS_FILE is empty (~/.atst/config may be broken); $key is not sent" 1>&2
+    atst_log_line_error no_alert_status "ATST_ALERT_STATUS_FILE is empty (~/.atst/config may be broken)" "$msg"
+    return 1
   fi
   if atst_spool_add "$key" "$verdict" "$msg"; then
     return 0
@@ -838,7 +859,13 @@ function atst_notify_text() {
 # this run's spool (mode 700) and exports ATST_NOTIFY_SPOOL for the checks. Returns 1 with one line on
 # stderr and ATST_NOTIFY_SPOOL unset when the spool cannot be made (every notice is then sent at once).
 function atst_spool_begin() {
-  local root="${ATST_CONFIG_DIR:?}/check_all.spool" run
+  # Not "${ATST_CONFIG_DIR:?}": it ends a non-interactive shell, and check_all.sh would run no check.
+  if [ -z "$ATST_CONFIG_DIR" ]; then
+    echo "atst_spool_begin: ATST_CONFIG_DIR is empty; notices of this run are sent one by one" 1>&2
+    unset ATST_NOTIFY_SPOOL
+    return 1
+  fi
+  local root="$ATST_CONFIG_DIR/check_all.spool" run
 
   run="$root/run.$(date +%s).$$"
   rm -rf -- "${root:?}" 2>/dev/null
@@ -860,7 +887,12 @@ function atst_spool_begin() {
 # For check_all.sh at the end of a run: removes the spool and unsets ATST_NOTIFY_SPOOL. Returns 0 (a
 # spool left behind is removed by the next run's atst_spool_begin).
 function atst_spool_end() {
-  local root="${ATST_CONFIG_DIR:?}/check_all.spool"
+  # Nothing to remove: atst_spool_begin made no spool without ATST_CONFIG_DIR.
+  if [ -z "$ATST_CONFIG_DIR" ]; then
+    unset ATST_NOTIFY_SPOOL
+    return 0
+  fi
+  local root="$ATST_CONFIG_DIR/check_all.spool"
 
   if ! rm -rf -- "${root:?}"; then
     echo "atst_spool_end: cannot remove $root; the next run removes it" 1>&2
@@ -882,6 +914,8 @@ function atst_spool_end() {
 #   up to 5 messages per push. At most <max_pushes> pushes; the rest is not sent nor recorded.
 # - Records the keys of a push only when it returned 200; stops at the first failed push.
 # - Removes every item it read, sent or not (a keyed notice still due is spooled again next run).
+# - A keyed notice is neither sent nor recorded while ATST_ALERT_STATUS_FILE is empty (one line on
+#   stderr and in line_error.log, rc 1; #110). Text-only notices are sent.
 # Holds the locks until the records are written. Returns 0 when everything due was sent and recorded
 # (or nothing was due, or there is no valid spool), 1 when something was left out or failed (one line
 # on stderr each), 2 on an invalid <max_pushes> (does nothing).
@@ -934,6 +968,14 @@ function atst_spool_flush() {
       [ -n "$key" ] || continue
       if [ "${last_of[$key]}" != "$i" ]; then
         send[$i]=0
+        continue
+      fi
+      # The state cannot be recorded (#110): do not send what would be sent again every run.
+      if [ -z "$ATST_ALERT_STATUS_FILE" ]; then
+        echo "atst_spool_flush: ATST_ALERT_STATUS_FILE is empty (~/.atst/config may be broken); $key is not sent" 1>&2
+        atst_log_line_error no_alert_status "ATST_ALERT_STATUS_FILE is empty (~/.atst/config may be broken)" "${texts[$i]}"
+        send[$i]=0
+        rc=1
         continue
       fi
       lockf=$(atst_alert_lock_file "$key")

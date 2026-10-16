@@ -817,3 +817,41 @@ EOF
   [ "$(ATST_NOTIFY_SPOOL=A bash -c '. "$1/common.sh"; printf %s "$ATST_NOTIFY_SPOOL"' _ "$repo")" = A ]
   [ "$(env -u ATST_NOTIFY_SPOOL bash -c '. "$1/common.sh"; printf %s "${ATST_NOTIFY_SPOOL+x}"' _ "$repo")" = "" ]
 }
+
+@test "NB-23: in a spool run, an empty ATST_ALERT_STATUS_FILE spools nothing keyed and the flush does not send keyed items (#110)" {
+  local saved
+  atst_test_source_common
+  atst_spool_begin
+  saved=$ATST_ALERT_STATUS_FILE
+
+  ATST_ALERT_STATUS_FILE=""
+  run atst_update_alert K23 1 '【発生】K23-first' r
+  [ "$status" -eq 1 ]
+  [ "$(items_in "$ATST_NOTIFY_SPOOL")" -eq 0 ]
+
+  ATST_ALERT_STATUS_FILE=$saved
+  atst_update_alert K23 1 '【発生】K23-second' r
+  printf 'T23\n' | atst_notify_text
+  [ "$(items_in "$ATST_NOTIFY_SPOOL")" -eq 2 ]
+  ATST_ALERT_STATUS_FILE=""
+  run atst_spool_flush 1
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'ATST_ALERT_STATUS_FILE is empty'* ]]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(has_text 1 'T23')" -eq 1 ]
+  [ "$(grep -c 'K23-second' "$ATST_TEST_CURL_LOG")" -eq 0 ]
+  [ "$(items_in "$ATST_NOTIFY_SPOOL")" -eq 0 ]
+  [ "$(status_lines '^K23,')" -eq 0 ]
+  grep -q 'http=no_alert_status' "$HOME/.atst/line_error.log"
+  grep -q 'K23-second' "$HOME/.atst/line_error.log"
+  atst_spool_end
+}
+
+@test "NB-24: atst_spool_begin with an empty ATST_CONFIG_DIR returns 1 instead of ending the shell (#110)" {
+  run bash -c '. "$1/common.sh"; ATST_CONFIG_DIR=; atst_spool_begin; echo "begin=$?"; echo "spool=${ATST_NOTIFY_SPOOL-unset}"; atst_spool_end; echo "end=$?"' _ "$repo"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'ATST_CONFIG_DIR is empty'* ]]
+  [[ "$output" == *'begin=1'* ]]
+  [[ "$output" == *'spool=unset'* ]]
+  [[ "$output" == *'end=0'* ]]
+}
