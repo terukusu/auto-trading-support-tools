@@ -97,3 +97,126 @@ mt_index_of() {
   run atst_has_targets
   [ "$status" -eq 1 ]
 }
+
+# cf_break_threshold <line>
+# Puts templates/config in the sandbox HOME with the ATST_MONITORING_THRESHOLD=180 line replaced by
+# <line>. Fails unless that line is exactly one and comes before ATST_LINE_ID and ATST_TARGETS, so a
+# change of the template cannot make the tests below pass for nothing.
+cf_break_threshold() {
+  local cfg="$HOME/.atst/config" n line_no line_id_no targets_no
+  mkdir -p "$HOME/.atst" || return 1
+  cp "$BATS_TEST_DIRNAME/../templates/config" "$cfg" || return 1
+  n=$(grep -c '^ATST_MONITORING_THRESHOLD=180$' "$cfg")
+  [ "$n" -eq 1 ] || return 1
+  sed -i "s|^ATST_MONITORING_THRESHOLD=180\$|$1|" "$cfg" || return 1
+  n=$(grep -cxF -- "$1" "$cfg")
+  [ "$n" -eq 1 ] || return 1
+  line_no=$(grep -nxF -- "$1" "$cfg" | cut -d: -f1)
+  line_id_no=$(grep -n '^ATST_LINE_ID=' "$cfg" | head -n 1 | cut -d: -f1)
+  targets_no=$(grep -n '^ATST_TARGETS=' "$cfg" | head -n 1 | cut -d: -f1)
+  [ -n "$line_no" ] && [ -n "$line_id_no" ] && [ -n "$targets_no" ] || return 1
+  [ "$line_no" -lt "$line_id_no" ] && [ "$line_no" -lt "$targets_no" ]
+}
+
+# cf_source <code>
+# Sources common.sh in a new bash (no ERR trap, no set -e, as cron starts the scripts) and runs <code>
+# after it. LC_ALL=C fixes bash's own messages to English.
+cf_source() {
+  run env LC_ALL=C bash -c '. "$1" || exit 9; echo after-source; '"$1" _ "$BATS_TEST_DIRNAME/../common.sh"
+}
+
+# Prints how many [warn] lines about the config $output has.
+cf_warn_count() {
+  printf '%s\n' "$output" | grep -c '^\[warn\] ~/.atst/config may not have been read completely'
+}
+
+# Settings a config that was read to the end has (only whether they are set, never their values).
+CF_AFTER_CODE='echo "targets=${#ATST_TARGETS[@]}"; echo "line_id=${ATST_LINE_ID+set}"'
+
+@test "CF-01: a parse error in a middle line warns once and the lines after it are not read (#114)" {
+  cf_break_threshold 'ATST_MONITORING_THRESHOLD=(180' || return 1
+  cf_source 'echo "targets=[${ATST_TARGETS+set}]"'
+  [ "$status" -eq 0 ]
+  [ "$(cf_warn_count)" -eq 1 ]
+  [[ "$output" == *"targets=[]"* ]]
+  [[ "$output" == *after-source* ]]
+  [ "$(atst_test_push_count)" -eq 0 ]
+}
+
+@test "CF-02: a middle line failing with a space after = warns once and the rest is read (#114)" {
+  cf_break_threshold 'ATST_MONITORING_THRESHOLD= 180' || return 1
+  cf_source "$CF_AFTER_CODE"
+  [ "$status" -eq 0 ]
+  [ "$(cf_warn_count)" -eq 1 ]
+  [[ "$output" == *"command not found"* ]]
+  [[ "$output" == *"targets=1"* ]]
+  [[ "$output" == *"line_id=set"* ]]
+  [[ "$output" == *after-source* ]]
+  [ "$(atst_test_push_count)" -eq 0 ]
+}
+
+@test "CF-03: a middle line with a failing command substitution warns once and the rest is read (#114)" {
+  cf_break_threshold 'ATST_MONITORING_THRESHOLD=$(atst_test_no_such_command_zz)' || return 1
+  cf_source "$CF_AFTER_CODE"
+  [ "$status" -eq 0 ]
+  [ "$(cf_warn_count)" -eq 1 ]
+  [[ "$output" == *"command not found"* ]]
+  [[ "$output" == *"targets=1"* ]]
+  [[ "$output" == *"line_id=set"* ]]
+  [[ "$output" == *after-source* ]]
+  [ "$(atst_test_push_count)" -eq 0 ]
+}
+
+@test "CF-04: the template config as it is gives no warning (#114)" {
+  mkdir -p "$HOME/.atst"
+  cp "$BATS_TEST_DIRNAME/../templates/config" "$HOME/.atst/config"
+  cf_source "$CF_AFTER_CODE"
+  [ "$status" -eq 0 ]
+  [ "$(cf_warn_count)" -eq 0 ]
+  [[ "$output" == *"targets=1"* ]]
+  [[ "$output" == *after-source* ]]
+  [ "$(atst_test_push_count)" -eq 0 ]
+}
+
+@test "CF-05: a config with a failing line is run only once (#114)" {
+  cf_break_threshold 'ATST_MONITORING_THRESHOLD= 180' || return 1
+  echo 'echo x >> "$HOME/atst_source_count"' >> "$HOME/.atst/config"
+  cf_source ':'
+  [ "$status" -eq 0 ]
+  [ "$(cf_warn_count)" -eq 1 ]
+  [ "$(wc -l < "$HOME/atst_source_count")" -eq 1 ]
+  [ "$(atst_test_push_count)" -eq 0 ]
+}
+
+@test "CF-06: no ERR trap, set -e or work variable is left in the caller after the source (#114)" {
+  local flags_line
+  cf_break_threshold 'ATST_MONITORING_THRESHOLD= 180' || return 1
+  cf_source 'echo "trap=[$(trap -p ERR)]"; echo "flags=$-"; echo "vars=[${_atst_cfg_failed+set}${_atst_cfg_errexit+set}]"'
+  [ "$status" -eq 0 ]
+  [ "$(cf_warn_count)" -eq 1 ]
+  [[ "$output" == *"trap=[]"* ]]
+  [[ "$output" == *"vars=[]"* ]]
+  flags_line=$(printf '%s\n' "$output" | grep '^flags=')
+  [ -n "$flags_line" ]
+  [[ "$flags_line" != *e* ]]
+  # A caller with set -e is not stopped by the failing line and gets set -e back.
+  run env LC_ALL=C bash -c 'set -e; . "$1"; echo after-source; echo "flags=$-"; echo "vars=[${_atst_cfg_failed+set}${_atst_cfg_errexit+set}]"' _ "$BATS_TEST_DIRNAME/../common.sh"
+  [ "$status" -eq 0 ]
+  [ "$(cf_warn_count)" -eq 1 ]
+  [[ "$output" == *after-source* ]]
+  flags_line=$(printf '%s\n' "$output" | grep '^flags=')
+  [[ "$flags_line" == flags=*e* ]]
+  [[ "$output" == *"vars=[]"* ]]
+  [ "$(atst_test_push_count)" -eq 0 ]
+}
+
+@test "CF-07: sourcing common.sh in the test body keeps the ERR trap and flags of bats (#114)" {
+  local before flags
+  before=$(trap -p ERR)
+  flags=$-
+  [ -n "$before" ]
+  atst_test_source_common || return 1
+  [ "$(trap -p ERR)" = "$before" ]
+  [ "$-" = "$flags" ]
+  [ "$(atst_test_push_count)" -eq 0 ]
+}

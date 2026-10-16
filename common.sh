@@ -20,12 +20,35 @@ unset ATST_TARGETS ATST_CHECK_TIMEOUT ATST_ORDER_CHECK_INTERVAL
 # environment only: a value written in ~/.atst/config would make every check keep its notices in a
 # spool nobody sends (P1). Keep the inherited value across the source and drop the config's.
 _atst_spool_env=${ATST_NOTIFY_SPOOL-}
-# shellcheck source=/dev/null  # ~/.atst/config lives outside the repository
-if ! . "$ATST_CONFIG_FILE"; then
-  # A syntax error (an unclosed quote or parenthesis) stops reading the config at that line, so the
-  # settings after it are missing. Say so; the caller goes on as before.
+# A syntax error (an unclosed quote or parenthesis) stops reading the config at that line; a line that
+# fails when run (`X= 180`, a failing $(...)) is skipped and the lines after it are still read. Warn on
+# either with one line; bash's own message (file and line) stays on stderr. The caller goes on as before.
+_atst_cfg_failed=0
+if [ -z "$(trap -p ERR)" ]; then
+  # Caught by an ERR trap of our own. The source must not sit in a condition (if/!/&&/||): bash runs
+  # no ERR trap there. A caller's set -e would stop the caller at the failing line, so drop it for the
+  # source and put it back after.
+  case $- in *e*) _atst_cfg_errexit=1 ;; *) _atst_cfg_errexit=0 ;; esac
+  set +e
+  trap '_atst_cfg_failed=1' ERR
+  # shellcheck source=/dev/null  # ~/.atst/config lives outside the repository
+  . "$ATST_CONFIG_FILE"
+  [ "$?" -eq 0 ] || _atst_cfg_failed=1
+  trap - ERR
+  if [ "$_atst_cfg_errexit" = 1 ]; then
+    set -e
+  fi
+  unset _atst_cfg_errexit
+else
+  # The caller has an ERR trap of its own (bats does): leave it alone and judge by the return value
+  # only, as before. A line that fails when run is not caught on this path.
+  # shellcheck source=/dev/null  # ~/.atst/config lives outside the repository
+  . "$ATST_CONFIG_FILE" || _atst_cfg_failed=1
+fi
+if [ "$_atst_cfg_failed" = 1 ]; then
   echo "[warn] ~/.atst/config may not have been read completely (syntax error or a failing line)" 1>&2
 fi
+unset _atst_cfg_failed
 if [ -n "$_atst_spool_env" ]; then
   export ATST_NOTIFY_SPOOL="$_atst_spool_env" 2>/dev/null
 else
