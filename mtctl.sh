@@ -40,7 +40,7 @@ function start_mt() {
 
     if [ -z "$target_path" ]; then
       pm "起動対象のMetaTraderのインストール場所が見つかりませ。起動をスキップします。: $target_name" 1>&2
-      let i++
+      i=$((i + 1))
       continue
     fi
 
@@ -57,7 +57,7 @@ function start_mt() {
 
     nohup "$WINE" start /b /d "$work_dir" /unix "$target_path" >> "$wine_log" 2>&1
 
-    let i++
+    i=$((i + 1))
   done
 }
 
@@ -73,14 +73,14 @@ function stop_mt() {
 
     if [ -z "$target_pid" ]; then
       pm "指定されたMetaTraderは起動していません。: $target_name" 1>&2
-      let i++
+      i=$((i + 1))
       continue
     fi
 
     pm stopping: pid=$target_pid, $target_name
     kill $target_pid
 
-    let i++
+    i=$((i + 1))
   done
 }
 
@@ -101,7 +101,7 @@ function list_mt() {
     fi
 
     echo [$(($i + 1))/$num_mt]:$mt_status type=${mt_type[$i]}, name=${mt_name[$i]}, home=${mt_home[$i]}, data=${mt_data[$i]}
-    let i++
+    i=$((i + 1))
   done
 }
 
@@ -121,7 +121,7 @@ function status_mt() {
       echo "status=stopped, pid= -, name=$target_name"
     fi
 
-    let i++
+    i=$((i + 1))
   done
 }
 

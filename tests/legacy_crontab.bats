@@ -69,9 +69,10 @@ no_runner_trace() {
 @test "LG-2: the two check_order lines send one order once and consume order_status" {
   atst_test_make_mt A_MT4 MT4
   atst_test_make_order_status A_MT4 'order one'
-  # $status is not checked: check_order.sh exits 1 after the loop with one MT (known, #101).
   run sh -c "$LEGACY_ORDER_10"
+  [ "$status" -eq 0 ]
   run sh -c "$LEGACY_ORDER_40"
+  [ "$status" -eq 0 ]
   [ "$(atst_test_push_count)" -eq 1 ]
   grep -q 'order one' "$ATST_TEST_CURL_LOG"
   [ ! -e "$F/order_status" ]

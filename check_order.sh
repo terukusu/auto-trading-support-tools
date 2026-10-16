@@ -69,7 +69,7 @@ while [ "$i" -lt "$target_num" ]; do
   if [ -z "$target_index" ]; then
     # Not installed (reported by check_process.sh). An empty index would read mt_home[0], i.e. a
     # different MetaTrader.
-    let i++
+    i=$((i + 1))
     continue
   fi
   order_status_file="$(atst_get_mql_folder_path "$target_name")/Files/order_status"
@@ -93,5 +93,5 @@ while [ "$i" -lt "$target_num" ]; do
 
   send_pending_orders "$pending_file"
 
-  let i++
+  i=$((i + 1))
 done
