@@ -13,7 +13,7 @@
 -A INPUT -p icmp ! --icmp-type echo-request -j ACCEPT
 
 -A INPUT -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
--A INPUT -p udp --sport 53 -j ACCEPT
+-A INPUT -p udp -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 -A INPUT -p tcp -m state --syn --state NEW --dport 22 -m hashlimit --hashlimit-name t_sshd --hashlimit 1/m --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-htable-expire 120000 -j ACCEPT
 
