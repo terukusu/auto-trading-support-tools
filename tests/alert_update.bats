@@ -204,3 +204,40 @@ hold_lock() {
   grep -q '^K,1,' "$ATST_ALERT_STATUS_FILE"
   [ -n "$output" ]
 }
+
+@test "UE-01: an empty ATST_ALERT_STATUS_FILE sends nothing, takes no lock, logs the notice and returns 1 (#110)" {
+  mkdir "$ATST_TEST_SANDBOX/cwd"
+  cd "$ATST_TEST_SANDBOX/cwd"
+  ATST_ALERT_STATUS_FILE=""
+  run atst_update_alert KEY 1 fire-ue01 recover-ue01
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'ATST_ALERT_STATUS_FILE is empty'* ]]
+  [ "$(atst_test_push_count)" -eq 0 ]
+  [ -z "$(compgen -G "$HOME/.atst/alert_update.*")" ]
+  [ -z "$(compgen -G "$HOME/.atst/alert_status*")" ]
+  grep -q 'http=no_alert_status' "$HOME/.atst/line_error.log"
+  grep -q 'fire-ue01' "$HOME/.atst/line_error.log"
+  [ -z "$(ls -A)" ]
+}
+
+@test "UE-02: with an empty ATST_ALERT_STATUS_FILE, nothing due stays silent and returns 0 (#110)" {
+  ATST_ALERT_STATUS_FILE=""
+  run atst_update_alert KEY 0 f r
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ "$(atst_test_push_count)" -eq 0 ]
+  [ ! -e "$HOME/.atst/line_error.log" ]
+}
+
+@test "UE-03: atst_alert_lock_file and atst_log_line_error do nothing and return 1 with an empty ATST_CONFIG_DIR (#110)" {
+  mkdir "$ATST_TEST_SANDBOX/cwd"
+  cd "$ATST_TEST_SANDBOX/cwd"
+  ATST_CONFIG_DIR=""
+  run atst_alert_lock_file KEY
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+  run atst_log_line_error 500 body text
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+  [ -z "$(ls -A)" ]
+}
