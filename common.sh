@@ -108,31 +108,47 @@ function atst_read_file() {
 }
 
 # 画像を一時置き場にアップロードし、公開 URL を出力する。LINE の画像メッセージは公開 HTTPS の URL が要る。
-# Litterbox (catbox.moe の一時置き場) に 72 時間だけ置く。URL を知っていれば誰でも見られるので、
-# 送る画像に秘匿したいものを含めないこと。(以前の 0x0.st は 2026 年にアップロードを停止した)
+# まず Litterbox (catbox.moe の一時置き場、72 時間) に置き、失敗したら Uguu (uguu.se、3 時間) に置く。
+# Litterbox は 2026 年 10 月にどの画像にも 500 を返す時期があった (#117)。
+# URL を知っていれば誰でも見られるので、送る画像に秘匿したいものを含めないこと。
+# (以前の 0x0.st は 2026 年にアップロードを停止した)
 function atst_upload_image() {
   local file="$1"
-  local api="https://litterbox.catbox.moe/resources/internals/api.php"
 
   if [ ! -f "$file" ]; then
     echo "Error: File not found: $file" >&2
     return 1
   fi
 
-  local response url code
+  local response body code url codes
   # IPv4: some VPS have a broken IPv6 route (kept from the 0x0.st version).
-  response=$(curl --max-time 60 --connect-timeout 10 -4 -s -w "\n%{http_code}" \
-    -F reqtype=fileupload -F time=72h -F "fileToUpload=@$file" "$api" 2>/dev/null)
-  code=${response##*$'\n'}
-  url=${response%$'\n'*}
 
+  # Litterbox: the body is the URL itself.
+  response=$(curl --max-time 60 --connect-timeout 10 -4 -s -w "\n%{http_code}" \
+    -F reqtype=fileupload -F time=72h -F "fileToUpload=@$file" \
+    "https://litterbox.catbox.moe/resources/internals/api.php" 2>/dev/null)
+  code=${response##*$'\n'}
+  body=${response%$'\n'*}
+  if [ "$code" == "200" ] && [[ "$body" =~ ^https://[^[:space:]]+$ ]]; then
+    echo "$body"
+    return 0
+  fi
+  codes="litterbox=$code"
+
+  # Uguu: JSON like {"success": true, "files": [{"url": "https:\/\/d.uguu.se\/xxxx.png", ...}]}
+  response=$(curl --max-time 60 --connect-timeout 10 -4 -s -w "\n%{http_code}" \
+    -F "files[]=@$file" "https://uguu.se/upload" 2>/dev/null)
+  code=${response##*$'\n'}
+  body=${response%$'\n'*}
+  url=$(printf '%s' "$body" | tr -d '\\' | grep -o '"url": *"https://[^"[:space:]]*"' | head -n 1 | sed -E 's/^"url": *"(.*)"$/\1/')
   if [ "$code" == "200" ] && [[ "$url" =~ ^https://[^[:space:]]+$ ]]; then
     echo "$url"
     return 0
   fi
+  codes="$codes,uguu=$code"
 
   # cron discards stderr; leave a trace where LINE failures are logged (000 = timeout etc.).
-  atst_log_line_error "upload:$code" "$url" "画像アップロード失敗: $(basename "$file")"
+  atst_log_line_error "upload:$codes" "$body" "画像アップロード失敗: $(basename "$file")"
   echo "Error: Upload failed" >&2
   return 1
 }
