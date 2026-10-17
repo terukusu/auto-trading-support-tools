@@ -28,8 +28,8 @@ echo ""
 echo "テスト用の小さな画像を ImgBB にアップロードして確かめます (1 分で消えます)。"
 test_image=$(mktemp "$ATST_CONFIG_DIR/imgbb_test.XXXXXX") || exit 1
 trap 'rm -f "$test_image"' EXIT
-# 1x1 PNG
-printf 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' | base64 -d > "$test_image"
+# 64x32 PNG. ImgBB refuses 1x1 images ("You have been forbidden to use this website.", code 103).
+printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAIAAAAt/+nTAAAARUlEQVR42u3XMQ0AIAxE0epgZcIWQmodRHRq+pJv4E2Xi7WzdQEAAAAAUAKc+1oHAAAAAFADWGIAAAAAf8ASAwAAAIwFfFhvFIhzDrjzAAAAAElFTkSuQmCC' | base64 -d > "$test_image"
 
 response=$(curl --max-time 60 --connect-timeout 10 -4 -s -w "\n%{http_code}" \
   -F "key=<"<(printf '%s' "$imgbb_key") -F "expiration=60" \
