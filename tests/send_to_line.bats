@@ -186,3 +186,41 @@ push_count() {
   [ "$status" -eq 1 ]
   grep -q 'http=upload:litterbox=500,uguu=200' "$HOME/.atst/line_error.log"
 }
+
+@test "U5: with ~/.atst/.imgbb_key ImgBB is tried first and its data.url is returned" {
+  export ATST_TEST_CURL_BODY='{"data":{"id":"x","url_viewer":"https:\/\/ibb.co\/x","url":"https:\/\/i.ibb.co\/x\/a.png","display_url":"https:\/\/i.ibb.co\/x\/b.png"},"success":true,"status":200}'
+  : > "$ATST_TEST_SANDBOX/i1.png"
+  atst_test_source_common || return 1
+  printf 'secretkey123\n' > "$ATST_CONFIG_DIR/.imgbb_key"
+  run atst_upload_image "$ATST_TEST_SANDBOX/i1.png"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://i.ibb.co/x/a.png" ]
+  [ "$(wc -l < "$ATST_TEST_CURL_LOG")" -eq 1 ]
+  grep -q 'api.imgbb.com/1/upload' "$ATST_TEST_CURL_LOG"
+  grep -q 'expiration=604800' "$ATST_TEST_CURL_LOG"
+  # the key is passed through a pipe, not on the command line
+  [ "$(grep -c secretkey123 "$ATST_TEST_CURL_LOG")" -eq 0 ]
+}
+
+@test "U6: ImgBB failing falls back to Litterbox and the log lists every uploader" {
+  export ATST_TEST_CURL_HTTP_CODE_SEQ="400 500 500"
+  export ATST_TEST_CURL_BODY='<html>error</html>'
+  : > "$ATST_TEST_SANDBOX/i1.png"
+  atst_test_source_common || return 1
+  printf 'secretkey123\n' > "$ATST_CONFIG_DIR/.imgbb_key"
+  run atst_upload_image "$ATST_TEST_SANDBOX/i1.png"
+  [ "$status" -eq 1 ]
+  [ "$(wc -l < "$ATST_TEST_CURL_LOG")" -eq 3 ]
+  grep -q 'http=upload:imgbb=400,litterbox=500,uguu=500' "$HOME/.atst/line_error.log"
+  [ "$(grep -c secretkey123 "$HOME/.atst/line_error.log")" -eq 0 ]
+}
+
+@test "U7: ATST_IMGBB_EXPIRATION is passed to ImgBB" {
+  export ATST_TEST_CURL_BODY='{"data":{"url":"https:\/\/i.ibb.co\/x\/a.png"},"success":true}'
+  : > "$ATST_TEST_SANDBOX/i1.png"
+  atst_test_source_common || return 1
+  printf 'k\n' > "$ATST_CONFIG_DIR/.imgbb_key"
+  ATST_IMGBB_EXPIRATION=86400 run atst_upload_image "$ATST_TEST_SANDBOX/i1.png"
+  [ "$status" -eq 0 ]
+  grep -q 'expiration=86400' "$ATST_TEST_CURL_LOG"
+}

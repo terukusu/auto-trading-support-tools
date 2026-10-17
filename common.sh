@@ -108,9 +108,12 @@ function atst_read_file() {
 }
 
 # 画像を一時置き場にアップロードし、公開 URL を出力する。LINE の画像メッセージは公開 HTTPS の URL が要る。
-# まず Litterbox (catbox.moe の一時置き場、72 時間) に置き、失敗したら Uguu (uguu.se、3 時間) に置く。
-# Litterbox は 2026 年 10 月にどの画像にも 500 を返す時期があった (#117)。
-# URL を知っていれば誰でも見られるので、送る画像に秘匿したいものを含めないこと。
+# LINE のサーバーが認証なしで取りに来るので、どこに置いても URL を知っていれば誰でも見られる。
+# 送る画像に秘匿したいものを含めないこと。次の順に試す:
+#   1. ImgBB: $ATST_CONFIG_DIR/.imgbb_key (setup_imgbb.sh で設定) があるとき。
+#      $ATST_IMGBB_EXPIRATION 秒 (既定 7 日) で消える。
+#   2. Litterbox (catbox.moe の一時置き場、72 時間)。2026 年 10 月にどの画像にも 500 を返す時期があった (#117)。
+#   3. Uguu (uguu.se、3 時間)。
 # (以前の 0x0.st は 2026 年にアップロードを停止した)
 function atst_upload_image() {
   local file="$1"
@@ -120,8 +123,27 @@ function atst_upload_image() {
     return 1
   fi
 
-  local response body code url codes
+  local response body code url codes="" key=""
   # IPv4: some VPS have a broken IPv6 route (kept from the 0x0.st version).
+
+  # ImgBB: JSON like {"data": {..., "url": "https:\/\/i.ibb.co\/xxxx\/a.png", ...}, "success": true}
+  if [ -s "$ATST_CONFIG_DIR/.imgbb_key" ]; then
+    key=$(tr -d '\r\n' < "$ATST_CONFIG_DIR/.imgbb_key")
+  fi
+  if [ -n "$key" ]; then
+    # The key is read by curl from a pipe so that it does not show up in ps.
+    response=$(curl --max-time 60 --connect-timeout 10 -4 -s -w "\n%{http_code}" \
+      -F "key=<"<(printf '%s' "$key") -F "expiration=${ATST_IMGBB_EXPIRATION:-604800}" \
+      -F "image=@$file" "https://api.imgbb.com/1/upload" 2>/dev/null)
+    code=${response##*$'\n'}
+    body=${response%$'\n'*}
+    url=$(atst_json_first_url "$body")
+    if [ "$code" == "200" ] && [ -n "$url" ]; then
+      echo "$url"
+      return 0
+    fi
+    codes="imgbb=$code,"
+  fi
 
   # Litterbox: the body is the URL itself.
   response=$(curl --max-time 60 --connect-timeout 10 -4 -s -w "\n%{http_code}" \
@@ -133,15 +155,15 @@ function atst_upload_image() {
     echo "$body"
     return 0
   fi
-  codes="litterbox=$code"
+  codes="${codes}litterbox=$code"
 
   # Uguu: JSON like {"success": true, "files": [{"url": "https:\/\/d.uguu.se\/xxxx.png", ...}]}
   response=$(curl --max-time 60 --connect-timeout 10 -4 -s -w "\n%{http_code}" \
     -F "files[]=@$file" "https://uguu.se/upload" 2>/dev/null)
   code=${response##*$'\n'}
   body=${response%$'\n'*}
-  url=$(printf '%s' "$body" | tr -d '\\' | grep -o '"url": *"https://[^"[:space:]]*"' | head -n 1 | sed -E 's/^"url": *"(.*)"$/\1/')
-  if [ "$code" == "200" ] && [[ "$url" =~ ^https://[^[:space:]]+$ ]]; then
+  url=$(atst_json_first_url "$body")
+  if [ "$code" == "200" ] && [ -n "$url" ]; then
     echo "$url"
     return 0
   fi
@@ -151,6 +173,15 @@ function atst_upload_image() {
   atst_log_line_error "upload:$codes" "$body" "画像アップロード失敗: $(basename "$file")"
   echo "Error: Upload failed" >&2
   return 1
+}
+
+# Prints the first "url": "https://..." value in a JSON text (with "\/" unescaped), or nothing.
+# Other keys ending in url ("display_url" etc.) are not matched. jq is not required.
+function atst_json_first_url() {
+  local url
+  url=$(printf '%s' "$1" | tr -d '\\' | grep -o '"url": *"https://[^"[:space:]]*"' | head -n 1 | sed -E 's/^"url": *"(.*)"$/\1/')
+  [[ "$url" =~ ^https://[^[:space:]]+$ ]] && printf '%s\n' "$url"
+  return 0
 }
 
 # LINE送信関数
