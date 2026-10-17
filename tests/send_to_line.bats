@@ -141,3 +141,48 @@ push_count() {
   without_jq=$(last_payload | "$JQ" -r '.messages[0].text')
   [ "$without_jq" = "$with_jq" ]
 }
+
+@test "U1: Litterbox 200 returns its URL without trying Uguu" {
+  export ATST_TEST_CURL_BODY=https://litter.catbox.moe/abc123.png
+  : > "$ATST_TEST_SANDBOX/i1.png"
+  atst_test_source_common || return 1
+  run atst_upload_image "$ATST_TEST_SANDBOX/i1.png"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://litter.catbox.moe/abc123.png" ]
+  [ "$(wc -l < "$ATST_TEST_CURL_LOG")" -eq 1 ]
+  [ "$(grep -c 'uguu.se' "$ATST_TEST_CURL_LOG")" -eq 0 ]
+}
+
+@test "U2: Litterbox 500 falls back to Uguu and returns the unescaped URL from its JSON" {
+  export ATST_TEST_CURL_HTTP_CODE_SEQ="500 200"
+  export ATST_TEST_CURL_BODY='{"success": true, "files": [{"hash": "x", "filename": "tfZf.png", "url": "https:\/\/d.uguu.se\/tfZf.png", "size": 10}]}'
+  : > "$ATST_TEST_SANDBOX/i1.png"
+  atst_test_source_common || return 1
+  run atst_upload_image "$ATST_TEST_SANDBOX/i1.png"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://d.uguu.se/tfZf.png" ]
+  [ "$(grep -c 'litterbox.catbox.moe' "$ATST_TEST_CURL_LOG")" -eq 1 ]
+  [ "$(grep -c 'uguu.se/upload' "$ATST_TEST_CURL_LOG")" -eq 1 ]
+  [ ! -e "$HOME/.atst/line_error.log" ]
+}
+
+@test "U3: both uploaders failing returns 1 and logs both HTTP codes" {
+  export ATST_TEST_CURL_HTTP_CODE_SEQ="500 503"
+  export ATST_TEST_CURL_BODY='<html>error</html>'
+  : > "$ATST_TEST_SANDBOX/i1.png"
+  atst_test_source_common || return 1
+  run atst_upload_image "$ATST_TEST_SANDBOX/i1.png"
+  [ "$status" -eq 1 ]
+  grep -q 'http=upload:litterbox=500,uguu=503' "$HOME/.atst/line_error.log"
+  grep -q '画像アップロード失敗: i1.png' "$HOME/.atst/line_error.log"
+}
+
+@test "U4: a Uguu 200 without a URL in the body is a failure" {
+  export ATST_TEST_CURL_HTTP_CODE_SEQ="500 200"
+  export ATST_TEST_CURL_BODY='{"success": false, "errorcode": 400}'
+  : > "$ATST_TEST_SANDBOX/i1.png"
+  atst_test_source_common || return 1
+  run atst_upload_image "$ATST_TEST_SANDBOX/i1.png"
+  [ "$status" -eq 1 ]
+  grep -q 'http=upload:litterbox=500,uguu=200' "$HOME/.atst/line_error.log"
+}
