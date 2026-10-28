@@ -19,7 +19,7 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 - `run_with_targets.sh` — 毎分以外のジョブ（`mtctl.sh` / `truncate_monitoring.sh` / `report_image.sh` の固定 3 本のみ）に `ATST_TARGETS` の MT 名を付けて起動する（`exec`、eval 無し）。監視対象が無ければ実行せず stderr に出して非 0 終了。
 - `wrapper.sh` — 旧形式の crontab（`TARGET="(...)"` と `wrapper.sh "$TARGET" <script>`）が動き続けるためだけに残している。第 1 引数（MT 名の配列リテラル）を `eval` で展開して各スクリプトへ渡す。新しい crontab では使わない。
 - `setup_*.sh` — `setup_cron.sh`（cron 設定。crontab が空なら確認なしで登録、旧形式の行があれば移行の案内と旧 `TARGET` の値を表示、atst の行がある crontab には追記しない、入力なし（EOF）では変更しない、書き込み・テンプレート読み込み失敗は exit 2）、`setup_line.sh`（LINE トークン設定）、`setup_monitoring_ea.sh`（監視 EA 配置）。
-- `report_image.sh` / `draw_graph.sh` — スプレッド/値動きのグラフとデスクトップ画像を LINE 通知。
+- `report_image.sh` / `draw_graph.sh` — 値動き/スプレッドの文字要約を LINE 通知。ImgBB の API キーがあるときだけグラフ画像、さらに `ATST_IMAGE_REPORT_DESKTOP=1` ならデスクトップ画像も（既定は送らない。口座番号・残高が写るため）。画像ホストは ImgBB のみで、`atst_upload_image` はキーが無ければ curl を呼ばず 1 を返す（キーの有無は `atst_has_imgbb_key`）。`check_daily.sh` は `ATST_IMAGE_REPORT_DESKTOP` の行が無い旧 config に、既定 OFF を `atst_update_alert IMAGE_REPORT_DEFAULT_CHANGED` で 1 度だけ案内する。
 - `sleep_random.sh`（旧形式の crontab の行用。新形式の `check_all.sh` は順次実行なので使わない）/ `truncate_monitoring.sh` / `minimize_*.sh` / `purge_needless_packages.sh` — 補助。
 - `scripts/` — 配布・リリース用（common.sh を source しない）。`init_atst.sh` は配布用で gist と同一内容（固定 tag の GitHub archive zip を取得し、埋め込みの sha256 と一致したときだけ `./auto-trading-support-tools-master/` に展開して `install_required_for_mt.sh` を実行。`--channel master` は未検証で最新 master）。`release.sh` は tag 作成（tag だけ push）と `init_atst.sh` の `ATST_VERSION` / `ATST_ZIP_SHA256` の書き換え（`--dry-run` / `--refresh-sha`）。
 - `templates/` — 配置用テンプレート（`config`、`crontab.txt`、`xstartup`、`vncserver@:1.service`、`font_replace.reg`、`ip_rules_v*.txt`）。

@@ -107,14 +107,21 @@ function atst_read_file() {
   cat "$1" | sed -re 's/\r//g'
 }
 
-# 画像を一時置き場にアップロードし、公開 URL を出力する。LINE の画像メッセージは公開 HTTPS の URL が要る。
-# LINE のサーバーが認証なしで取りに来るので、どこに置いても URL を知っていれば誰でも見られる。
-# 送る画像に秘匿したいものを含めないこと。次の順に試す:
-#   1. ImgBB: $ATST_CONFIG_DIR/.imgbb_key (setup_imgbb.sh で設定) があるとき。
-#      $ATST_IMGBB_EXPIRATION 秒 (既定 7 日) で消える。
-#   2. Litterbox (catbox.moe の一時置き場、72 時間)。2026 年 10 月にどの画像にも 500 を返す時期があった (#117)。
-#   3. Uguu (uguu.se、3 時間)。
-# (以前の 0x0.st は 2026 年にアップロードを停止した)
+# $ATST_CONFIG_DIR/.imgbb_key (setup_imgbb.sh で設定) に ImgBB の API キーがあれば 0、無ければ 1。
+# ATST_CONFIG_DIR が空・ファイル無し・空・改行だけ・読めないときは「無し」。atst_upload_image が curl に
+# 渡すキーと同じ基準 (CR/LF を除く) で判定する。何も出力しない (キーの値を出さない。P5)。
+function atst_has_imgbb_key() {
+  [ -n "$ATST_CONFIG_DIR" ] || return 1
+  [ -s "$ATST_CONFIG_DIR/.imgbb_key" ] || return 1
+  # The braces also silence bash's own "Permission denied" for the redirection.
+  [ -n "$({ tr -d '\r\n' < "$ATST_CONFIG_DIR/.imgbb_key"; } 2>/dev/null)" ]
+}
+
+# 画像を ImgBB にアップロードし、公開 URL を出力する。LINE の画像メッセージは公開 HTTPS の URL が要る。
+# LINE のサーバーが認証なしで取りに来るので、URL を知っていれば誰でも見られる。
+# 送る画像に秘匿したいものを含めないこと。
+# ImgBB の API キー ($ATST_CONFIG_DIR/.imgbb_key、setup_imgbb.sh で設定) が無ければアップロードせず 1 を返す
+# (curl を呼ばない)。画像は $ATST_IMGBB_EXPIRATION 秒 (既定 24 時間) で消える。
 function atst_upload_image() {
   local file="$1"
 
@@ -123,43 +130,21 @@ function atst_upload_image() {
     return 1
   fi
 
-  local response body code url codes="" key=""
-  # IPv4: some VPS have a broken IPv6 route (kept from the 0x0.st version).
+  if ! atst_has_imgbb_key; then
+    # Not logged to line_error.log: a missing key is a setting (doctor.sh shows it), not a failure.
+    echo "Error: ImgBB API key is not set (run setup_imgbb.sh)" >&2
+    return 1
+  fi
+
+  local response body code url key
+  key=$(tr -d '\r\n' < "$ATST_CONFIG_DIR/.imgbb_key")
 
   # ImgBB: JSON like {"data": {..., "url": "https:\/\/i.ibb.co\/xxxx\/a.png", ...}, "success": true}
-  if [ -s "$ATST_CONFIG_DIR/.imgbb_key" ]; then
-    key=$(tr -d '\r\n' < "$ATST_CONFIG_DIR/.imgbb_key")
-  fi
-  if [ -n "$key" ]; then
-    # The key is read by curl from a pipe so that it does not show up in ps.
-    response=$(curl --max-time 60 --connect-timeout 10 -4 -s -w "\n%{http_code}" \
-      -F "key=<"<(printf '%s' "$key") -F "expiration=${ATST_IMGBB_EXPIRATION:-604800}" \
-      -F "image=@$file" "https://api.imgbb.com/1/upload" 2>/dev/null)
-    code=${response##*$'\n'}
-    body=${response%$'\n'*}
-    url=$(atst_json_first_url "$body")
-    if [ "$code" == "200" ] && [ -n "$url" ]; then
-      echo "$url"
-      return 0
-    fi
-    codes="imgbb=$code,"
-  fi
-
-  # Litterbox: the body is the URL itself.
+  # The key is read by curl from a pipe so that it does not show up in ps.
+  # IPv4: some VPS have a broken IPv6 route.
   response=$(curl --max-time 60 --connect-timeout 10 -4 -s -w "\n%{http_code}" \
-    -F reqtype=fileupload -F time=72h -F "fileToUpload=@$file" \
-    "https://litterbox.catbox.moe/resources/internals/api.php" 2>/dev/null)
-  code=${response##*$'\n'}
-  body=${response%$'\n'*}
-  if [ "$code" == "200" ] && [[ "$body" =~ ^https://[^[:space:]]+$ ]]; then
-    echo "$body"
-    return 0
-  fi
-  codes="${codes}litterbox=$code"
-
-  # Uguu: JSON like {"success": true, "files": [{"url": "https:\/\/d.uguu.se\/xxxx.png", ...}]}
-  response=$(curl --max-time 60 --connect-timeout 10 -4 -s -w "\n%{http_code}" \
-    -F "files[]=@$file" "https://uguu.se/upload" 2>/dev/null)
+    -F "key=<"<(printf '%s' "$key") -F "expiration=${ATST_IMGBB_EXPIRATION:-86400}" \
+    -F "image=@$file" "https://api.imgbb.com/1/upload" 2>/dev/null)
   code=${response##*$'\n'}
   body=${response%$'\n'*}
   url=$(atst_json_first_url "$body")
@@ -167,10 +152,9 @@ function atst_upload_image() {
     echo "$url"
     return 0
   fi
-  codes="$codes,uguu=$code"
 
   # cron discards stderr; leave a trace where LINE failures are logged (000 = timeout etc.).
-  atst_log_line_error "upload:$codes" "$body" "画像アップロード失敗: $(basename "$file")"
+  atst_log_line_error "upload:imgbb=$code" "$body" "画像アップロード失敗: $(basename "$file")"
   echo "Error: Upload failed" >&2
   return 1
 }

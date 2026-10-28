@@ -149,7 +149,8 @@ ATST_TARGETS=('Land Prime')
 こんな感じで設定しておけば、再起動時とMT4/5プロセスが落ちたときや、ポジションの新規や決済、値動きやスプレッド、Pingに異常が有った時ににLINEへ通知してくれます。  
 
 * `check_all.sh` は毎分の監視(再起動・約定・プロセス・監視データ・Ping・値動き・スプレッド・ハートビート)を 1 回ずつ順番に実行します。crontab の毎分の行はこの 1 行だけです。
-* `run_with_targets.sh` は、`@reboot` のMT4/5の自動起動、監視データの整理、画像の通知のジョブに、`ATST_TARGETS` の名前を付けて実行します。
+* `run_with_targets.sh` は、`@reboot` のMT4/5の自動起動、監視データの整理、定期レポート (値動き・スプレッドの要約と画像) のジョブに、`ATST_TARGETS` の名前を付けて実行します。
+* `report_image.sh` は毎朝、MT ごとの値動き・スプレッドの文字要約を送ります。ImgBB の API キー (`setup_imgbb.sh`) があればグラフ画像を付け、`~/.atst/config` に `ATST_IMAGE_REPORT_DESKTOP=1` を書くとデスクトップ画像も付けます (既定は送りません。口座番号・残高が写るため)。画像は ImgBB に置かれ、24 時間で消えます (`ATST_IMGBB_EXPIRATION` で変更できます)。
 
 
 ### 監視するMT4/5の指定 (ATST_TARGETS)
@@ -177,6 +178,18 @@ ATST_TARGETS=('Land Prime')
 * 約定のチェックは 1 回目の開始から `ATST_ORDER_CHECK_INTERVAL` 秒(0〜50、既定 30。こちらも `~/.atst/config` の末尾に書きます)後にもう一度実行するので、従来どおり毎分 2 回です。
 * ハートビート(`heartbeat.sh`)は `check_all.sh` の最後に送ります。外部サービス側の猶予(grace)は **3 分以上**を推奨します。
 
+
+### デスクトップ画像の通知の移行
+
+朝の定期レポート (`report_image.sh`) のデスクトップ画像は、口座番号・残高が写るため、既定で送らなくなりました。画像の置き場所は ImgBB だけになり、ImgBB の API キー (`setup_imgbb.sh`) が無いときは画像を送らず、文字要約だけを送ります。
+
+これまでどおりデスクトップ画像を受け取るには、`setup_imgbb.sh` で API キーを設定したうえで、`~/.atst/config` に次の 1 行を書きます。
+```
+ATST_IMAGE_REPORT_DESKTOP=1
+```
+
+* この行が無い `~/.atst/config` では、`check_daily.sh` が LINE で 1 度だけ案内します。上の 1 行を書くと案内は届きません。
+* 画像が消えるまでの時間 (`ATST_IMGBB_EXPIRATION`) の既定は、7 日から 24 時間になりました。この行を `~/.atst/config` に書いてある場合は、その値のままです。
 
 ### 既存の crontab からの移行
 
@@ -237,7 +250,7 @@ mtctl.sh のメッセージ(`list` の 1 行目、`status` の各行、`stop` / 
 6. `ea` / `csv`: 監視 EA (`TerminalMonitoring.ex4` / `.ex5`) が置かれているか、`terminal_monitoring.csv` の最終行が `ATST_MONITORING_THRESHOLD` 秒より新しいか (check_monitoring.sh と同じ基準)。
 7. `crontab -l`: 新形式 (`check_all.sh`) なら OK、旧形式 (`wrapper.sh`) のみなら OK で「旧形式」と添えます。両方ある (混在)・どちらも無いときは NG。
 8. `line_error.log`: `~/.atst/line_error.log` の LINE 送信失敗の見出し行 (末尾 5 件)。表示のみです。
-9. `.line_token` / `.line_id` / `.imgbb_key`: 存在と権限 (600 でなければ NG)。`.imgbb_key` は任意です。
+9. `.line_token` / `.line_id` / `.imgbb_key`: 存在と権限 (600 でなければ NG)。`.imgbb_key` は任意です (定期レポートにグラフ・デスクトップの画像を付けるのに必要。無ければ文字要約だけを送ります)。
 10. `heartbeat`: `ATST_HEARTBEAT_URL` (外形監視) が設定されているか。疎通確認はしません。
 
 NG の例:

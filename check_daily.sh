@@ -58,3 +58,13 @@ if [ "$ATST_DAILY_REPORT" != "0" ] || [ -n "$upgrade_msg$mt_update_msg$quota_war
     [ -n "$upgrade_msg" ] && echo "$upgrade_msg"
   } | atst_send_to_line
 fi
+
+# Issue #135: the desktop image of the morning report became opt-in (it shows the account number and
+# balance). Tell a user whose config predates ATST_IMAGE_REPORT_DESKTOP, once: atst_update_alert records
+# the key only when the push succeeded (a failed one is sent again the next day). The verdict is 1 or
+# empty, never 0, so there is no "recovered" notice. A line "ATST_IMAGE_REPORT_DESKTOP=" counts as set.
+image_notice=""
+if [ -z "${ATST_IMAGE_REPORT_DESKTOP+x}" ] && [ "${ATST_IMAGE_REPORT_TERM:-}" != "0" ]; then
+  image_notice=1
+fi
+atst_update_alert IMAGE_REPORT_DEFAULT_CHANGED "$image_notice" "【お知らせ】デスクトップ画像の通知は既定 OFF になりました (口座番号・残高が写るため)。朝の定期レポートは文字要約 (ImgBB の API キーがあればグラフ画像も) になります。デスクトップ画像も送るには、setup_imgbb.sh で ImgBB の API キーを設定し、~/.atst/config に ATST_IMAGE_REPORT_DESKTOP=1 を書いてください。この通知は 1 度だけです。" ""
