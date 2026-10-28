@@ -118,7 +118,7 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 
 ## 既にLinux + Wine + MetaTrader4/5 で自動売買をしている人向けの紹介
 
-まずは crontab と、監視する MT4/5 を書く設定ファイル `~/.atst/config` です。
+まずは crontab と、監視する MT4/5 を書く設定ファイル `~/.atst/config` です。設定が合っているか確かめたいときは、`doctor.sh` で診断できます([自己診断](#自己診断-doctorsh))。
 
 crontab (`templates/crontab.txt` と同じ内容)
 ```
@@ -187,6 +187,7 @@ ATST_TARGETS=('Land Prime')
 * `@reboot`、`truncate_monitoring.sh`、`report_image.sh`、`check_daily.sh` の行は、旧形式と新形式の両方に残すと 2 回動きます。旧形式の行は必ず消してください。
 * 元に戻すときは、新しい行を消して旧形式の行に戻せばかまいません。
 * `ATST_TARGETS` が未設定のままだと、再起動時のMT4/5の自動起動(`@reboot` の行)も動きません。移行の前に必ず設定してください。
+* 移行後に動かないときや、設定が合っているか確かめたいときは、`doctor.sh` を実行してください([自己診断](#自己診断-doctorsh))。
 
 `setup_cron.sh` の動き:
 * crontab が空のときは、確認なしで新しいテンプレートを登録します。
@@ -211,3 +212,33 @@ Usage: mtctl.sh [-qsh] <list|start|status|stop|monitor> <MetaTrader Name1> [<Met
 	-q: quiet mode. print nothing.
 	-h: help. print this message.
 ```
+
+mtctl.sh のメッセージ(`list` の 1 行目、`status` の各行、`stop` / `start` で対象が見つからないときの行)には、判定に使った WINEPREFIX が ` (WINEPREFIX=...)` の形で付きます。`-q` のときはこれまでどおり何も出しません。
+
+### 自己診断 (doctor.sh)
+
+`./doctor.sh` (引数なし) で、atst の設定と監視の状態を項目ごとに 1 行で表示します。**読み取り専用**で、ファイル・crontab・MT4/5・Wine を一切変更せず、LINE への送信やネットワークアクセスもしません (`wine --version` と `crontab -l` を実行するだけです。`~/.atst/config` が無い初回だけは、共通処理が雛形を作ります)。
+
+各行は `OK` / `NG` / `--` で始まります。`--` は「未設定・対象なし・表示のみ (判定しない)」です。補足の行は空白 2 個で字下げして表示し、最終行は件数のまとめです。NG が 1 件以上あれば終了コード 1、無ければ 0 です (`--` は終了コードに影響しません)。引数を付けると使い方を表示して終了コード 1 で終わります。
+
+見る項目:
+1. `wine --version`: wine が PATH にあり、版を表示できるか。
+2. `arch`: 使用中の WINEPREFIX (config 読み込み後) があり、`system.reg` の `#arch=` の値。
+3. `WINEPREFIX`: 対話シェルの環境変数 (`env=`)、config 読み込み後 (`config=`)、環境変数を外して config を読んだ値 (`cron=`、cron で使われる値) を並べ、`config=` と `cron=` が違えば NG (文字列で比較するので、シンボリックリンク経由で同じ場所を指していても NG になります)。
+4. `target` / `mt`: `ATST_TARGETS` の各名前が検出した MT4/5 に前方一致するか (未設定・空は NG)。どの名前にも選ばれない MT4/5 は `--` (監視対象外) で表示します。前方一致で複数に当たるときは、check_*.sh と同じく最初の 1 つだけが監視対象です。
+5. `process`: 対象の MT4/5 が起動しているか。
+6. `ea` / `csv`: 監視 EA (`TerminalMonitoring.ex4` / `.ex5`) が置かれているか、`terminal_monitoring.csv` の最終行が `ATST_MONITORING_THRESHOLD` 秒より新しいか (check_monitoring.sh と同じ基準)。
+7. `crontab -l`: 新形式 (`check_all.sh`) なら OK、旧形式 (`wrapper.sh`) のみなら OK で「旧形式」と添えます。両方ある (混在)・どちらも無いときは NG。
+8. `line_error.log`: `~/.atst/line_error.log` の LINE 送信失敗の見出し行 (末尾 5 件)。表示のみです。
+9. `.line_token` / `.line_id` / `.imgbb_key`: 存在と権限 (600 でなければ NG)。`.imgbb_key` は任意です。
+10. `heartbeat`: `ATST_HEARTBEAT_URL` (外形監視) が設定されているか。疎通確認はしません。
+
+NG の例:
+```
+NG WINEPREFIX env=~/.wine32 config=~/.wine32 cron=~/.wine
+  interactive shell and cron use different WINEPREFIX; set WINEPREFIX in ~/.atst/config
+NG crontab -l mixed: both check_all.sh and wrapper.sh
+NG .line_token mode 644 (must be 600): ~/.atst/.line_token
+```
+
+トークン・キー・URL は末尾 4 文字だけ (`****abcd`) を表示し、LINE ID は表示しません。ホームディレクトリは `~` で表示するので、出力はそのまま Issue に貼れます (貼る前に念のため目で確認してください)。

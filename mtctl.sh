@@ -39,7 +39,7 @@ function start_mt() {
     target_path=$(atst_find_terminal "$target_name")
 
     if [ -z "$target_path" ]; then
-      pm "起動対象のMetaTraderのインストール場所が見つかりませ。起動をスキップします。: $target_name" 1>&2
+      pm "起動対象のMetaTraderのインストール場所が見つかりませ。起動をスキップします。: $target_name (WINEPREFIX=$WINEPREFIX)" 1>&2
       i=$((i + 1))
       continue
     fi
@@ -72,7 +72,7 @@ function stop_mt() {
     target_pid=$(atst_find_pid "$target_name")
 
     if [ -z "$target_pid" ]; then
-      pm "指定されたMetaTraderは起動していません。: $target_name" 1>&2
+      pm "指定されたMetaTraderは起動していません。: $target_name (WINEPREFIX=$WINEPREFIX)" 1>&2
       i=$((i + 1))
       continue
     fi
@@ -87,7 +87,7 @@ function stop_mt() {
 function list_mt() {
   num_mt=${#mt_home[@]}
 
-  echo $num_mt MetaTrader found.
+  echo "$num_mt MetaTrader found. (WINEPREFIX=$WINEPREFIX)"
 
   i=0
   while [ "$i" -lt ${#mt_home[@]} ]; do
@@ -116,9 +116,9 @@ function status_mt() {
     target_pid=$(atst_find_pid "$target_name")
 
     if [ -n "$target_pid" ]; then
-      echo "status=running, pid=$target_pid, name=$target_name"
+      echo "status=running, pid=$target_pid, name=$target_name (WINEPREFIX=$WINEPREFIX)"
     else
-      echo "status=stopped, pid= -, name=$target_name"
+      echo "status=stopped, pid= -, name=$target_name (WINEPREFIX=$WINEPREFIX)"
     fi
 
     i=$((i + 1))
