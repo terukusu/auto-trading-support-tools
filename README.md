@@ -100,6 +100,13 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 
 ※ この動画は 2019 年に撮ったものです。Google Cloud のコンソールや MetaTrader の画面、インストールのコマンドなどが今とは違うところがあります。実際の作業は上の各ページの手順に従ってください。
 
+### 導入スクリプトの配布について
+* 「自動売買に必要なものをインストール」で実行する `init_atst.sh`（Wiki が参照する gist）は、このリポジトリの `scripts/init_atst.sh` と同じものです。
+* リリース tag の zip を取得し、スクリプトに埋め込まれた sha256 と一致したときだけ展開して `install_required_for_mt.sh` を実行します。一致しない・取得できないときは `[error]` を出して何も展開せずに止まります。
+* 展開先は従来どおり `auto-trading-support-tools-master/` です（既存の crontab はそのまま使えます）。
+* 最新の master を試したい場合だけ `--channel master` を付けます（sha256 の照合はしません。`[warn]` が出ます）。
+* リリースの手順は [docs/RELEASE.md](docs/RELEASE.md) にあります。
+
 ### おまけ
 * [外側からの監視(ハートビート)](../../wiki/setup_heartbeat)
     * サーバーそのものやネットワークのダウンを検知する。VPS が毎分外部サービスへ生存を知らせ、途絶えたら外部サービスが通知する
