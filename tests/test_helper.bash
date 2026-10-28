@@ -264,3 +264,39 @@ atst_test_stub_script() {
   } > "$real/$name" || return 1
   chmod 755 "$real/$name"
 }
+
+# atst_test_make_dummy_zip <zip_path> <top> [<install_body>]
+# Writes <zip_path> (in the sandbox) holding <top>/install_required_for_mt.sh (mode 755) and
+# <top>/README.md, shaped like a GitHub archive zip. The default install_required_for_mt.sh touches
+# $ATST_TEST_SANDBOX/marker and appends its arguments and working directory as one line to
+# $ATST_TEST_SANDBOX/install.log; <install_body> replaces that body. <top> must be a plain name.
+# Prints nothing; take the sha256 of the zip afterwards (timestamps make the bytes differ per call).
+atst_test_make_dummy_zip() {
+  local zip="$1" top="$2" body
+  local sandbox parent work
+
+  [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
+  { [ "$#" -eq 2 ] || [ "$#" -eq 3 ]; } || return 1
+  [[ "$top" =~ ^[A-Za-z0-9_.-]+$ ]] && [ "$top" != . ] && [ "$top" != .. ] || return 1
+  [ -n "$zip" ] || return 1
+  sandbox=$(cd "$ATST_TEST_SANDBOX" && pwd -P) || return 1
+  parent=$(cd "$(dirname "$zip")" && pwd -P) || return 1
+  case "$parent" in
+    "$sandbox"|"$sandbox"/*) ;;
+    *) return 1 ;;
+  esac
+  zip="$parent/$(basename "$zip")"
+  if [ "$#" -eq 3 ]; then
+    body="$3"
+  else
+    # shellcheck disable=SC2016 # expanded by the dummy script when it runs, not here
+    body=$'#!/bin/bash\ntouch "$ATST_TEST_SANDBOX/marker"\necho "args=$* cwd=$(pwd)" >> "$ATST_TEST_SANDBOX/install.log"'
+  fi
+
+  work=$(mktemp -d "$ATST_TEST_SANDBOX/zipwork.XXXXXX") || return 1
+  mkdir -p "$work/$top" || return 1
+  printf '%s\n' "$body" > "$work/$top/install_required_for_mt.sh" || return 1
+  chmod 755 "$work/$top/install_required_for_mt.sh" || return 1
+  printf 'dummy\n' > "$work/$top/README.md" || return 1
+  (cd "$work" && zip -qr "$zip" "$top") || return 1
+}

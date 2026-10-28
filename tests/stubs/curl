@@ -6,6 +6,9 @@
 # - Prints $ATST_TEST_CURL_BODY, then "\n$ATST_TEST_CURL_HTTP_CODE" (default 200) when -w is given.
 # - With $ATST_TEST_CURL_HTTP_CODE_SEQ (space-separated HTTP codes), the n-th call (n = the number of
 #   lines in $ATST_TEST_CURL_LOG after appending) prints the n-th code instead; past its end, as above.
+# - With $ATST_TEST_CURL_FILE set and a separate "-o <path>" argument (not -o<path> / --output), copies
+#   that file to <path> and prints no body (as the real curl does with -o); -w still prints the code.
+#   Only when the exit code below is 0; a failed copy makes the stub fail. Unset: nothing changes.
 # - Exits with $ATST_TEST_CURL_EXIT (default 0).
 
 # Outside a sandbox: do nothing (and send nothing).
@@ -22,7 +25,25 @@ if [ -n "${ATST_TEST_CURL_HTTP_CODE_SEQ:-}" ]; then
   fi
 fi
 
-printf '%s' "${ATST_TEST_CURL_BODY-}"
+rc="${ATST_TEST_CURL_EXIT:-0}"
+
+# -o <path> with ATST_TEST_CURL_FILE: write the file instead of printing the body.
+out=""
+if [ -n "${ATST_TEST_CURL_FILE:-}" ] && [ "$rc" = 0 ]; then
+  prev=""
+  for a in "$@"; do
+    if [ "$prev" = "-o" ]; then
+      out=$a
+      break
+    fi
+    prev=$a
+  done
+fi
+if [ -n "$out" ]; then
+  cp -- "$ATST_TEST_CURL_FILE" "$out" || exit 1
+else
+  printf '%s' "${ATST_TEST_CURL_BODY-}"
+fi
 for a in "$@"; do
   if [ "$a" = "-w" ]; then
     printf '\n%s' "$code"
@@ -30,4 +51,4 @@ for a in "$@"; do
   fi
 done
 
-exit "${ATST_TEST_CURL_EXIT:-0}"
+exit "$rc"
