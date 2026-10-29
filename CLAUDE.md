@@ -24,7 +24,7 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 - `sleep_random.sh`（旧形式の crontab の行用。新形式の `check_all.sh` は順次実行なので使わない）/ `truncate_monitoring.sh`（監視 CSV・wine ログ・`check_all.log` の切り詰め）/ `minimize_*.sh` / `purge_needless_packages.sh` — 補助。
 - `scripts/` — 配布・リリース用（common.sh を source しない）。`init_atst.sh` は配布用で gist と同一内容（固定 tag の GitHub archive zip を取得し、埋め込みの sha256 と一致したときだけ `./auto-trading-support-tools-master/` に展開して `install_required_for_mt.sh` を実行。`--channel master` は未検証で最新 master）。`release.sh` は tag 作成（tag だけ push）と `init_atst.sh` の `ATST_VERSION` / `ATST_ZIP_SHA256` の書き換え（`--dry-run` / `--refresh-sha`）。
 - `templates/` — 配置用テンプレート（`config`、`crontab.txt`、`xstartup`、`vncserver@:1.service`、`font_replace.reg`、`ip_rules_v*.txt`）。
-- `MQL4/` `MQL5/` — MT に組み込む監視 EA のソース。
+- `MQL4/` `MQL5/` — MT に組み込む監視 EA のソース。書き出す CSV（`terminal_monitoring.csv`）と `order_status` の契約は [`docs/monitoring-csv.md`](docs/monitoring-csv.md)。
 - `tests/` — bats の自動テスト（`*.bats`）、共通フィクスチャ `test_helper.bash`、`stubs/`（curl / winepath）。開発者向けで、インストール経路からは参照しない。
 
 設定は `~/.atst/config`（`templates/config` から初回生成）を source して `ATST_*` 変数で参照。監視対象は `ATST_TARGETS`（bash 配列。MT 名の前方一致）、毎分の監視の設定は `ATST_CHECK_TIMEOUT`（1 チェックの上限秒、既定 40）と `ATST_ORDER_CHECK_INTERVAL`（check_order の 2 回の間隔、既定 30）。この 3 項目は config の**末尾**に置く（引用符や括弧の閉じ忘れがあるとその行より後は読まれないため、末尾なら LINE の設定は読み込み済みで通知が届く）。既存利用者の config には自動では入らないので、未設定は `RUNNER_TARGETS_EMPTY` の通知で気付けるようにしてある。LINE トークン等の秘匿値は `~/.atst/.line_token` / `~/.atst/.line_id`（リポジトリ外）。
