@@ -273,3 +273,89 @@ doctor_ng_count() {
   [ "$(printf '%s\n' "$output" | grep -cE '^(OK|NG|--) ')" -eq 0 ]
   [ ! -e "$HOME/.atst" ]
 }
+
+# The indented lines under item 11 (check_all.log, the last item before the summary).
+cl_notes() {
+  printf '%s\n' "$output" | awk '/^-- check_all\.log /{f=1;next} /^(OK|NG|--) /{f=0} f'
+}
+
+@test "DR-16: check_all.log: one item line with mode and last START, its tail without START lines, ~ for home (AC-10, AC-11)" {
+  local D="$HOME/.atst/log" L="$HOME/.atst/log/check_all.log"
+  mkdir -p "$D"
+  printf '===== START 2026-10-29 06:30:00 pid=1 =====\n%s/.atst/check_all.lock: tail-line-4b2d\ncr-line\r-5e7a\n===== START 2026-10-29 06:30:00 pid=2 =====\n' "$HOME" > "$L"
+  chmod 600 "$L"
+  touch "$ATST_TEST_SANDBOX/marker"
+  doctor_run
+  [ "$status" -eq 0 ]
+  [ "$(doctor_ng_count)" -eq 0 ]
+  [ "$(doctor_line_of 'check_all\.log ' | wc -l)" -eq 1 ]
+  [[ "$(doctor_line_of 'check_all\.log ')" == "-- check_all.log "* ]]
+  [[ "$(doctor_line_of 'check_all\.log ')" == *"~/.atst/log/check_all.log: mode 600, last START 2026-10-29 06:30:00, last 5 lines:"* ]]
+  [[ "$(doctor_line_of 'check_all\.log ')" != *pid=* ]]
+  [ "$(cl_notes | grep -cxF '  ~/.atst/check_all.lock: tail-line-4b2d')" -eq 1 ]
+  [ "$(cl_notes | grep -cxF '  cr-line?-5e7a')" -eq 1 ]
+  [ "$(cl_notes | grep -c '===== START')" -eq 0 ]
+  [ "$(cl_notes | wc -l)" -eq 2 ]
+  [[ "$output" != *"$HOME"* ]]
+  [ "$(printf '%s\n' "$output" | grep -vcE '^((OK|NG|--) |  )')" -eq 0 ]
+  [[ "$output" != *abcdefghijkl1234* ]]
+  [[ "$output" != *U0123456789abcdef* ]]
+  [[ "$output" != *cdef* ]]
+  [[ "$output" != *Authorization* ]]
+  [ -z "$(find "$ATST_TEST_SANDBOX" -newer "$ATST_TEST_SANDBOX/marker" ! -path "$ATST_TEST_SANDBOX/marker")" ]
+  [[ "${lines[${#lines[@]}-1]}" == "OK summary "* ]]
+  [[ "${lines[${#lines[@]}-1]}" == *" ng=0 "* ]]
+}
+
+@test "DR-17: no or an empty check_all.log is shown as none (AC-10)" {
+  doctor_run
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^-- check_all\.log none (~/\.atst/log/check_all\.log)$')" -eq 1 ]
+  [ "$(cl_notes | wc -l)" -eq 0 ]
+  [ "$(doctor_ng_count)" -eq 0 ]
+
+  mkdir -p "$HOME/.atst/log"
+  : > "$HOME/.atst/log/check_all.log"
+  doctor_run
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^-- check_all\.log none (~/\.atst/log/check_all\.log)$')" -eq 1 ]
+  [ "$(cl_notes | wc -l)" -eq 0 ]
+  [ "$(doctor_ng_count)" -eq 0 ]
+}
+
+@test "DR-18: a check_all.log without START lines shows last START none" {
+  mkdir -p "$HOME/.atst/log"
+  printf 'only-line-8a3f\n' > "$HOME/.atst/log/check_all.log"
+  chmod 600 "$HOME/.atst/log/check_all.log"
+  doctor_run
+  [ "$status" -eq 0 ]
+  [[ "$(doctor_line_of 'check_all\.log ')" == *"mode 600, last START none, last 5 lines:"* ]]
+  [ "$(cl_notes)" = '  only-line-8a3f' ]
+}
+
+@test "DR-19: only the last 5 lines other than START are shown, with the date of the last START" {
+  mkdir -p "$HOME/.atst/log"
+  {
+    echo '===== START 2026-10-29 06:30:00 pid=1 ====='
+    for i in 1 2 3 4 5 6 7; do echo "body-$i-91d0"; done
+    echo '===== START 2026-10-29 06:31:00 pid=2 ====='
+  } > "$HOME/.atst/log/check_all.log"
+  doctor_run
+  [ "$status" -eq 0 ]
+  [ "$(cl_notes)" = "$(printf '  body-%s-91d0\n' 3 4 5 6 7)" ]
+  [[ "$(doctor_line_of 'check_all\.log ')" == *"last START 2026-10-29 06:31:00,"* ]]
+}
+
+@test "DR-20: an unreadable check_all.log is still not NG and shows none of its lines" {
+  [ "$EUID" -ne 0 ] || skip "root ignores permissions"
+  mkdir -p "$HOME/.atst/log"
+  printf '===== START 2026-10-29 06:30:00 pid=1 =====\ntail-line-4b2d\n' > "$HOME/.atst/log/check_all.log"
+  chmod 000 "$HOME/.atst/log/check_all.log"
+  doctor_run
+  chmod 600 "$HOME/.atst/log/check_all.log"
+  [ "$status" -eq 0 ]
+  [ "$(doctor_ng_count)" -eq 0 ]
+  [ "$(doctor_line_of 'check_all\.log ' | wc -l)" -eq 1 ]
+  [[ "$(doctor_line_of 'check_all\.log ')" == *"mode 0, last START none,"* ]]
+  [[ "$output" != *tail-line-4b2d* ]]
+}

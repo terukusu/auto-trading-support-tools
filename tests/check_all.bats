@@ -5,6 +5,7 @@
 # The runner runs from a copy of the repository in the sandbox (atst_test_make_runner_home) whose
 # checks are stubs recording their arguments (atst_test_stub_script), unless a test puts the real one
 # back. Also covers the test_helper functions made for it.
+# LOG-xx (#144): the stderr of the runner and its checks goes to ~/.atst/log/check_all.log.
 
 load test_helper
 
@@ -23,6 +24,8 @@ setup() {
   done
   CALLS="$ATST_TEST_SANDBOX/calls.log"
   ST="$HOME/.atst/alert_status"
+  D="$HOME/.atst/log"
+  L="$D/check_all.log"
 }
 
 teardown() {
@@ -37,6 +40,8 @@ teardown() {
         ;;
     esac
   done
+  # LOG-04a / LOG-04c / LOG-09 take permissions away; give them back so the sandbox can be removed.
+  chmod -R u+rwX "$ATST_TEST_SANDBOX" 2>/dev/null
   atst_test_teardown_sandbox
 }
 
@@ -78,6 +83,29 @@ hold_lock() {
     sleep 0.1
   done
   return 1
+}
+
+# stub_stderr <name> <mode> <text>: atst_test_stub_script, then <text> on stderr before the mode's
+# last line (for hang, before "exec sleep 300"). <text> is a fixed string of letters, digits and -.
+stub_stderr() {
+  atst_test_stub_script "$home" "$1" "$2" || return 1
+  sed -i "\$i echo '$3' 1>&2" "$home/$1"
+}
+
+# The run log (empty without it).
+runlog() {
+  cat "$L" 2>/dev/null
+}
+
+# What every run that could not use the log must still do (LOG-04a/b/c, LOG-09): all checks once
+# (check_order twice: 9 lines in calls.log), no push, and the check's stderr where it was (in $output), without a START line.
+assert_ran_unlogged() {
+  [ "$status" -eq 0 ] || return 1
+  [ "$(wc -l < "$CALLS")" -eq 9 ] || return 1
+  [ "$(calls_of check_order.sh)" -eq 2 ] || return 1
+  [ "$(atst_test_push_count)" -eq 0 ] || return 1
+  [[ "$output" == *PING-STDERR-7f3a* ]] || return 1
+  [[ "$output" != *"===== START"* ]] || return 1
 }
 
 release_lock() {
@@ -334,27 +362,29 @@ heartbeat.sh"
   local v
   for v in 040 0 301 abc; do
     atst_test_set_config ATST_CHECK_TIMEOUT "$v"
+    rm -f "$HOME/.atst/log/check_all.log"
     run bash "$home/check_all.sh"
     [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | grep -c ATST_CHECK_TIMEOUT)" -eq 1 ] || { echo "value=$v"; false; }
-    [[ "$(printf '%s\n' "$output" | grep ATST_CHECK_TIMEOUT)" == *40* ]]
+    [ "$(runlog | grep -c ATST_CHECK_TIMEOUT)" -eq 1 ] || { echo "value=$v"; false; }
+    [[ "$(runlog | grep ATST_CHECK_TIMEOUT)" == *40* ]]
   done
   atst_test_set_config ATST_CHECK_TIMEOUT 2
+  rm -f "$HOME/.atst/log/check_all.log"
   run bash "$home/check_all.sh"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -c ATST_CHECK_TIMEOUT)" -eq 0 ]
+  [ "$(runlog | grep -c ATST_CHECK_TIMEOUT)" -eq 0 ]
 }
 
 @test "RUN-15: an invalid ATST_ORDER_CHECK_INTERVAL (51, 08) falls back to 30 with one line" {
   local v
   for v in 51 08; do
-    rm -f "$CALLS"
+    rm -f "$CALLS" "$HOME/.atst/log/check_all.log"
     atst_test_set_config ATST_ORDER_CHECK_INTERVAL "$v"
     # The default 30 seconds are not waited for: cut the runner after 3 seconds.
     run timeout 3 bash "$home/check_all.sh"
     [ "$status" -eq 124 ] || { echo "value=$v status=$status"; false; }
-    [ "$(printf '%s\n' "$output" | grep -c ATST_ORDER_CHECK_INTERVAL)" -eq 1 ]
-    [[ "$(printf '%s\n' "$output" | grep ATST_ORDER_CHECK_INTERVAL)" == *30* ]]
+    [ "$(runlog | grep -c ATST_ORDER_CHECK_INTERVAL)" -eq 1 ]
+    [[ "$(runlog | grep ATST_ORDER_CHECK_INTERVAL)" == *30* ]]
     [ "$(calls_of check_order.sh)" -eq 1 ]
   done
 }
@@ -412,10 +442,258 @@ EOF
   [ "$(grep -n '^ATST_LINE_ID=' "$conf" | cut -d: -f1)" -lt "$(grep -n '^ATST_TARGETS=' "$conf" | cut -d: -f1)" ]
   run bash "$home/check_all.sh"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"[warn] ~/.atst/config may not have been read completely"* ]]
+  runlog | grep -qF '[warn] ~/.atst/config may not have been read completely'
   [ "$(atst_test_push_count)" -eq 1 ]
   [ "$(status_lines '^RUNNER_TARGETS_EMPTY,1,')" -eq 1 ]
   [ "$(calls)" = "$(printf 'check_reboot.sh\nheartbeat.sh')" ]
+}
+
+@test "LOG-01: a check's stderr goes to the log (700/600), not to the terminal; stdout and the run are unchanged (AC-3)" {
+  local m0 ref
+  stub_stderr check_ping.sh record PING-STDERR-7f3a
+  sed -i '$i echo PING-STDOUT-2b8e' "$home/check_ping.sh"
+  m0=$(stat -c %a "$HOME/.atst")
+  run bash -c 'umask 022; exec bash "$1"' _ "$home/check_all.sh"
+  ( umask 022; : > "$ATST_TEST_SANDBOX/umask.ref" )
+  ref=$(stat -c %a "$ATST_TEST_SANDBOX/umask.ref")
+  [ "$status" -eq 0 ]
+  [ "$(runlog | grep -c PING-STDERR-7f3a)" -eq 1 ]
+  [[ "$output" != *PING-STDERR-7f3a* ]]
+  [[ "$output" == *PING-STDOUT-2b8e* ]]
+  [ "$(runlog | grep -c PING-STDOUT-2b8e)" -eq 0 ]
+  [[ "$output" != *"===== START"* ]]
+  [ "$(stat -c %a "$D")" = 700 ]
+  [ "$(stat -c %a "$L")" = 600 ]
+  [ "$(stat -c %a "$HOME/.atst")" = "$m0" ]
+  [ "$(stat -c %a "$HOME/.atst/check_all.started")" = "$ref" ]
+  [ "$(stat -c %a "$HOME/.atst/check_all.lock")" = "$ref" ]
+  [ "$(atst_test_push_count)" -eq 0 ]
+  [ "$(wc -l < "$CALLS")" -eq 9 ]
+  [ "$(calls_of check_order.sh)" -eq 2 ]
+  [ "$(calls_of check_reboot.sh)" -eq 1 ]
+  [ "$(calls_of check_process.sh)" -eq 1 ]
+  [ "$(calls_of check_monitoring.sh)" -eq 1 ]
+  [ "$(calls_of check_ping.sh)" -eq 1 ]
+  [ "$(calls_of check_price.sh)" -eq 1 ]
+  [ "$(calls_of check_spread.sh)" -eq 1 ]
+  [ "$(calls_of heartbeat.sh)" -eq 1 ]
+}
+
+@test "LOG-02: each run starts with one START line in a fixed format, before its checks' lines (AC-4)" {
+  local s2 p2
+  stub_stderr check_ping.sh record PING-STDERR-7f3a
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(runlog | grep -c '^===== START ')" -eq 2 ]
+  [ "$(runlog | grep -cE '^===== START [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} pid=[0-9]+ =====$')" -eq 2 ]
+  s2=$(runlog | awk '/^===== START /{n++; if (n==2) print NR}')
+  p2=$(runlog | awk '/PING-STDERR-7f3a/{n++; if (n==2) print NR}')
+  [ -n "$s2" ] && [ -n "$p2" ]
+  [ "$s2" -lt "$p2" ]
+  [ "$(runlog | head -n 1 | grep -c '^===== START ')" -eq 1 ]
+}
+
+@test "LOG-03: the [warn] of common.sh on a broken config is kept in the log (AC-5)" {
+  local conf="$HOME/.atst/config" s w
+  cp "$repo/templates/config" "$conf"
+  sed -i "s/^ATST_TARGETS=('Land Prime')\$/ATST_TARGETS=('A_MT4)/" "$conf"
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(runlog | grep -cF '[warn] ~/.atst/config may not have been read completely')" -eq 1 ]
+  s=$(runlog | grep -n '^===== START ' | head -n 1 | cut -d: -f1)
+  w=$(runlog | grep -nF '[warn] ~/.atst/config may not have been read completely' | cut -d: -f1)
+  [ "$s" -lt "$w" ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(status_lines '^RUNNER_TARGETS_EMPTY,1,')" -eq 1 ]
+}
+
+@test "LOG-04a: a log directory without write permission: nothing is logged and the run is unchanged (AC-6)" {
+  [ "$EUID" -ne 0 ] || skip "root ignores permissions"
+  stub_stderr check_ping.sh record PING-STDERR-7f3a
+  mkdir -p "$D"
+  chmod 500 "$D"
+  run bash "$home/check_all.sh"
+  assert_ran_unlogged
+  [ ! -e "$L" ]
+  [ "$(stat -c %a "$D")" = 500 ]
+}
+
+@test "LOG-04b: ~/.atst/log as a plain file: nothing is logged and the run is unchanged (AC-6)" {
+  stub_stderr check_ping.sh record PING-STDERR-7f3a
+  printf 'keep-7d21\n' > "$D"
+  cp "$D" "$ATST_TEST_SANDBOX/d.orig"
+  run bash "$home/check_all.sh"
+  assert_ran_unlogged
+  [ -f "$D" ]
+  cmp "$D" "$ATST_TEST_SANDBOX/d.orig"
+}
+
+@test "LOG-04c: a read-only log: left as it is and the run is unchanged (AC-6)" {
+  local s0
+  [ "$EUID" -ne 0 ] || skip "root ignores permissions"
+  stub_stderr check_ping.sh record PING-STDERR-7f3a
+  mkdir -p "$D"
+  printf 'old-3c90\n' > "$L"
+  chmod 400 "$L"
+  s0=$(stat -c %s "$L")
+  run bash "$home/check_all.sh"
+  assert_ran_unlogged
+  [ "$(stat -c %s "$L")" -eq "$s0" ]
+  [ "$(stat -c %a "$L")" = 400 ]
+}
+
+@test "LOG-05: a cut-off check keeps what it printed and gets 'exit 124' (AC-7)" {
+  local t0 el h e
+  stub_stderr check_ping.sh hang PING-BEFORE-HANG
+  t0=$(date +%s)
+  run timeout 60 bash "$home/check_all.sh"
+  el=$(( $(date +%s) - t0 ))
+  [ "$status" -eq 0 ]
+  [ "$el" -le 12 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(status_lines '^RUNNER_TIMEOUT_CHECK_PING,1,')" -eq 1 ]
+  [ "$(runlog | grep -c PING-BEFORE-HANG)" -eq 1 ]
+  [ "$(runlog | grep -cx 'check_ping.sh: exit 124')" -eq 1 ]
+  h=$(runlog | grep -n PING-BEFORE-HANG | cut -d: -f1)
+  e=$(runlog | grep -nx 'check_ping.sh: exit 124' | cut -d: -f1)
+  [ "$h" -lt "$e" ]
+}
+
+@test "LOG-06: a failing check gets '<name>.sh: exit <rc>' without LINE; exit 0 gets no line (AC-7)" {
+  atst_test_stub_script "$home" check_ping.sh fail
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(runlog | grep -cx 'check_ping.sh: exit 3')" -eq 1 ]
+  [ "$(atst_test_push_count)" -eq 0 ]
+  [ "$(status_lines '^RUNNER_TIMEOUT_')" -eq 0 ]
+
+  atst_test_stub_script "$home" check_ping.sh record
+  rm -f "$L"
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(runlog | grep -c ': exit ')" -eq 0 ]
+  [ "$(runlog | grep -c '^===== START ')" -eq 1 ]
+}
+
+@test "LOG-07: a run skipped on the lock says so in one line, with the age of the run holding it or ? (AC-8)" {
+  local s k
+  echo "$(( $(date +%s) - 10 ))" > "$HOME/.atst/check_all.started"
+  hold_lock "$HOME/.atst/check_all.lock"
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(runlog | grep -c 'another run holds the lock')" -eq 1 ]
+  [ "$(runlog | grep -cE '^another run holds the lock \(started -?[0-9]+ s ago\); skipped$')" -eq 1 ]
+  [ "$(runlog | grep -c '^===== START ')" -eq 1 ]
+  s=$(runlog | grep -n '^===== START ' | cut -d: -f1)
+  k=$(runlog | grep -n 'another run holds the lock' | cut -d: -f1)
+  [ "$s" -lt "$k" ]
+  [ ! -e "$CALLS" ]
+  [ "$(atst_test_push_count)" -eq 0 ]
+
+  rm -f "$HOME/.atst/check_all.started" "$L"
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(runlog | grep -cxF 'another run holds the lock (started ? s ago); skipped')" -eq 1 ]
+  [ "$(atst_test_push_count)" -eq 0 ]
+
+  # An elapsed inherited from the environment is not used.
+  rm -f "$L"
+  run env elapsed=999 bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(runlog | grep -cxF 'another run holds the lock (started ? s ago); skipped')" -eq 1 ]
+  [ "$(runlog | grep -c 'started 999 s')" -eq 0 ]
+  [ ! -e "$CALLS" ]
+  release_lock
+}
+
+@test "LOG-08: no secret reaches the log when a cut-off notice fails to send (AC-11)" {
+  printf 'abcdefghijkl1234\n' > "$HOME/.atst/.line_token"
+  printf 'U0123456789abcdef\n' > "$HOME/.atst/.line_id"
+  chmod 600 "$HOME/.atst/.line_token" "$HOME/.atst/.line_id"
+  export ATST_TEST_CURL_HTTP_CODE=500
+  stub_stderr check_ping.sh hang PING-BEFORE-HANG
+  run timeout 60 bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ -s "$L" ]
+  [ "$(runlog | grep -cE 'abcdefghijkl1234|U0123456789abcdef|cdef|Authorization')" -eq 0 ]
+  [ "$(runlog | grep -cx 'check_ping.sh: exit 124')" -eq 1 ]
+}
+
+@test "LOG-09: in POSIX mode a log that cannot be opened still does not stop the run" {
+  local s0
+  [ "$EUID" -ne 0 ] || skip "root ignores permissions"
+  stub_stderr check_ping.sh record PING-STDERR-7f3a
+  mkdir -p "$D"
+  printf 'old-3c90\n' > "$L"
+  chmod 400 "$L"
+  s0=$(stat -c %s "$L")
+  run env POSIXLY_CORRECT=1 bash "$home/check_all.sh"
+  assert_ran_unlogged
+  [ "$(stat -c %s "$L")" -eq "$s0" ]
+}
+
+@test "LOG-10: an existing log directory and file keep their modes and contents" {
+  mkdir -p "$D"
+  chmod 750 "$D"
+  printf 'prev-run-6e14\n' > "$L"
+  chmod 640 "$L"
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(stat -c %a "$D")" = 750 ]
+  [ "$(stat -c %a "$L")" = 640 ]
+  [ "$(runlog | head -n 1)" = prev-run-6e14 ]
+  [ "$(runlog | grep -c '^===== START ')" -eq 1 ]
+}
+
+@test "LOG-11: in POSIX mode the redirection holds for the whole run" {
+  stub_stderr check_ping.sh record PING-STDERR-7f3a
+  run env POSIXLY_CORRECT=1 bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(runlog | grep -c PING-STDERR-7f3a)" -eq 1 ]
+  [[ "$output" != *PING-STDERR-7f3a* ]]
+  [ "$(runlog | grep -c '^===== START ')" -eq 1 ]
+  [ "$(wc -l < "$CALLS")" -eq 9 ]
+}
+
+@test "LOG-12: an argument exits before the log is touched" {
+  run bash "$home/check_all.sh" x
+  [ "$status" -eq 1 ]
+  [[ "$output" == *Usage* ]]
+  [ ! -e "$D" ]
+}
+
+@test "LOG-13: without ~/.atst, it is made 700 together with the log" {
+  rm -rf "$HOME/.atst"
+  # The template config waits 30 seconds for the second check_order: cut the runner after 5 seconds.
+  run timeout 5 bash -c 'umask 022; exec bash "$1"' _ "$home/check_all.sh"
+  [ "$status" -eq 124 ]
+  [ "$(stat -c %a "$HOME/.atst")" = 700 ]
+  [ "$(stat -c %a "$D")" = 700 ]
+  [ "$(stat -c %a "$L")" = 600 ]
+  [ "$(runlog | grep -c '^===== START ')" -eq 1 ]
+  [ -s "$HOME/.atst/config" ]
+}
+
+@test "LOG-14: a check killed after ignoring TERM gets 'exit 137'" {
+  atst_test_stub_script "$home" check_ping.sh hang_ignore_term
+  run timeout 60 bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(runlog | grep -cx 'check_ping.sh: exit 137')" -eq 1 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+}
+
+@test "LOG-15: the redirection works in a cron-like minimal environment (env -i)" {
+  stub_stderr check_ping.sh record PING-STDERR-7f3a
+  run env -i HOME="$HOME" PATH="$PATH" ATST_TEST_SANDBOX="$ATST_TEST_SANDBOX" \
+    ATST_TEST_CURL_LOG="$ATST_TEST_CURL_LOG" bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(runlog | grep -c PING-STDERR-7f3a)" -eq 1 ]
+  [[ "$output" != *PING-STDERR-7f3a* ]]
+  [ "$(runlog | grep -c '^===== START ')" -eq 1 ]
+  [ "$(wc -l < "$CALLS")" -eq 9 ]
+  [ "$(atst_test_push_count)" -eq 0 ]
 }
 
 @test "TH-01: atst_test_set_targets writes an array read back element by element, only in the sandbox" {
