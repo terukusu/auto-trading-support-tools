@@ -349,6 +349,24 @@ function doctor_check_heartbeat() {
   fi
 }
 
+# 11. The tail of ~/.atst/log/check_all.log, the stderr of the per-minute runs (shown only). The lines
+# are what the checks printed; look at them before pasting into an Issue.
+function doctor_check_check_all_log() {
+  local f="$ATST_CONFIG_DIR/log/check_all.log"
+  local m ts l
+
+  if [ ! -s "$f" ]; then
+    doctor_line -- check_all.log "none ($f)"
+    return 0
+  fi
+  m=$(stat -c %a "$f" 2>/dev/null)
+  ts=$(grep -a '^===== START ' "$f" | tail -n 1 | sed -nE 's/^===== START ([0-9-]+ [0-9:]+) pid=.*/\1/p')
+  doctor_line -- check_all.log "$f: mode ${m:-unknown}, last START ${ts:-none}, last 5 lines:"
+  while IFS= read -r l; do
+    doctor_note "$l"
+  done < <(grep -av '^===== START ' "$f" | tail -n 5)
+}
+
 doctor_check_wine
 doctor_check_arch
 doctor_check_prefix
@@ -359,6 +377,7 @@ doctor_check_cron
 doctor_check_line_log
 doctor_check_secrets
 doctor_check_heartbeat
+doctor_check_check_all_log
 
 if [ "$doctor_ng" -eq 0 ]; then
   echo "OK summary ok=$doctor_ok ng=0 skip=$doctor_skip"

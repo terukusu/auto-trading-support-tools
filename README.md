@@ -177,6 +177,12 @@ ATST_TARGETS=('Land Prime')
     * まとめた通知が LINE の 1 メッセージの上限(5000 字)を超えるときは、通知の区切りで分けて送ります。
 * 約定のチェックは 1 回目の開始から `ATST_ORDER_CHECK_INTERVAL` 秒(0〜50、既定 30。こちらも `~/.atst/config` の末尾に書きます)後にもう一度実行するので、従来どおり毎分 2 回です。
 * ハートビート(`heartbeat.sh`)は `check_all.sh` の最後に送ります。外部サービス側の猶予(grace)は **3 分以上**を推奨します。
+* `check_all.sh` と各チェックの stderr (エラーや警告) は `~/.atst/log/check_all.log` に追記します。
+    * 回の先頭に `===== START 日時 pid=... =====` の 1 行が入ります。チェックが 0 以外で終わった回は `check_ping.sh: exit 3` のような 1 行 (打ち切りは `exit 124` / `exit 137`)、前の回が終わっていなくて飛ばした回は `another run holds the lock (started ... s ago); skipped` の 1 行が入ります。`START` の直後に `skipped` が続く 2 行は、飛ばした回です。
+    * ディレクトリは 700、ファイルは 600 で作ります (既にあれば権限は変えません。`~/.atst` がまだ無い初回は、これも 700 で作ります)。2 MB を超えると、毎朝 6:30 の `truncate_monitoring.sh` が末尾 1 MB に切り詰めます。
+    * 手で `check_all.sh` を実行したときも、stderr は端末に出ずにこのログに入ります (stdout は従来どおり)。
+    * 「通知が来ない」「止まっています」「打ち切りました」が続くときは、まず `tail ~/.atst/log/check_all.log` を見てください。
+    * ログを作れない・書けないときは従来どおり stderr は捨てられ、監視は止まりません。
 
 
 ### デスクトップ画像の通知の移行
@@ -252,6 +258,7 @@ mtctl.sh のメッセージ(`list` の 1 行目、`status` の各行、`stop` / 
 8. `line_error.log`: `~/.atst/line_error.log` の LINE 送信失敗の見出し行 (末尾 5 件)。表示のみです。
 9. `.line_token` / `.line_id` / `.imgbb_key`: 存在と権限 (600 でなければ NG)。`.imgbb_key` は任意です (定期レポートにグラフ・デスクトップの画像を付けるのに必要。無ければ文字要約だけを送ります)。
 10. `heartbeat`: `ATST_HEARTBEAT_URL` (外形監視) が設定されているか。疎通確認はしません。
+11. `check_all.log`: `~/.atst/log/check_all.log` の権限・最後の START 行の日時・START 行以外の末尾 5 行。表示のみです (権限が 600 でなくても NG にしません)。**末尾の行は各チェックの出力そのままなので、Issue に貼る前に目で確認してください。**
 
 NG の例:
 ```

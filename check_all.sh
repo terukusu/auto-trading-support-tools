@@ -10,11 +10,26 @@
 # - 約定のチェックは 1 回目の開始から ATST_ORDER_CHECK_INTERVAL 秒後にもう一度実行します (毎分 2 回)。
 # - その回の通知 (発生・復帰・再起動の検出・打ち切り) は 1 通にまとめて LINE に送ります
 #   (1 回目のチェック群の後に 1 回、後から出た打ち切りの通知は回の最後にもう 1 回)。約定通知は従来どおり即時です。
+# - 自分と各チェックの stderr は ~/.atst/log/check_all.log に追記します (回の先頭に START 行。書けなければ従来どおり)。
 #
 
 if [ "$#" -ne 0 ]; then
   echo "Usage: $(basename "$0")  (no arguments: the MetaTrader names are read from ATST_TARGETS in ~/.atst/config)" 1>&2
   exit 1
+fi
+
+# The stderr of this run and of every check goes to ~/.atst/log/check_all.log (#144): cron throws it
+# away (MAILTO=""). Done before common.sh so its [warn] on ~/.atst/config is kept. Any failure here
+# leaves stderr as it was and changes nothing else: the checks must run anyway. "command exec" so a
+# failed redirection is not fatal even in POSIX mode. No 2>/dev/null on the exec: it would undo it.
+if [ -n "$HOME" ]; then
+  run_log_dir="$HOME/.atst/log"
+  run_log="$run_log_dir/check_all.log"
+  if { [ -d "$run_log_dir" ] || ( umask 077; mkdir -p -- "$run_log_dir" ) 2>/dev/null; } \
+    && { [ -e "$run_log" ] || ( umask 077; : > "$run_log" ) 2>/dev/null; } \
+    && command exec 2>> "$run_log"; then
+    echo "===== START $(date '+%Y-%m-%d %H:%M:%S') pid=$$ =====" 1>&2
+  fi
 fi
 
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
@@ -71,9 +86,11 @@ if ! exec 7>> "$lock_file"; then
 fi
 if ! flock -n 7; then
   started=$(head -n 1 "$started_file" 2>/dev/null)
+  skip_ago='?'
   # No record, a broken one or a clock that went back: undecided, say nothing.
   if [[ "$started" =~ ^[0-9]{1,12}$ ]]; then
     elapsed=$(( $(date +%s) - 10#$started ))
+    skip_ago=$elapsed
     if [ "$elapsed" -ge "$stuck_after" ]; then
       # Only the run that gets the lock again sends the recovery.
       atst_update_alert RUNNER_STUCK 1 \
@@ -81,6 +98,7 @@ if ! flock -n 7; then
         "$stuck_recover"
     fi
   fi
+  echo "another run holds the lock (started $skip_ago s ago); skipped" 1>&2
   exit 0
 fi
 
@@ -96,13 +114,16 @@ atst_update_alert RUNNER_STUCK 0 "" "$stuck_recover"
 # Runs $ATST_HOME/<name>.sh, TERM after <cap> seconds and KILL 5 seconds later. timeout is not in its
 # foreground mode, so the signals go to the whole process group and no grandchild is left behind.
 # Returns 1 when it was cut off (124: TERM, 137: KILL), 0 otherwise: any other failure is the check's
-# own business and must not stop the rest.
+# own business and must not stop the rest. A non-zero exit is noted in one stderr line (the log).
 run_check() {
   local cap="$1" name="$2" rc
   shift 2
 
   timeout -k 5 "$cap" bash "$ATST_HOME/$name.sh" "$@" 7>&-
   rc=$?
+  if [ "$rc" -ne 0 ]; then
+    echo "$name.sh: exit $rc" 1>&2
+  fi
   case "$rc" in
     124|137) return 1 ;;
   esac

@@ -43,6 +43,22 @@ function trim_wine_logs() {
   done
 }
 
+# check_all.sh appends the stderr of every run to log/check_all.log (#144). Keep its last 1 MB once it
+# passes 2 MB, like the wine logs but without the preloader filter. Rewritten in place (no mv): a
+# running check_all.sh and its checks keep it open for appending.
+function trim_check_all_log() {
+  local log tmp
+  [ -n "$ATST_CONFIG_DIR" ] || return 0
+  log="$ATST_CONFIG_DIR/log/check_all.log"
+  [ -f "$log" ] && [ "$(stat -c %s "$log")" -gt $((2 * 1024 * 1024)) ] || return 0
+  tmp=$(mktemp "$log.XXXXXX") || return 0
+  if tail -c $((1024 * 1024)) "$log" > "$tmp"; then
+    cat "$tmp" > "$log"
+  fi
+  rm -f "$tmp"
+  return 0
+}
+
 target_names=("$@")
 
 if [ "$#" -le 0 ]; then
@@ -53,3 +69,4 @@ fi
 
 atst_traverse_mt do_check "${target_names[@]}"
 trim_wine_logs
+trim_check_all_log
