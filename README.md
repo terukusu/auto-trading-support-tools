@@ -261,7 +261,7 @@ mtctl.sh のメッセージ(`list` の 1 行目、`status` の各行、`stop` / 
 3. `WINEPREFIX`: 対話シェルの環境変数 (`env=`)、config 読み込み後 (`config=`)、環境変数を外して config を読んだ値 (`cron=`、cron で使われる値) を並べ、`config=` と `cron=` が違えば NG (文字列で比較するので、シンボリックリンク経由で同じ場所を指していても NG になります)。
 4. `target` / `mt`: `ATST_TARGETS` の各名前が検出した MT4/5 に前方一致するか (未設定・空は NG)。どの名前にも選ばれない MT4/5 は `--` (監視対象外) で表示します。前方一致で複数に当たるときは、check_*.sh と同じく最初の 1 つだけが監視対象です。
 5. `process`: 対象の MT4/5 が起動しているか。
-6. `ea` / `csv`: 監視 EA (`TerminalMonitoring.ex4` / `.ex5`) が置かれているか、`terminal_monitoring.csv` の最終行が `ATST_MONITORING_THRESHOLD` 秒より新しいか (check_monitoring.sh と同じ基準)。
+6. `ea` / `csv`: 監視 EA (`TerminalMonitoring.ex4` / `.ex5`) が置かれているか、`terminal_monitoring.csv` の最終行が `ATST_MONITORING_THRESHOLD` 秒より新しいか (check_monitoring.sh と同じ基準)。CSV の各列の意味は [docs/monitoring-csv.md](docs/monitoring-csv.md) を参照してください。
 7. `crontab -l`: 新形式 (`check_all.sh`) なら OK、旧形式 (`wrapper.sh`) のみなら OK で「旧形式」と添えます。両方ある (混在)・どちらも無いときは NG。
 8. `line_error.log`: `~/.atst/line_error.log` の LINE 送信失敗の見出し行 (末尾 5 件)。表示のみです。
 9. `.line_token` / `.line_id` / `.imgbb_key`: 存在と権限 (600 でなければ NG)。`.imgbb_key` は任意です (定期レポートにグラフ・デスクトップの画像を付けるのに必要。無ければ文字要約だけを送ります)。
