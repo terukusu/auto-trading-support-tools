@@ -24,9 +24,15 @@ ATST_IMGBB_EXPIRATION=86400
 ATST_DAILY_REPORT=1
 
 # 外形監視のハートビートを送る URL (Healthchecks.io などの ping URL)。空なら送らない。
-# VPS が止まったときに外部サービスから通知を受けるためのもの。手順は Wiki の「外側からの監視」を参照。
-# 値はダブルクォートで囲む。
+# VPS が止まったときや、監視が異常を検知している間に外部サービスから通知を受けるためのもの。
+# setup_heartbeat.sh で設定するのが標準 (~/.atst/.heartbeat_url に保存)。この行は従来の方法で、
+# .heartbeat_url があればそちらが優先。正常なら毎分 ping、監視が異常を検知中 (MT 停止・監視 EA の停止・
+# LINE の送信失敗の連続・送信数 8 割超など。相場の異常は含めない) は <URL>/fail に送る。
+# 手順は Wiki の「外側からの監視」を参照。値はダブルクォートで囲む。
 ATST_HEARTBEAT_URL=""
+
+# LINE の送信失敗 (~/.atst/line_error.log) が直近 60 分以内にこの件数続いたら、ハートビートを /fail にする (1〜999。ログは末尾 1000 行までで 1 件 3 行なので、約 333 件を超える値では /fail にならない)。
+ATST_HEARTBEAT_LINE_FAIL_COUNT=3
 
 # この秒数モニタリングデータの更新が無ければ通知します
 ATST_MONITORING_THRESHOLD=180

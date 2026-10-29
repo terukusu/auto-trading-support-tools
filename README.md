@@ -93,6 +93,8 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 1. [再起動検知やMT4/5クラッシュ検知を設定](../../wiki/setup_monitoring)
 1. [自動売買を開始する](../../wiki/setup_ea)
 1. [ポジション新規／決済、価格、スプレッド、Pingの異常検知を設定](../../wiki/setup_monitoring2)
+1. [外側からの監視(ハートビート)を設定](../../wiki/setup_heartbeat)
+    * 推奨(必須ではありません)。VPS・ネットワーク・cron の停止と、監視が異常を検知している状態(LINE が届かないときも)を、LINE とは別の経路(外部サービスのメールなど)で知らせます。`setup_heartbeat.sh` で URL を設定します。
 
 
 を、一通り行っている作業動画がこちら↓  
@@ -108,8 +110,6 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 * リリースの手順は [docs/RELEASE.md](docs/RELEASE.md) にあります。
 
 ### おまけ
-* [外側からの監視(ハートビート)](../../wiki/setup_heartbeat)
-    * サーバーそのものやネットワークのダウンを検知する。VPS が毎分外部サービスへ生存を知らせ、途絶えたら外部サービスが通知する
 * 不正アクセス防止のところは GCP がよしなにやってくれてるので気にしなくてOK
     * 他の格安VPSの場合はちゃんとしないと驚くほど攻撃を受けるので注意。 [設定例](../../wiki/setup_iptables)
 * [スマートフォンで口座を操作する](../../wiki/setup_mobile_mt)
@@ -177,6 +177,14 @@ ATST_TARGETS=('Land Prime')
     * まとめた通知が LINE の 1 メッセージの上限(5000 字)を超えるときは、通知の区切りで分けて送ります。
 * 約定のチェックは 1 回目の開始から `ATST_ORDER_CHECK_INTERVAL` 秒(0〜50、既定 30。こちらも `~/.atst/config` の末尾に書きます)後にもう一度実行するので、従来どおり毎分 2 回です。
 * ハートビート(`heartbeat.sh`)は `check_all.sh` の最後に送ります。外部サービス側の猶予(grace)は **3 分以上**を推奨します。
+    * URL は `setup_heartbeat.sh` で設定します(`~/.atst/.heartbeat_url` に 600 で保存し、テストの ping を 1 回送ります。何も入力せずに Enter で削除)。`~/.atst/config` の `ATST_HEARTBEAT_URL` に書いた従来の設定もそのまま使えます(`.heartbeat_url` があればそちらが優先)。未設定なら何も送りません。
+    * 正常なら `<URL>` に ping、監視が異常を検知している間は毎分 `<URL>/fail` に送ります(本文は発生中のキー名だけ。建玉・口座・通知の文面・ホスト名は入れません)。「ping が途絶える」は cron / VPS / ネットワークの停止、「`/fail` が届く」は監視が異常を検知中、と区別できます。
+    * `/fail` になるもの: MT4/5 の停止(PROCESS)、監視対象が見つからない(TARGET)、監視 EA の CSV の停止(MONITORING)、毎分の監視自体の異常(RUNNER_STUCK / RUNNER_TARGETS_EMPTY / 打ち切り。ハートビート自身の打ち切りは除く)、LINE の送信失敗の連続(`~/.atst/line_error.log` の直近 60 分に `ATST_HEARTBEAT_LINE_FAIL_COUNT` 件。既定 3。LINE が直っても最大 60 分は `/fail` が続くことがあります)、LINE の今月の送信数が上限の 8 割以上(毎朝の `check_daily.sh` が記録し、8 割未満を観測するまで続きます)。
+    * `/fail` にならないもの: 値動き・スプレッド・Ping(PRICE / SPREAD / PING)の異常。これらは LINE の通知だけです。
+    * `/fail` を受け付けないサービスでは、異常の間は ping も送られないので「ping の途絶」として通知されます。
+    * 外形監視が未設定のときは、毎朝の稼働OK(`check_daily.sh`)の最後に「外形監視: 未設定(推奨。setup_heartbeat.sh で設定)」の 1 行が付きます(この行のためだけには送りません)。
+    * 旧形式の crontab の `heartbeat.sh` の行が残っていると、その行の ping が `/fail` を打ち消して up/down が往復することがあります(移行が終わったら消してください)。
+    * 監視対象から外した MT4/5 の発生状態が残ると `/fail` が続きます。そのときは `~/.atst/alert_status` の該当するキー(`PROCESS_<名前>` など)の行を消してください。
 * `check_all.sh` と各チェックの stderr (エラーや警告) は `~/.atst/log/check_all.log` に追記します。
     * 回の先頭に `===== START 日時 pid=... =====` の 1 行が入ります。チェックが 0 以外で終わった回は `check_ping.sh: exit 3` のような 1 行 (打ち切りは `exit 124` / `exit 137`)、前の回が終わっていなくて飛ばした回は `another run holds the lock (started ... s ago); skipped` の 1 行が入ります。`START` の直後に `skipped` が続く 2 行は、飛ばした回です。
     * ディレクトリは 700、ファイルは 600 で作ります (既にあれば権限は変えません。`~/.atst` がまだ無い初回は、これも 700 で作ります)。2 MB を超えると、毎朝 6:30 の `truncate_monitoring.sh` が末尾 1 MB に切り詰めます。
@@ -257,7 +265,7 @@ mtctl.sh のメッセージ(`list` の 1 行目、`status` の各行、`stop` / 
 7. `crontab -l`: 新形式 (`check_all.sh`) なら OK、旧形式 (`wrapper.sh`) のみなら OK で「旧形式」と添えます。両方ある (混在)・どちらも無いときは NG。
 8. `line_error.log`: `~/.atst/line_error.log` の LINE 送信失敗の見出し行 (末尾 5 件)。表示のみです。
 9. `.line_token` / `.line_id` / `.imgbb_key`: 存在と権限 (600 でなければ NG)。`.imgbb_key` は任意です (定期レポートにグラフ・デスクトップの画像を付けるのに必要。無ければ文字要約だけを送ります)。
-10. `heartbeat`: `ATST_HEARTBEAT_URL` (外形監視) が設定されているか。疎通確認はしません。
+10. `heartbeat`: 外形監視の URL。`~/.atst/.heartbeat_url` (setup_heartbeat.sh) が有効なら `OK heartbeat .heartbeat_url=****abcd`、config の `ATST_HEARTBEAT_URL` なら `OK heartbeat ATST_HEARTBEAT_URL=****abcd` (末尾 4 文字のみ)。`.heartbeat_url` が 600 でなければ NG。未設定は `-- heartbeat not set (recommended: run setup_heartbeat.sh)` (推奨ですが必須ではないので NG にはしません)。疎通確認はしません。
 11. `check_all.log`: `~/.atst/log/check_all.log` の権限・最後の START 行の日時・START 行以外の末尾 5 行。表示のみです (権限が 600 でなくても NG にしません)。**末尾の行は各チェックの出力そのままなので、Issue に貼る前に目で確認してください。**
 
 NG の例:

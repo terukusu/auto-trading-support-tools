@@ -696,6 +696,75 @@ EOF
   [ "$(atst_test_push_count)" -eq 0 ]
 }
 
+# RUN-21 to RUN-24 (#136): the real heartbeat.sh at the end of the run (the other checks stay stubs, so the
+# curl log holds the heartbeat only). ping while healthy, /fail while an allow-listed key is 1.
+HB_U=https://example.invalid/ping/abcd9876
+
+# use_real_heartbeat: put the real heartbeat.sh back into the runner home and set the dummy URL.
+use_real_heartbeat() {
+  cp -p "$repo/heartbeat.sh" "$home/" || return 1
+  atst_test_set_config ATST_HEARTBEAT_URL "$HB_U"
+  unset ATST_TEST_CURL_BODY ATST_TEST_CURL_HTTP_CODE ATST_TEST_CURL_HTTP_CODE_SEQ ATST_TEST_CURL_EXIT
+}
+
+hb_fail_lines() {
+  if [ -e "$ATST_TEST_CURL_LOG" ]; then
+    grep -c 'abcd9876/fail"' "$ATST_TEST_CURL_LOG"
+  else
+    echo 0
+  fi
+}
+
+hb_ping_lines() {
+  if [ -e "$ATST_TEST_CURL_LOG" ]; then
+    grep abcd9876 "$ATST_TEST_CURL_LOG" | grep -vc '/fail'
+  else
+    echo 0
+  fi
+}
+
+@test "RUN-21/HB-30: all checks healthy: the real heartbeat sends one ping, no /fail, no cut-off (AC6, AC11)" {
+  use_real_heartbeat
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(hb_ping_lines)" -eq 1 ]
+  [ "$(hb_fail_lines)" -eq 0 ]
+  [ "$(status_lines '^RUNNER_TIMEOUT_HEARTBEAT,1,')" -eq 0 ]
+  [ "$(calls_of heartbeat.sh)" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 0 ]
+}
+
+@test "RUN-22/HB-31: PROCESS_A set to 1: one /fail with PROCESS_A and no ping (AC7)" {
+  use_real_heartbeat
+  printf 'PROCESS_A,1,%s\n' "$(date +%s)" > "$ST"
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(hb_fail_lines)" -eq 1 ]
+  [ "$(hb_ping_lines)" -eq 0 ]
+  [ "$(sed -nE 's/.*data(-raw)? = "([^"]*)".*/\2/p' "$ATST_TEST_CURL_LOG")" = PROCESS_A ]
+}
+
+@test "RUN-23/HB-32: only PRICE_A set to 1: a ping, no /fail (AC6)" {
+  use_real_heartbeat
+  printf 'PRICE_A,1,%s\n' "$(date +%s)" > "$ST"
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(hb_ping_lines)" -eq 1 ]
+  [ "$(hb_fail_lines)" -eq 0 ]
+}
+
+@test "RUN-24/HB-33: a failing heartbeat curl: the run exits 0, one line without the URL in the log (AC11, AC21)" {
+  use_real_heartbeat
+  export ATST_TEST_CURL_EXIT=6
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  # the stderr of the run goes to ~/.atst/log/check_all.log (#144), not to $output
+  [ "$(runlog | grep -c '^heartbeat: send failed (curl exit 6)$')" -eq 1 ]
+  [[ "$output" != *example.invalid* ]]
+  [ "$(status_lines '^RUNNER_TIMEOUT_HEARTBEAT,1,')" -eq 0 ]
+  [ -z "$(grep -rl example.invalid "$HOME/.atst" | grep -vE '/(config|\.heartbeat_url)$')" ]
+}
+
 @test "TH-01: atst_test_set_targets writes an array read back element by element, only in the sandbox" {
   local sum rc=0
   atst_test_set_targets "it's" 'a  b' '*'

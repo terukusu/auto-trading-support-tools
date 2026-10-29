@@ -220,3 +220,24 @@ CF_AFTER_CODE='echo "targets=${#ATST_TARGETS[@]}"; echo "line_id=${ATST_LINE_ID+
   [ "$-" = "$flags" ]
   [ "$(atst_test_push_count)" -eq 0 ]
 }
+
+@test "MK-1: atst_mask_tail4 shows **** and the last 4 characters of 8 or more (#136)" {
+  atst_test_source_common
+  [ "$(atst_mask_tail4 abcdefgh)" = '****efgh' ]
+  [ "$(atst_mask_tail4 https://example.invalid/ping/abcd9876)" = '****9876' ]
+}
+
+@test "MK-2: atst_mask_tail4 shows only **** for fewer than 8 characters or an empty value (#136)" {
+  atst_test_source_common
+  [ "$(atst_mask_tail4 abcdefg)" = '****' ]
+  [ "$(atst_mask_tail4 '')" = '****' ]
+}
+
+@test "MK-3: atst_mask_tail4 prints no newline and returns 0 (#136)" {
+  local out
+  atst_test_source_common
+  out=$(atst_mask_tail4 abcdefgh; echo x)
+  [ "$out" = '****efghx' ]
+  run atst_mask_tail4 abcdefgh
+  [ "$status" -eq 0 ]
+}

@@ -56,6 +56,34 @@ else
 fi
 unset _atst_spool_env
 
+# atst_load_heartbeat_url
+# The heartbeat URL (heartbeat.sh) comes from ~/.atst/.heartbeat_url (written by setup_heartbeat.sh)
+# when its first line, without spaces / CR / LF, is not empty; otherwise from ATST_HEARTBEAT_URL of
+# ~/.atst/config, as before. Sets ATST_HEARTBEAT_URL and ATST_HEARTBEAT_URL_FROM (file / config / empty)
+# without exporting them. Read here, after the config, so an existing config needs no new line. Prints
+# nothing (not even a read error; the URL is a secret, P5) and always returns 0.
+function atst_load_heartbeat_url() {
+  local u=''
+
+  if [ -n "$ATST_CONFIG_DIR" ]; then
+    # The braces also silence bash's own message for an unreadable file or a directory. "|| :" keeps
+    # a caller's set -e (and bats) going when there is no file or no final newline.
+    { IFS= read -r u < "$ATST_CONFIG_DIR/.heartbeat_url"; } 2>/dev/null || :
+    u=${u//[[:space:]]/}
+  fi
+  # shellcheck disable=SC2034  # ATST_HEARTBEAT_URL_FROM is read by doctor.sh
+  if [ -n "$u" ]; then
+    ATST_HEARTBEAT_URL=$u
+    ATST_HEARTBEAT_URL_FROM='file'
+  elif [ -n "${ATST_HEARTBEAT_URL:-}" ]; then
+    ATST_HEARTBEAT_URL_FROM='config'
+  else
+    ATST_HEARTBEAT_URL_FROM=
+  fi
+  return 0
+}
+atst_load_heartbeat_url
+
 # MT4/5 need neither Wine-Mono (.NET) nor Wine-Gecko (embedded IE). Keep both disabled for every
 # wine call made from cron (mtctl start, ...) so Wine never opens a download dialog unattended
 # (P10). cron does not read ~/.bash_profile, so this must live here.
@@ -100,6 +128,21 @@ function atst_char_count() {
 
 function atst_head_chars() {
   ( LC_ALL=C.UTF-8; printf %s "${1:0:$2}" )
+}
+
+# atst_mask_tail4 <value>
+# Prints ****<last 4 characters of <value>>, or only **** when <value> is shorter than 8 characters (the
+# last 4 would be most of it). No newline. Run it in $(...): the value never stays in a variable of the
+# calling shell (doctor.sh, setup_heartbeat.sh).
+function atst_mask_tail4() {
+  local s="$1"
+
+  if [ "${#s}" -ge 8 ]; then
+    s=${s: -4}
+  else
+    s=''
+  fi
+  printf '****%s' "$s"
 }
 
 function atst_read_file() {
@@ -324,6 +367,31 @@ function atst_log_line_error() {
     local tmp
     tmp=$(mktemp "$ATST_CONFIG_DIR/line_error.log.XXXXXX") && tail -n 1000 "$log" > "$tmp" && mv "$tmp" "$log"
   fi
+}
+
+# atst_line_send_failing <n>
+# Returns 0 when LINE looks dead: the last <n> headings of line_error.log (written by
+# atst_log_line_error; failed image uploads "http=upload:..." do not count, "no_alert_status" does) are
+# all there and the oldest of them is at most 60 minutes old. A success leaves no line, so "in a row" is
+# taken as "within the last hour". Returns 1 otherwise (no or unreadable log, fewer headings, an older
+# one, an empty ATST_CONFIG_DIR, a date that cannot be read). <n> is a positive integer. Prints nothing
+# and changes no file (heartbeat.sh calls it every minute).
+function atst_line_send_failing() {
+  local n="$1" log heads ts t now
+
+  [ -n "$ATST_CONFIG_DIR" ] || return 1
+  [[ "$n" =~ ^[1-9][0-9]*$ ]] || return 1
+  log="$ATST_CONFIG_DIR/line_error.log"
+  [ -r "$log" ] || return 1
+  heads=$(grep -aE '^\[[0-9-]+ [0-9:]+\] LINE send failed' "$log" 2>/dev/null \
+    | grep -av '^\[[0-9-]* [0-9:]*\] LINE send failed: http=upload:' | tail -n "$n")
+  [ -n "$heads" ] || return 1
+  [ "$(printf '%s\n' "$heads" | wc -l)" -ge "$n" ] || return 1
+  ts=$(printf '%s\n' "$heads" | sed -nE '1s/^\[([0-9-]+ [0-9:]+)\].*/\1/p')
+  t=$(date -d "$ts" +%s 2>/dev/null) || return 1
+  [[ "$t" =~ ^[0-9]+$ ]] || return 1
+  now=$(date +%s)
+  [ "$t" -ge $(( now - 3600 )) ]
 }
 
 function atst_abs_path() {
