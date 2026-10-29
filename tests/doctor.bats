@@ -94,7 +94,8 @@ doctor_ng_count() {
   [ "$(doctor_ng_count)" -eq 0 ]
   [[ "${lines[${#lines[@]}-1]}" == "OK summary "* ]]
   [[ "${lines[${#lines[@]}-1]}" == *" ng=0 "* ]]
-  [ -n "$(printf '%s\n' "$output" | grep '^-- heartbeat ATST_HEARTBEAT_URL not set$')" ]
+  [ -n "$(printf '%s\n' "$output" | grep '^-- heartbeat not set (recommended: run setup_heartbeat\.sh)$')" ]
+  [ -z "$(printf '%s\n' "$output" | grep 'ATST_HEARTBEAT_URL not set')" ]
   [ -n "$(doctor_line_of 'wine --version wine-10\.0')" ]
   [ -n "$(doctor_line_of 'arch win64')" ]
   [ -n "$(doctor_line_of 'process A_MT4 pid=123')" ]
@@ -358,4 +359,71 @@ cl_notes() {
   [ "$(doctor_line_of 'check_all\.log ' | wc -l)" -eq 1 ]
   [[ "$(doctor_line_of 'check_all\.log ')" == *"mode 0, last START none,"* ]]
   [[ "$output" != *tail-line-4b2d* ]]
+}
+
+# DR-H20 to DR-H24 (#136): item 10 with ~/.atst/.heartbeat_url (setup_heartbeat.sh). The IDs are DR-20 to
+# DR-24 of the #136 plan; "H" keeps them apart from DR-16 to DR-20 of #144.
+
+# put_heartbeat_file <mode>: .heartbeat_url with a dummy URL ending in 2222.
+put_heartbeat_file() {
+  doctor_in_sandbox || return 1
+  printf '%s\n' https://example.invalid/file/yyyy2222 > "$HOME/.atst/.heartbeat_url" || return 1
+  chmod "$1" "$HOME/.atst/.heartbeat_url"
+}
+
+@test "DR-H20: .heartbeat_url (600) is OK and shown as its last 4 characters (AC19, AC21)" {
+  put_heartbeat_file 600
+  doctor_run
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^OK heartbeat \.heartbeat_url=\*\*\*\*2222$')" -eq 1 ]
+  [[ "$output" != *example.invalid* ]]
+  [[ "$output" != *yyyy* ]]
+}
+
+@test "DR-H21: .heartbeat_url wins over the config URL (AC18, AC19)" {
+  put_heartbeat_file 600
+  atst_test_set_config ATST_HEARTBEAT_URL "https://example.invalid/ping/abcd9876"
+  doctor_run
+  [ "$(printf '%s\n' "$output" | grep -c '^OK heartbeat \.heartbeat_url=\*\*\*\*2222$')" -eq 1 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^OK heartbeat ATST_HEARTBEAT_URL=')" -eq 0 ]
+  [[ "$output" != *example.invalid* ]]
+}
+
+@test "DR-H22: .heartbeat_url not 600 (644, 400) is one NG, exit 1, no URL (AC19, AC21)" {
+  local m
+  for m in 644 400; do
+    echo "case=$m"
+    put_heartbeat_file "$m"
+    doctor_run
+    [ "$status" -eq 1 ]
+    [ "$(printf '%s\n' "$output" | grep -c "^NG heartbeat mode $m (must be 600): ~/\.atst/\.heartbeat_url\$")" -eq 1 ]
+    # one NG item (item 9 does not list .heartbeat_url) and the summary line
+    [ "$(printf '%s\n' "$output" | grep '^NG ' | grep -vc '^NG summary ')" -eq 1 ]
+    [[ "${lines[${#lines[@]}-1]}" == *" ng=1 "* ]]
+    [[ "$output" != *example.invalid* ]]
+    [[ "$output" != *yyyy2222* ]]
+  done
+}
+
+@test "DR-H23: an empty .heartbeat_url (600) shows the config URL" {
+  : > "$HOME/.atst/.heartbeat_url"
+  chmod 600 "$HOME/.atst/.heartbeat_url"
+  atst_test_set_config ATST_HEARTBEAT_URL "https://example.invalid/ping/abcd9876"
+  doctor_run
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^OK heartbeat ATST_HEARTBEAT_URL=\*\*\*\*9876$')" -eq 1 ]
+}
+
+@test "DR-H24: item 10 calls no curl and changes neither the file nor its mode" {
+  local m c0
+  for m in 600 644; do
+    echo "case=$m"
+    rm -f "$ATST_TEST_CURL_LOG"
+    put_heartbeat_file "$m"
+    c0=$(cksum < "$HOME/.atst/.heartbeat_url")
+    doctor_run
+    [ ! -s "$ATST_TEST_CURL_LOG" ]
+    [ "$(cksum < "$HOME/.atst/.heartbeat_url")" = "$c0" ]
+    [ "$(stat -c %a "$HOME/.atst/.heartbeat_url")" = "$m" ]
+  done
 }

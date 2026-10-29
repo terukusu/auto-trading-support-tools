@@ -3,6 +3,11 @@
 # Never touches the network and never runs the real curl.
 # - Appends its arguments as one line to $ATST_TEST_CURL_LOG. Files given as "-H @<path>"
 #   (the Authorization header) are neither opened nor recorded.
+# - With "-K <path>" (a curl config file, e.g. the heartbeat URL given through a process substitution),
+#   reads that file and appends its "url", "data" and "data-raw" lines (trimmed) to the same log line
+#   as "<args> | <line> | <line>". Any other line of it ("header", "user", "oauth2-bearer", ...) is
+#   never recorded. An unreadable file or one without such lines leaves the log line as "<args>".
+#   One call is always one log line (ATST_TEST_CURL_HTTP_CODE_SEQ counts lines).
 # - Prints $ATST_TEST_CURL_BODY, then "\n$ATST_TEST_CURL_HTTP_CODE" (default 200) when -w is given.
 # - With $ATST_TEST_CURL_HTTP_CODE_SEQ (space-separated HTTP codes), the n-th call (n = the number of
 #   lines in $ATST_TEST_CURL_LOG after appending) prints the n-th code instead; past its end, as above.
@@ -14,7 +19,23 @@
 # Outside a sandbox: do nothing (and send nothing).
 [ -n "${ATST_TEST_CURL_LOG:-}" ] || exit 1
 
-printf '%s\n' "$*" >> "$ATST_TEST_CURL_LOG"
+# -K <path>: only the url / data / data-raw lines, never header lines (they may hold a token).
+kept=""
+prev=""
+for a in "$@"; do
+  if [ "$prev" = "-K" ]; then
+    while IFS= read -r l || [ -n "$l" ]; do
+      if [[ "$l" =~ ^[[:space:]]*(url|data|data-raw)[[:space:]]*= ]]; then
+        l="${l#"${l%%[![:space:]]*}"}"
+        l="${l%"${l##*[![:space:]]}"}"
+        kept+=" | $l"
+      fi
+    done 2>/dev/null < "$a"
+    break
+  fi
+  prev=$a
+done
+printf '%s%s\n' "$*" "$kept" >> "$ATST_TEST_CURL_LOG"
 
 code="${ATST_TEST_CURL_HTTP_CODE:-200}"
 if [ -n "${ATST_TEST_CURL_HTTP_CODE_SEQ:-}" ]; then

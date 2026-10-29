@@ -84,16 +84,9 @@ function doctor_tail4_file() {
 }
 
 # doctor_tail4_value <value>
-# Same as doctor_tail4_file for a string (the heartbeat URL).
+# Same as doctor_tail4_file for a string (the heartbeat URL): atst_mask_tail4 of common.sh.
 function doctor_tail4_value() {
-  local s="$1"
-
-  if [ "${#s}" -ge 8 ]; then
-    s=${s: -4}
-  else
-    s=''
-  fi
-  printf '****%s' "$s"
+  atst_mask_tail4 "$1"
 }
 
 # 1. Wine on PATH: only its version is asked (nothing that creates or updates a prefix).
@@ -340,13 +333,25 @@ function doctor_check_secrets() {
   done
 }
 
-# 10. External monitoring: only whether ATST_HEARTBEAT_URL is set (not contacted).
+# 10. External monitoring (heartbeat.sh): which URL is in use, ~/.atst/.heartbeat_url (setup_heartbeat.sh)
+# or ATST_HEARTBEAT_URL of the config (common.sh decides, ATST_HEARTBEAT_URL_FROM), shown as its last 4
+# characters. .heartbeat_url not 600 is NG (same rule as item 9; not listed there, so not NG twice).
+# Recommended, not required: unset is --. The URL is not contacted.
 function doctor_check_heartbeat() {
-  if [ -z "${ATST_HEARTBEAT_URL:-}" ]; then
-    doctor_line -- heartbeat "ATST_HEARTBEAT_URL not set"
-  else
-    doctor_line OK heartbeat "ATST_HEARTBEAT_URL=$(doctor_tail4_value "$ATST_HEARTBEAT_URL")"
+  local f="$ATST_CONFIG_DIR/.heartbeat_url" m
+
+  if [ -e "$f" ]; then
+    m=$(stat -c %a "$f" 2>/dev/null)
+    if [ "$m" != 600 ]; then
+      doctor_line NG heartbeat "mode ${m:-unknown} (must be 600): $f"
+      return 0
+    fi
   fi
+  case "${ATST_HEARTBEAT_URL_FROM:-}" in
+    file) doctor_line OK heartbeat ".heartbeat_url=$(doctor_tail4_value "$ATST_HEARTBEAT_URL")" ;;
+    config) doctor_line OK heartbeat "ATST_HEARTBEAT_URL=$(doctor_tail4_value "$ATST_HEARTBEAT_URL")" ;;
+    *) doctor_line -- heartbeat "not set (recommended: run setup_heartbeat.sh)" ;;
+  esac
 }
 
 # 11. The tail of ~/.atst/log/check_all.log, the stderr of the per-minute runs (shown only). The lines

@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # check_daily.sh (#135): a config without ATST_IMAGE_REPORT_DESKTOP (written before the desktop image
 # became opt-in) gets a one-time LINE notice through atst_update_alert (IMAGE_REPORT_DEFAULT_CHANGED).
+# CD-11 and later (#136): LINE_QUOTA in alert_status (read by heartbeat.sh) and the line about an unset
+# external monitor in the report.
 # apt is a stub in the sandbox; LINE goes to the curl stub. The key and the LINE token are dummies.
 
 load test_helper
@@ -167,4 +169,158 @@ run_daily() {
   [ "$status" -eq 1 ]
   [ "$(notice_count)" -eq 0 ]
   grep -q 'http=no_alert_status' "$HOME/.atst/line_error.log"
+}
+
+# ---- #136: LINE_QUOTA for heartbeat.sh and the line about the external monitor ----
+# The quota API answers with one body for both calls (quota and consumption); value 200 is the limit.
+
+HB_U=https://example.invalid/ping/abcd9876
+
+quota_body() {
+  export ATST_TEST_CURL_BODY="{\"type\":\"limited\",\"value\":200,\"totalUsage\":$1}"
+}
+
+# Number of LINE_QUOTA lines in alert_status matching the regex $1 (0 without the file).
+quota_lines() {
+  if [ -e "$HOME/.atst/alert_status" ]; then
+    grep -c "$1" "$HOME/.atst/alert_status"
+  else
+    echo 0
+  fi
+}
+
+# The push lines of the daily report.
+daily_push() {
+  if [ -e "$ATST_TEST_CURL_LOG" ]; then
+    grep 'api.line.me/v2/bot/message/push' "$ATST_TEST_CURL_LOG" | grep '稼働OK'
+  fi
+}
+
+# heartbeat.sh after the daily run, with the dummy URL.
+run_heartbeat() {
+  unset ATST_TEST_CURL_BODY
+  atst_test_set_config ATST_HEARTBEAT_URL "$HB_U"
+  run bash "$BATS_TEST_DIRNAME/../heartbeat.sh"
+}
+
+hb_fail_lines() {
+  grep -c 'abcd9876/fail"' "$ATST_TEST_CURL_LOG"
+}
+
+@test "CD-11: 85% of the quota records LINE_QUOTA,1 and the next heartbeat is /fail (AC10)" {
+  atst_test_set_config ATST_DAILY_REPORT 1
+  quota_body 170
+  run_daily
+  [ "$status" -eq 0 ]
+  [ "$(quota_lines '^LINE_QUOTA,1,[0-9]*$')" -eq 1 ]
+  run_heartbeat
+  [ "$status" -eq 0 ]
+  [ "$(hb_fail_lines)" -eq 1 ]
+  [[ "$(grep 'abcd9876/fail"' "$ATST_TEST_CURL_LOG")" == *'data-raw = "LINE_QUOTA"' ]]
+}
+
+@test "CD-12: the bound is the same as the warning: 160/200 is 1, 159/200 is 0" {
+  atst_test_set_config ATST_DAILY_REPORT 1
+  quota_body 160
+  run_daily
+  [ "$(quota_lines '^LINE_QUOTA,1,')" -eq 1 ]
+  quota_body 159
+  run_daily
+  [ "$(quota_lines '^LINE_QUOTA,0,')" -eq 1 ]
+  [ "$(quota_lines '^LINE_QUOTA,1,')" -eq 0 ]
+}
+
+@test "CD-13: below 80% turns LINE_QUOTA back to 0 and the next heartbeat is a ping (AC10)" {
+  atst_test_set_config ATST_DAILY_REPORT 1
+  printf 'LINE_QUOTA,1,1700000000\n' > "$HOME/.atst/alert_status"
+  quota_body 10
+  run_daily
+  [ "$status" -eq 0 ]
+  [ "$(quota_lines '^LINE_QUOTA,0,')" -eq 1 ]
+  [ "$(quota_lines '^LINE_QUOTA,1')" -eq 0 ]
+  run_heartbeat
+  [ "$(hb_fail_lines)" -eq 0 ]
+  [ "$(grep abcd9876 "$ATST_TEST_CURL_LOG" | grep -vc '/fail')" -eq 1 ]
+}
+
+@test "CD-14: a plan without a limit records LINE_QUOTA,0" {
+  atst_test_set_config ATST_DAILY_REPORT 1
+  export ATST_TEST_CURL_BODY='{"type":"none","totalUsage":10}'
+  run_daily
+  [ "$(quota_lines '^LINE_QUOTA,0,')" -eq 1 ]
+  [ "$(quota_lines '^LINE_QUOTA,1')" -eq 0 ]
+}
+
+@test "CD-15: when the quota cannot be read LINE_QUOTA is neither changed nor created" {
+  atst_test_set_config ATST_DAILY_REPORT 1
+  printf 'LINE_QUOTA,1,1700000000\n' > "$HOME/.atst/alert_status"
+  run_daily
+  [ "$(quota_lines '^LINE_QUOTA,1,1700000000$')" -eq 1 ]
+  rm -f "$HOME/.atst/alert_status"
+  run_daily
+  [ "$(quota_lines '^LINE_QUOTA')" -eq 0 ]
+}
+
+@test "CD-16: LINE_QUOTA is written before the push (a failed push keeps it) and is not a notice of its own" {
+  atst_test_set_config ATST_DAILY_REPORT 1
+  quota_body 170
+  export ATST_TEST_CURL_HTTP_CODE_SEQ="200 200 500"
+  run_daily
+  [ "$(quota_lines '^LINE_QUOTA,1,')" -eq 1 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+}
+
+@test "CD-17: a failed LINE_QUOTA write (empty ATST_ALERT_STATUS_FILE) still sends the report" {
+  atst_test_set_config ATST_DAILY_REPORT 1
+  atst_test_set_config ATST_ALERT_STATUS_FILE ''
+  quota_body 170
+  run_daily
+  [ "$(daily_push | wc -l)" -eq 1 ]
+}
+
+@test "CD-18: without a heartbeat URL the report has the line, after the LINE count (AC20)" {
+  atst_test_set_config ATST_DAILY_REPORT 1
+  quota_body 10
+  run_daily
+  [ "$status" -eq 0 ]
+  [ "$(daily_push | wc -l)" -eq 1 ]
+  [[ "$(daily_push)" == *'LINE 送信数'*'外形監視: 未設定（推奨。setup_heartbeat.sh で設定）'* ]]
+}
+
+@test "CD-19: with a URL in the config or in .heartbeat_url there is no line and no URL (AC20, AC21)" {
+  atst_test_set_config ATST_DAILY_REPORT 1
+  atst_test_set_config ATST_HEARTBEAT_URL "$HB_U"
+  quota_body 10
+  run_daily
+  [ "$(daily_push | wc -l)" -eq 1 ]
+  [[ "$(daily_push)" != *'外形監視'* ]]
+  [[ "$output" != *example.invalid* ]]
+  [ "$(grep -c example.invalid "$ATST_TEST_CURL_LOG")" -eq 0 ]
+
+  rm -f "$HOME/.atst/config" "$ATST_TEST_CURL_LOG"
+  atst_test_set_config ATST_DAILY_REPORT 1
+  printf '%s\n' "$HB_U" > "$HOME/.atst/.heartbeat_url"
+  chmod 600 "$HOME/.atst/.heartbeat_url"
+  run_daily
+  [ "$(daily_push | wc -l)" -eq 1 ]
+  [[ "$(daily_push)" != *'外形監視'* ]]
+  [[ "$output" != *example.invalid* ]]
+  [ "$(grep -c example.invalid "$ATST_TEST_CURL_LOG")" -eq 0 ]
+}
+
+@test "CD-20: with ATST_DAILY_REPORT=0 the line alone sends nothing (AC20)" {
+  atst_test_set_config ATST_DAILY_REPORT 0
+  quota_body 10
+  run_daily
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 0 ]
+}
+
+@test "CD-21: with ATST_DAILY_REPORT=0 a quota warning is sent with the line" {
+  atst_test_set_config ATST_DAILY_REPORT 0
+  quota_body 170
+  run_daily
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [[ "$(daily_push)" == *'【注意】LINE の今月の送信数'* ]]
+  [[ "$(daily_push)" == *'外形監視: 未設定'* ]]
 }
