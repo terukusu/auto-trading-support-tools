@@ -13,6 +13,9 @@ setup() {
   PATH="$ATST_TEST_SANDBOX/bin:$PATH"
   export PATH
   doctor_make_ok_state
+  # A fixed day before the deadline of the old-style crontab (#143), whatever the real date is.
+  atst_test_stub_date "$ATST_TEST_SANDBOX/bin" 2026-11-01
+  hash -r
 }
 
 teardown() {
