@@ -14,8 +14,54 @@ function vnc_password_ok() {
   [[ "$1" =~ ^[[:graph:]]{6,8}$ ]]
 }
 
-# tests/install_vnc_password.bats reads only the functions above. Honored only when sourced, so the
-# variable in the environment can never make a real run skip the install.
+# ATST_INSTALL_NO_ZDRIVE=1 removes the Z: drive of the prefix (#145). Only "1" enables it; any other
+# non-empty value is ignored with a warning so a typo never looks like it worked. The value is not shown.
+function zdrive_opt_in() {
+  [ "$1" = 1 ] && return 0
+  [ -n "$1" ] && echo "[warn] ATST_INSTALL_NO_ZDRIVE must be 1 to remove the Z: drive; ignored." >&2
+  return 1
+}
+
+# Removes <prefix>/dosdevices/z: (a link to /) so Windows programs in the prefix, e.g. an EA calling
+# a DLL, cannot open the Linux file system through Z:\ (#145). Mitigation only: Wine is no sandbox.
+# Idempotent: no link -> nothing to do. Anything that is not a symbolic link is left alone (rc 1).
+# The link itself is removed; its target (/) is never followed.
+function remove_z_drive() {
+  [ -n "${WINEPREFIX:-}" ] || { echo "[error] WINEPREFIX is empty; not touching any Z: drive." >&2; return 1; }
+  local z="${WINEPREFIX:?}/dosdevices/z:"
+  if [ -L "$z" ]; then
+    rm -f -- "${WINEPREFIX:?}/dosdevices/z:" || return 1
+    echo "Removed the Z: drive ($z). Windows programs in this prefix (MetaTrader, EAs) no longer see / and MetaTrader's file dialogs show no Z:."
+    echo "  To restore it (MetaTrader stopped): ln -s / \"$z\""
+  elif [ -e "$z" ]; then
+    echo "[warn] $z is not a symbolic link; left as it is." >&2
+    return 1
+  fi
+  return 0
+}
+
+# Prints <prefix>/drive_c/atst/installer, the directory the MT installer is saved to (#145), after
+# creating it (mode 700, one level at a time). Inside drive_c, so "wine start /unix" reaches it via
+# C: even without Z:. Shares C:\atst with mtctl.sh's startup ini (#133), which also keeps it 700.
+# A symbolic link at either level is refused (rc 1) so the download never lands outside the prefix.
+# Returns 1 without creating anything when the prefix has no drive_c yet.
+function prepare_mt_installer_dir() {
+  [ -n "${WINEPREFIX:-}" ] && [ -d "$WINEPREFIX/drive_c" ] && [ ! -L "$WINEPREFIX/drive_c" ] || return 1
+  local d
+  for d in "$WINEPREFIX/drive_c/atst" "$WINEPREFIX/drive_c/atst/installer"; do
+    if [ -L "$d" ]; then
+      echo "[error] $d is a symbolic link; not saving the installer there." >&2
+      return 1
+    fi
+    [ -d "$d" ] || mkdir -m 700 -- "$d" || return 1
+    chmod 700 -- "$d" || return 1
+  done
+  printf '%s\n' "$WINEPREFIX/drive_c/atst/installer"
+}
+
+# tests/install_vnc_password.bats and tests/install_zdrive.bats read only the functions above.
+# Honored only when sourced, so the variable in the environment can never make a real run skip the
+# install.
 if [ "${BASH_SOURCE[0]}" != "$0" ] && [ -n "${ATST_INSTALL_SOURCE_ONLY:-}" ]; then
   return 0
 fi
@@ -29,6 +75,11 @@ if [ -n "$VNC_PASS_GIVEN" ] && ! vnc_password_ok "$VNC_PASS_GIVEN"; then
   echo "[error] VNC_PASSWORD must be 6 to 8 printable characters without spaces." >&2
   exit 1
 fi
+
+# ATST_INSTALL_NO_ZDRIVE=1 (optional, for a new install): remove the Z: drive after the prefix is set
+# up. Default: leave it (existing environments are never changed). See docs/MT_USER_SEPARATION.md.
+NO_ZDRIVE=0
+if zdrive_opt_in "${ATST_INSTALL_NO_ZDRIVE:-}"; then NO_ZDRIVE=1; fi
 
 ########################################
 # Setup shell/environment variables
@@ -52,7 +103,6 @@ ABS_PWD=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ORG_USER=${SUDO_USER:-$USER}
 IS_SYSTEMD=$(which systemctl)
 DIR_TEMPLATES="$ABS_PWD/templates"
-DIR_WINECACHE=$HOME/.cache/wine
 APT_OPT='-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'
 
 export DEBIAN_FRONTEND=noninteractive
@@ -100,12 +150,6 @@ if [ "$DIST_NAME" = "ubuntu" ]; then
 elif [ "$DIST_NAME" = "debian" ]; then
     FAUDIO_REPOS=${FAUDIO_REPOS_BASE}/Debian_${VERSION_ID}
 fi
-
-########################################
-# Creating directories
-########################################
-
-mkdir -p "$DIR_WINECACHE"
 
 ########################################
 # Setup root crontab
@@ -740,26 +784,33 @@ function clean_needless_files {
 # Download MT4 and start installer
 #####################################################
 # Result of download_and_start_mt4_installer, reported by verify_and_report:
-# running / exited / download-failed / skipped-win32
+# running / exited / download-failed / skipped-win32 / no-dir
 INSTALLER_STATUS=""
 
+# Saved inside drive_c (C:\atst\installer) so it starts whether or not the Z: drive exists (#145).
 function download_and_start_mt4_installer() {
-  local name installer
+  local name installer dir
   name=$(basename "$MT_INSTALLER_URL")
-  installer="$DIR_WINECACHE/$name"
 
   if [ "$(wineprefix_arch)" = "win32" ]; then
     INSTALLER_STATUS=skipped-win32
     return 1
   fi
 
+  if ! dir=$(prepare_mt_installer_dir); then
+    echo "[error] cannot prepare the MT installer directory (C:\\atst\\installer in $WINEPREFIX)" >&2
+    INSTALLER_STATUS=no-dir
+    return 1
+  fi
+  installer="$dir/$name"
+
   echo Downloading MetaTrader installer ...
   if [ -f "$installer" ]; then
-    rm "$installer"
+    rm -f -- "$installer"
   fi
 
   # A cut-off download can leave a partial file; drop it so it is reported as a download failure.
-  wget -q --timeout=30 --tries=3 -N -P "$DIR_WINECACHE" "$MT_INSTALLER_URL" || rm -f "$installer"
+  wget -q --timeout=30 --tries=3 -N -P "$dir" "$MT_INSTALLER_URL" || rm -f -- "$installer"
 
   if [ ! -f "$installer" ]; then
     echo "[error] MT installer download failed: $MT_INSTALLER_URL" >&2
@@ -822,6 +873,15 @@ function verify_and_report() {
     echo "[ NG ] wine prefix: $WINEPREFIX is missing or incomplete"; ng=1
   fi
 
+  # Only with ATST_INSTALL_NO_ZDRIVE=1 (#145); the default output has no such line.
+  if [ "${NO_ZDRIVE:-0}" = 1 ]; then
+    if [ -L "$WINEPREFIX/dosdevices/z:" ] || [ -e "$WINEPREFIX/dosdevices/z:" ]; then
+      echo "[ NG ] wine Z: drive: $WINEPREFIX/dosdevices/z: is still present (ATST_INSTALL_NO_ZDRIVE=1)"; ng=1
+    else
+      echo "[ OK ] wine Z: drive: removed (/ is no longer a drive for Windows programs)"
+    fi
+  fi
+
   if [ -n "$IS_SYSTEMD" ]; then
     if systemctl is-active --quiet "vncserver@:1" && ss -tln 2>/dev/null | grep -qE '[:.]5901[[:space:]]'; then
       echo "[ OK ] VNC: vncserver@:1 is listening on 5901"
@@ -856,6 +916,7 @@ function verify_and_report() {
     skipped-win32)   echo "[ NG ] MetaTrader installer: not started ($WINEPREFIX is 32-bit; see the warning above)"; ng=1 ;;
     download-failed) echo "[ NG ] MetaTrader installer: download failed ($MT_INSTALLER_URL)"; ng=1 ;;
     exited)          echo "[ NG ] MetaTrader installer: exited right after start (check the wine version: $WINE_PIN_VERSION is required)"; ng=1 ;;
+    no-dir)          echo "[ NG ] MetaTrader installer: not started (cannot prepare $WINEPREFIX/drive_c/atst/installer; see the error above)"; ng=1 ;;
     *)               echo "[ NG ] MetaTrader installer: not started"; ng=1 ;;
   esac
 
@@ -912,6 +973,11 @@ install_packages_needed_by_graphical_report || echo "[warn] graphical report pac
 setup_auto_update_package_list
 setup_vncserver
 setup_wine || die "setting up wine failed (see the messages above)."
+# Right after setup_wine: wineboot -i has run and wineserver has stopped. Also on an existing prefix
+# when the flag is given (#145). Never fatal; verify_and_report shows NG if the link is still there.
+if [ "$NO_ZDRIVE" = 1 ]; then
+  remove_z_drive || echo "[warn] the Z: drive was not removed (see above); the result below reports it." >&2
+fi
 start_vncserver_service
 clean_needless_files
 download_and_start_mt4_installer
