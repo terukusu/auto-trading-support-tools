@@ -185,7 +185,6 @@ ATST_TARGETS=('Land Prime')
 * 名前に `'` を含むときは、その名前を `"` で囲みます。例: `ATST_TARGETS=("Bob's MT4" 'MetaTrader 5')`
 * `ATST_TARGETS` に該当する MT4/5 が見つからない場合は、その MT4/5 の監視と自動起動が効いていないことを LINE に通知します(check_process.sh)。
 * `ATST_TARGETS` が未設定・空のときや、書き間違えて読み込めなかったときは、LINE に「監視対象が設定されていません」が届きます(MT4/5ごとの監視と約定の通知、再起動時のMT4/5の自動起動が止まります)。この通知が来たら、`~/.atst/config` の `ATST_TARGETS` の行の引用符と括弧の閉じ忘れを確認してください。通知が届いていた場合は、設定が読み込まれると復帰の通知が 1 回届きます。
-* 旧形式の crontab (`TARGET="('Land Prime')"` と `wrapper.sh "$TARGET" ...` の行)は `ATST_TARGETS` を使わず、従来どおり crontab の `TARGET` を使います。
 
 
 ### 毎分の監視 (check_all.sh) の動き
@@ -211,7 +210,7 @@ ATST_TARGETS=('Land Prime')
     * `/fail` にならないもの: 値動き・スプレッド・Ping(PRICE / SPREAD / PING)の異常。これらは LINE の通知だけです。
     * `/fail` を受け付けないサービスでは、異常の間は ping も送られないので「ping の途絶」として通知されます。
     * 外形監視が未設定のときは、毎朝の稼働OK(`check_daily.sh`)の最後に「外形監視: 未設定(推奨。setup_heartbeat.sh で設定)」の 1 行が付きます(この行のためだけには送りません)。
-    * crontab が旧形式(または旧形式と新形式の混在)のときは、期限 (2027-05-31) までは毎朝の稼働OKの最後に「crontab: 旧形式 (wrapper.sh) です。…」の 1 行が付き(この行のためだけには送りません)、LINE で 1 度だけ案内が届きます。期限後は「【注意】crontab の旧形式 (wrapper.sh) の猶予期限 … を過ぎています。…」の行になり、`ATST_DAILY_REPORT=0` でも毎朝 1 通届きます([既存の crontab からの移行](#既存の-crontab-からの移行))。
+    * crontab が旧形式(または旧形式と新形式の混在)のときは、毎朝の稼働OKに「【注意】crontab が旧形式 (wrapper.sh) です。…」の行が付き、`ATST_DAILY_REPORT=0` でも毎朝 1 通届きます(wrapper.sh は撤去したので旧形式の行は動きません。[既存の crontab からの移行](#既存の-crontab-からの移行))。
     * 旧形式の crontab の `heartbeat.sh` の行が残っていると、その行の ping が `/fail` を打ち消して up/down が往復することがあります(移行が終わったら消してください)。
     * 監視対象から外した MT4/5 の発生状態が残ると `/fail` が続きます。そのときは `~/.atst/alert_status` の該当するキー(`PROCESS_<名前>` など)の行を消してください。
 * `check_all.sh` と各チェックの stderr (エラーや警告) は `~/.atst/log/check_all.log` に追記します。
@@ -257,7 +256,7 @@ ATST_IMAGE_REPORT_DESKTOP=1
 
 ### 既存の crontab からの移行
 
-旧形式の crontab (`TARGET="(...)"` と `wrapper.sh "$TARGET" check_*.sh` の行を並べたもの)は、**2027-05-31 まで**は旧形式のまま動きます。期限後も監視は止まりませんが、毎朝の報告に【注意】が付き、`doctor.sh` が NG になり、期限後の別 Issue で `wrapper.sh` を撤去します。期限前は、毎朝の報告の最後に「crontab: 旧形式 (wrapper.sh) です。…」の 1 行が付き(この行のためだけには送りません)、LINE で 1 度だけ案内が届きます。新形式に変えるときは、次の順で行います。
+旧形式の crontab (`TARGET="(...)"` と `wrapper.sh "$TARGET" check_*.sh` の行を並べたもの)は、`wrapper.sh` を撤去したため動きません (`check_daily.sh`・`check_reboot.sh`・`heartbeat.sh` のように直接書いた行を除く)。毎朝の報告に【注意】が付き、`doctor.sh` が NG になります。次の順で新形式に変えてください。
 
 1. `~/.atst/config` の**末尾に** `ATST_TARGETS=(...)` を 1 行追記します。括弧の中身は旧 crontab の `TARGET="(...)"` の括弧の中身をそのまま使います(`TARGET="('Land Prime')"` なら `ATST_TARGETS=('Land Prime')`)。先頭や途中に書くと、書き間違えたときにそれより後の設定(LINE の設定など)が読まれず、通知も届かなくなるので、必ず末尾に書きます。
 2. `crontab -e` で旧形式の行を消し、新しい行を書きます。
@@ -267,15 +266,14 @@ ATST_IMAGE_REPORT_DESKTOP=1
 3. `crontab -l` で内容を確認します。1〜2 分後に `ls -l ~/.atst/check_all.started` で更新時刻が直近になっていて、「監視対象が設定されていません」の通知が来ていなければ完了です。
 
 注意:
-* 移行の途中で旧行と新行が同時にあっても、毎分の監視の通知は重複しません(旧形式の行が出す通知は、従来どおりその場で個別に届きます)。ただし共存は短い間にしてください(同じチェックが 1 分に 2 回動くため、しきい値付近で発生・復帰の通知が出やすくなります。LINE の応答が遅いと、打ち切りの通知が出ることもあります)。
-* `@reboot`、`truncate_monitoring.sh`、`report_image.sh`、`check_daily.sh` の行は、旧形式と新形式の両方に残すと 2 回動きます。旧形式の行は必ず消してください。
-* 元に戻すときは、新しい行を消して旧形式の行に戻せばかまいません。
+* `check_daily.sh` の行を旧形式と新形式の両方に残すと 2 回動きます。旧形式の行は必ず消してください。
+* 元の crontab は `~/.atst/crontab.bak.<日時>` に残りますが、戻しても旧形式の行は動きません。
 * `ATST_TARGETS` が未設定のままだと、再起動時のMT4/5の自動起動(`@reboot` の行)も動きません。移行の前に必ず設定してください。
 * 移行後に動かないときや、設定が合っているか確かめたいときは、`doctor.sh` を実行してください([自己診断](#自己診断-doctorsh))。
 
 `setup_cron.sh` の動き:
 * crontab が空のときは、確認なしで新しいテンプレートを登録します。
-* 旧形式の行があれば、移行の案内(期限 2027-05-31 を含む)と、旧 `TARGET` の値(`~/.atst/config` に書く 1 行の形)を表示します。`n` では旧形式の行は消しません。
+* 旧形式の行があれば、移行の案内と、旧 `TARGET` の値(`~/.atst/config` に書く 1 行の形)を表示します。`n` では旧形式の行は消しません。
 * 空でない crontab を書き換える前(上書き・追記のどちらも)に、元の crontab を `~/.atst/crontab.bak.<YYYYmmddHHMMSS>` に 600 で退避し、そのパスを表示します。退避できないときは crontab を変えずに終了コード 2 で終わります。退避は自動では消しません。戻すときは `crontab ~/.atst/crontab.bak.<日時>` です。
 * 旧形式の crontab に `Y` と答えたときは、次の条件をすべて満たせば `~/.atst/config` の末尾に `ATST_TARGETS=<TARGET の値>` を 1 行追記します(値は評価しません): `~/.atst/config` に `ATST_TARGETS` の行が無い、`TARGET=` の値が 1 種類だけ、値が `('...' "...")` のような 1 行の配列(要素は空でない `'...'` か、`"` `\` `$` `` ` `` を含まない `"..."`)。満たさないときは追記せず「手で書いてください」と表示します(crontab の置き換えは続けます)。テンプレートのままの `~/.atst/config` には `ATST_TARGETS=('Land Prime')` の行があるので追記されません。その値が旧 `TARGET` と同じ MetaTrader を指しているか確かめてください。
 * atst の行(`check_*.sh`、`heartbeat.sh`、`wrapper.sh` など)がある crontab には、二重登録になるため追記しません。atst 以外の `check_*.sh` の行も atst の行とみなします。
@@ -346,7 +344,7 @@ mtctl.sh のメッセージ(`list` の 1 行目、`status` の各行、`stop` / 
 4. `target` / `mt`: `ATST_TARGETS` の各名前が検出した MT4/5 に前方一致するか (未設定・空は NG)。どの名前にも選ばれない MT4/5 は `--` (監視対象外) で表示します。前方一致で複数に当たるときは、check_*.sh と同じく最初の 1 つだけが監視対象です。
 5. `process`: 対象の MT4/5 が起動しているか。
 6. `ea` / `csv`: 監視 EA (`TerminalMonitoring.ex4` / `.ex5`) が置かれているか、`terminal_monitoring.csv` の最終行が `ATST_MONITORING_THRESHOLD` 秒より新しいか (check_monitoring.sh と同じ基準)。`csv` の行の末尾の `cols N` は最終行の列数で、14 未満なら古い監視 EA のままなので、「the monitoring EA is old (N fields) …」の補足行を出します (判定は変えません。監視 EA を更新して載せ直すと 14 になり、`check_trade_ready.sh` が働きます)。CSV の各列の意味は [docs/monitoring-csv.md](docs/monitoring-csv.md) を参照してください。
-7. `crontab -l`: 新形式 (`check_all.sh`) なら OK。旧形式 (`wrapper.sh`) のみなら、期限 (2027-05-31) までは OK で「旧形式」と期限を添え、期限を過ぎると NG です。両方ある (混在)・どちらも無いときは NG。
+7. `crontab -l`: 新形式 (`check_all.sh`) なら OK。旧形式 (`wrapper.sh`) のみ・両方ある (混在)・どちらも無いときは NG (旧形式は wrapper.sh を撤去したため動きません)。
 8. `line_error.log`: `~/.atst/line_error.log` の LINE 送信失敗の見出し行 (末尾 5 件)。表示のみです。
 9. `.line_token` / `.line_id` / `.imgbb_key`: 存在と権限 (600 でなければ NG)。`.imgbb_key` は任意です (定期レポートにグラフ・デスクトップの画像を付けるのに必要。無ければ文字要約だけを送ります)。
 10. `heartbeat`: 外形監視の URL。`~/.atst/.heartbeat_url` (setup_heartbeat.sh) が有効なら `OK heartbeat .heartbeat_url=****abcd`、config の `ATST_HEARTBEAT_URL` なら `OK heartbeat ATST_HEARTBEAT_URL=****abcd` (末尾 4 文字のみ)。`.heartbeat_url` が 600 でなければ NG。未設定は `-- heartbeat not set (recommended: run setup_heartbeat.sh)` (推奨ですが必須ではないので NG にはしません)。疎通確認はしません。

@@ -31,9 +31,9 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 
 ### 共通ライブラリ
 
-- `common.sh` — 全スクリプトが source する共通ライブラリ。`atst_*` 関数と設定ロード。source 時に `atst_load_mt_list` で MT 一覧を検出し、グローバル配列 `mt_home/mt_data/mt_name/mt_type/mt_term` へ直接読み込む（フォルダ名をシェルコードとして評価しない。再呼び出しで再読込できる。`mt_data` は MQL4/MQL5 の Files・Experts がある MT のデータフォルダ。決め方は `docs/monitoring-csv.md`）。旧形式 crontab の期限 `ATST_LEGACY_CRONTAB_DEADLINE` と、crontab の形・期限の判定関数もここ（契約は `docs/notification-pipeline.md`）。
+- `common.sh` — 全スクリプトが source する共通ライブラリ。`atst_*` 関数と設定ロード。source 時に `atst_load_mt_list` で MT 一覧を検出し、グローバル配列 `mt_home/mt_data/mt_name/mt_type/mt_term` へ直接読み込む（フォルダ名をシェルコードとして評価しない。再呼び出しで再読込できる。`mt_data` は MQL4/MQL5 の Files・Experts がある MT のデータフォルダ。決め方は `docs/monitoring-csv.md`）。crontab の形の判定（旧形式の検出）もここ。
 - MT プロセスの特定（`atst_find_pid`）は `/proc`（`ATST_PROC_ROOT` で差し替え可）を自ユーザー分だけ走査し、`winepath`・`ps` を使わない（argv[0]（wine loader なら argv[1]）が terminal.exe のパスそのもの、またはパス + 空白 + 後続（Wine が StartUp ini の引数などを連結して見せる形。後続は無視）なら一致）。
-- `lib/` — common.sh が source する内部ファイル（呼び出し側は common.sh だけを source する。単独で source しない）。`atst_config.sh`（~/.atst/config の生成・読み込み、KEY=VALUE 形式のパーサ `atst_config_parse`、`atst_load_heartbeat_url`、WINEDLLOVERRIDES）、`atst_line.sh`（文字列ヘルパ・ImgBB・LINE 送信・line_error.log・`atst_line_send_failing`）、`atst_mt.sh`（MT 検出・pid・StartUp ini・MT ごとのロックのパス `atst_mt_lock_path`・MQL / 監視 CSV のパス・走査）。
+- `lib/` — common.sh が source する内部ファイル（呼び出し側は common.sh だけを source する。単独で source しない）。`atst_config.sh`（~/.atst/config の生成・読み込み、KEY=VALUE 形式のパーサ `atst_config_parse`、`atst_load_heartbeat_url`、WINEDLLOVERRIDES）、`atst_line.sh`（文字列ヘルパ・ImgBB・LINE 送信・line_error.log・`atst_line_send_failing`）、`atst_mt.sh`（MT 検出・pid・StartUp ini・MT ごとのロックのパス `atst_mt_lock_path`・MQL / 監視 CSV のパス・走査）、`atst_notify.sh`（alert_status・再通知・スプール・キー単位のロック。契約は `docs/notification-pipeline.md`）。
 
 設定は `~/.atst/config`（`templates/config` から初回生成）を読んで `ATST_*` 変数で参照し（全行が KEY=VALUE 形式なら `atst_config_parse` が source せずに代入、それ以外は従来どおり source）、LINE トークン等の秘匿値は `~/.atst/` の別ファイル（リポジトリ外）に置く。契約は `docs/config.md`。
 
@@ -45,22 +45,21 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 ### MT の操作・診断・手動の補助
 
 - `mtctl.sh` — 複数 MT の list/start/restart/status/stop/monitor。メッセージに使用中の WINEPREFIX を ` (WINEPREFIX=...)` で付ける（`-q` は無出力のまま）。`ATST_AUTO_ATTACH_EA=1` のときの start（StartUp ini）は `docs/config.md`。start / restart は X の起動待ち（`ATST_X_WAIT`）・MT ごとのロック・`setsid` での起動を持つ（規則と終了コードは README と `docs/config.md`）。
-- `doctor.sh` — 読み取り専用の自己診断（wine / prefix / ATST_TARGETS / EA・CSV / crontab 形式（旧形式は `ATST_LEGACY_CRONTAB_DEADLINE` まで OK、過ぎると NG） / 秘匿ファイル権限 / 外形監視・`check_all.log` の末尾・`auto_attach` を OK・NG・-- で表示。何も変更しない。各項目の判定は README）。
+- `doctor.sh` — 読み取り専用の自己診断（wine / prefix / ATST_TARGETS / EA・CSV / crontab 形式（旧形式・混在は NG） / 秘匿ファイル権限 / 外形監視・`check_all.log` の末尾・`auto_attach` を OK・NG・-- で表示。何も変更しない。各項目の判定は README）。
 - `snap.sh` — VNC デスクトップ (:1) を `vncsnapshot` で 1 枚撮って `~/.atst/snap/` に保存し、絶対パスだけを stdout に出す（スマホから ssh / scp で見る用。手動実行のみで cron には無い）。削除はそのディレクトリ直下の日時名の通常ファイルだけで、いま撮ったものは消さない。`~/.atst/snap` がシンボリックリンクなら撮らない。`--line` は `atst_send_to_line` で 1 push。`[error]` / `[notice]` は stderr。保持枚数・権限・終了コードは README。
 
 ### 毎分の監視
 
 - `check_all.sh` — crontab の毎分の行はこの 1 行だけ。固定の順で各チェックを 1 回ずつ順次実行し（同時多発を避ける）、その回の通知を 1 通にまとめる。実行順・打ち切り・`RUNNER_*`・ログは `docs/notification-pipeline.md`。
-- `check_*.sh` — 監視（reboot / process / order / ping / price / spread / monitoring / tick / trade_ready / daily）。毎分のものは `check_all.sh` が実行する。`check_tick.sh`・`check_trade_ready.sh` の判定と `check_daily.sh` の状態だけのキーは `docs/notification-pipeline.md`。`check_daily.sh` は旧形式（または混在）の crontab に、期限前は送る理由にならない 1 行と 1 度だけの案内 `CRONTAB_LEGACY_NOTICE`、期限後は送る理由になる【注意】の行を出す（監視は止めない）。
+- `check_*.sh` — 監視（reboot / process / order / ping / price / spread / monitoring / tick / trade_ready / daily）。毎分のものは `check_all.sh` が実行する。`check_tick.sh`・`check_trade_ready.sh` の判定と `check_daily.sh` の状態だけのキーは `docs/notification-pipeline.md`。`check_daily.sh` は旧形式（または混在）の crontab に、送る理由になる【注意】の行を毎朝出す（#176 で wrapper.sh を撤去）。
 - `self_heal.sh` — opt-in の自己修復（#140。`~/.atst/self_heal.enabled` があるときだけ、`check_all.sh` の回の最後に `mtctl.sh start` / `restart`）。`check_all.sh` 以外から呼ばない。P1 の例外は `docs/CODING_GUIDELINES.md`、通知と状態は `docs/notification-pipeline.md`、手順は `docs/RUNBOOK.md`。
-- `heartbeat.sh` — 外形監視（`check_all.sh` の最後、または旧形式の crontab の行）。URL 未設定なら何もしない。送る内容は `docs/notification-pipeline.md`。
+- `heartbeat.sh` — 外形監視（`check_all.sh` の最後）。URL 未設定なら何もしない。送る内容は `docs/notification-pipeline.md`。
 
-### 毎分以外のジョブと旧形式
+### 毎分以外のジョブと補助
 
 - `run_with_targets.sh` — 毎分以外のジョブ（`mtctl.sh` / `truncate_monitoring.sh` / `report_image.sh` の固定 3 本のみ）に `ATST_TARGETS` の MT 名を付けて起動する（`exec`、eval 無し）。監視対象が無ければ実行せず stderr に出して非 0 終了。
 - `report_image.sh` / `draw_graph.sh` — 値動き/スプレッドの文字要約を LINE 通知。ImgBB の API キーがあるときだけグラフ画像、さらに `ATST_IMAGE_REPORT_DESKTOP=1` ならデスクトップ画像も（既定は送らない。口座番号・残高が写るため）。画像ホストとキーの規則・旧 config への案内は `docs/config.md`。
-- `wrapper.sh` — 旧形式の crontab（`TARGET="(...)"` と `wrapper.sh "$TARGET" <script>`）が動き続けるためだけに残している。第 1 引数（MT 名の配列リテラル）を `eval` で展開して各スクリプトへ渡す。新しい crontab では使わない。期限 `ATST_LEGACY_CRONTAB_DEADLINE`（#143）。期限後の別 Issue で撤去する（それまでは期限後も動き続ける）。
-- `sleep_random.sh`（旧形式の crontab の行用。新形式の `check_all.sh` は順次実行なので使わない）/ `truncate_monitoring.sh`（監視 CSV・wine ログ・`check_all.log` の切り詰め）/ `minimize_*.sh` / `purge_needless_packages.sh` — 補助。
+- `sleep_random.sh`（旧形式の crontab の名残。新形式の `check_all.sh` は順次実行なので使わない）/ `truncate_monitoring.sh`（監視 CSV・wine ログ・`check_all.log` の切り詰め）/ `minimize_*.sh` / `purge_needless_packages.sh` — 補助。
 
 ### 配布・テンプレート
 

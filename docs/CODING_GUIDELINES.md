@@ -27,7 +27,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 
 ## 4. 共通処理は common.sh に寄せる
 
-全スクリプトは `common.sh` を source し、`atst_*` 関数・`ATST_*` 変数を使う。ロジックの重複を見つけたら `common.sh` の関数化を検討する（ただし 3 回ルール: 2 回目までは重複を許容し、3 回目で抽象化）。`common.sh` は内部で `lib/atst_config.sh` / `atst_line.sh` / `atst_mt.sh` を source する。呼び出し側は `common.sh` だけを source し、`lib/*.sh` を直接 source しない。
+全スクリプトは `common.sh` を source し、`atst_*` 関数・`ATST_*` 変数を使う。ロジックの重複を見つけたら `common.sh` の関数化を検討する（ただし 3 回ルール: 2 回目までは重複を許容し、3 回目で抽象化）。`common.sh` は内部で `lib/atst_config.sh` / `atst_line.sh` / `atst_mt.sh` / `atst_notify.sh` を source する。呼び出し側は `common.sh` だけを source し、`lib/*.sh` を直接 source しない。
 
 ---
 
@@ -82,7 +82,6 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 ## P7. eval の安全性（block〜warn）
 
 - `eval` は入力が**信頼できる文字列**（管理者が書いたもの等）に限る。外部・ネットワーク由来を `eval` するのは block。
-  - 許容例: `wrapper.sh` の `eval "target_mt=$1"`（crontab 管理者が書いた配列リテラル）。入力元が**信頼できる管理者の記述**である前提で、旧形式の crontab（`wrapper.sh "$TARGET" ...`）を動かし続けるためだけに残している。新しい経路（`check_all.sh` / `run_with_targets.sh`）は `~/.atst/config` の `ATST_TARGETS` 配列をそのまま渡し、eval を使わない。新規コードで `wrapper.sh` を使わない。期限 `ATST_LEGACY_CRONTAB_DEADLINE`（common.sh）まで。期限後に撤去する（#143）。
   - ファイルシステム由来の値（フォルダ名など）は `eval` しない。`common.sh` の MT 一覧は `atst_load_mt_list` が配列へ直接代入する（#93）。
 
 ## P8. apt / 鍵 / リポジトリ（block）
@@ -107,7 +106,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 - MT の検出・特定は `common.sh` の `atst_find_mt_index`（フォルダ名の前方一致・大文字小文字無視）に合わせる。独自の照合ロジックを増やさない。
 - MT プロセスの特定は `common.sh` の `atst_find_pid`（`/proc` 走査）に合わせる。`ps | grep` や `winepath` で独自に探さない。
 
-## P11. cron / wrapper の堅牢性（warn）
+## P11. cron から動くスクリプトの堅牢性（warn）
 
 - cron から動く前提のスクリプトは `PATH`・`cwd`・環境変数に依存しない（`common.sh` を絶対パス解決で source する既存パターン `. "$(cd "$(dirname "$BASH_SOURCE")"; pwd)/common.sh"` を踏襲）。
 - 毎分の監視は `check_all.sh` が固定の順で 1 つずつ実行する（同時多発の負荷を避ける設計。実行タイミングを散らす `sleep_random.sh` / `atst_random_sleep` は旧形式の crontab の行用）。毎分の監視を足すときは crontab に行を足さず `check_all.sh` の固定リストに足し、`run_check` の `timeout` の対象にして、打ち切りの通知（`RUNNER_TIMEOUT_*`）も付ける。毎分の監視の通知は `atst_update_alert`（状態あり）か `atst_notify_text`（文面だけ）で出す。`atst_send_to_line` を直接呼ぶと、その回のまとめ送信に入らず即時の個別 push になる（`check_order` の約定通知は即時でよい例外）。
@@ -119,7 +118,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
   - 例外: `mt_home` / `mt_data` / `mt_name` / `mt_type` / `mt_term` は `atst_load_mt_list` が設定するグローバル配列で、`ATST_*` 命名の意図的な例外（これら以外の新規共通変数は `ATST_*` にする）。
 - 1 スクリプト 1 責務。cron から叩く監視は `check_*.sh`、セットアップは `setup_*.sh` の命名に合わせる。
 - テンプレート化すべき設定ファイルは `templates/` に置き、`%%PLACEHOLDER%%` 置換の既存流儀に合わせる。
-- usage を持つスクリプトは引数不足時に usage を出して非 0 終了する（`wrapper.sh` の `print_usage_exit` 参照）。
+- usage を持つスクリプトは引数不足時に usage を出して非 0 終了する（`run_with_targets.sh` の `print_usage_exit` 参照）。
 
 ## P13. install の fail-fast と最終検証（block）
 

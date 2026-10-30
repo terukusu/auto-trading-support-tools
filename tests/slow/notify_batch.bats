@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 # Notices of one check_all.sh run in one LINE push (#96): the checks add their notices to the run's
 # spool (atst_update_alert / atst_notify_text), and the runner sends them together (atst_spool_flush),
-# recording a key only when its push succeeded. Outside a run (a check started directly or by
-# wrapper.sh, send_to_line.sh, a value in ~/.atst/config) everything is sent at once as before.
+# recording a key only when its push succeeded. Outside a run (a check started directly,
+# send_to_line.sh, a value in ~/.atst/config) everything is sent at once as before.
 # The runner runs from a copy of the repository in the sandbox (atst_test_make_runner_home) whose
 # checks are recording stubs unless a test puts the real one back or writes its own. The function
 # tests read common.sh in the test itself (atst_test_source_common).
@@ -193,16 +193,9 @@ three_events() {
   [ "$(status_lines '^PROCESS_\|^MONITORING_')" -eq 0 ]
 }
 
-@test "NB-03: a check run directly, by wrapper.sh, or send_to_line.sh sends at once without a spool (AC3)" {
+@test "NB-03: a check run directly or send_to_line.sh sends at once without a spool (AC3)" {
   atst_test_make_mt MT_A MT4
   run bash "$repo/check_process.sh" MT_A
-  [ "$status" -eq 0 ]
-  [ "$(atst_test_push_count)" -eq 1 ]
-  [ "$(status_lines '^PROCESS_MT_A,1,')" -eq 1 ]
-  [ ! -e "$SP" ]
-
-  rm -f "$ST" "$ATST_TEST_CURL_LOG"
-  TARGET="('MT_A')" PATH="$repo:$PATH" run bash -c 'wrapper.sh "$TARGET" check_process.sh'
   [ "$status" -eq 0 ]
   [ "$(atst_test_push_count)" -eq 1 ]
   [ "$(status_lines '^PROCESS_MT_A,1,')" -eq 1 ]

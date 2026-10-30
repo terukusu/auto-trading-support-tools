@@ -11,7 +11,7 @@ if [ "$target_num" -le 0 ]; then
   exit 1
 fi
 
-# check_all.sh (or the old-style crontab) starts this twice a minute, about 30 seconds apart. If a
+# check_all.sh starts this twice a minute, about 30 seconds apart. If a
 # send is slow (LINE timeout is 30s) the next run would read the same file and notify twice; let only
 # one run work at a time.
 if ! exec 9>> "$ATST_CONFIG_DIR/check_order.lock"; then

@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
-# #143: the old-style crontab (TARGET and wrapper.sh "$TARGET" check_*.sh) works until a fixed deadline
-# (ATST_LEGACY_CRONTAB_DEADLINE in common.sh) and after it. The deadline changes only what doctor.sh and
-# check_daily.sh say. setup_cron.sh saves the crontab before writing it and appends ATST_TARGETS to the
-# config when it can. crontab, date, apt and wine are stubs in $ATST_TEST_SANDBOX/bin put first on PATH;
-# setup fails unless the crontab and date found first are the stubs, so the real crontab is never touched.
+# #143/#176: the old-style crontab (TARGET and wrapper.sh "$TARGET" check_*.sh): its detection, the NG of
+# doctor.sh, the 【注意】 line of check_daily.sh, and the backup and ATST_TARGETS append of setup_cron.sh.
+# wrapper.sh was removed in #176, so the old-style lines do not run. crontab, apt and wine are stubs in
+# $ATST_TEST_SANDBOX/bin put first on PATH; setup fails unless the crontab found first is the stub, so the
+# real crontab is never touched.
 # LINE goes to the curl stub. The TARGET value SecretA stands for a value that must not be printed.
 
 load test_helper
@@ -55,13 +55,10 @@ EOS
   chmod 755 "$B/crontab"
   atst_test_stub_script "$B" apt record
   atst_test_stub_script "$B" wine record
-  atst_test_stub_date "$B" 2026-11-01
   PATH="$B:$PATH"
   export PATH
   hash -r
   [ "$(command -v crontab)" = "$B/crontab" ]
-  [ "$(command -v date)" = "$B/date" ]
-  [ "$(date +%Y-%m-%d)" = 2026-11-01 ]
   EXPECTED="$ATST_TEST_SANDBOX/expected"
   sed "s|%%ATST_HOME%%|$repo|" "$repo/templates/crontab.txt" > "$EXPECTED"
 }
@@ -70,10 +67,6 @@ teardown() {
   # LD-15 / LD-22 take permissions away; give them back so the sandbox can be removed.
   chmod -R u+rwX "$ATST_TEST_SANDBOX" 2>/dev/null
   atst_test_teardown_sandbox
-}
-
-set_day() {
-  atst_test_stub_date "$B" "$1"
 }
 
 # The config from the template with ATST_DAILY_REPORT=<0|1> (ATST_IMAGE_REPORT_DESKTOP is set, so the
@@ -93,7 +86,8 @@ pushes() {
   fi
 }
 
-# Number of pushes carrying the one-time notice.
+# Number of pushes carrying crontab.bak (the 【注意】 line of a report, or the one-time notice of
+# earlier versions).
 notice_pushes() {
   pushes | grep -c 'crontab\.bak'
 }
@@ -103,7 +97,8 @@ report_pushes() {
   pushes | grep '稼働OK'
 }
 
-# Number of CRONTAB_LEGACY_NOTICE lines in alert_status (0 without the file).
+# Number of CRONTAB_LEGACY_NOTICE lines in alert_status (0 without the file). Nothing writes the key
+# since #176.
 recorded_notice() {
   if [ -e "$HOME/.atst/alert_status" ]; then
     grep -c '^CRONTAB_LEGACY_NOTICE,' "$HOME/.atst/alert_status"
@@ -134,36 +129,15 @@ run_setup_cron() {
   run bash "$repo/setup_cron.sh" <<< "$1"
 }
 
-# ---- the constant and the two functions ----
+# ---- what was removed (#176) ----
 
-@test "LD-1: the deadline is written once in the scripts and README shows the same date (AC1)" {
-  [ "$(cat "$repo"/*.sh "$repo"/lib/*.sh | grep -c '2027-05-31')" -eq 1 ]
-  [ "$(cat "$repo"/*.sh "$repo"/lib/*.sh | grep -c '^ATST_LEGACY_CRONTAB_DEADLINE=')" -eq 1 ]
-  atst_test_source_common
-  [[ "$ATST_LEGACY_CRONTAB_DEADLINE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
-  [ "$(grep -c "\*\*${ATST_LEGACY_CRONTAB_DEADLINE} まで\*\*" "$repo/README.md")" -ge 1 ]
-}
-
-@test "LD-2: atst_legacy_crontab_expired is true only after the deadline and prints nothing (AC2)" {
-  local d want
-  atst_test_source_common
-  while IFS='|' read -r d want; do
-    run atst_legacy_crontab_expired "$d"
-    [ "$status" -eq "$want" ] || { echo "date=[$d] status=$status"; false; }
-    [ -z "$output" ] || { echo "date=[$d] output=[$output]"; false; }
-  done <<'EOS'
-2027-05-31|1
-2027-06-01|0
-2026-11-01|1
-|1
-2027/06/01|1
-tomorrow|1
-2028-01-01|0
-2027-06-01x|1
-EOS
-  run atst_legacy_crontab_expired
-  [ "$status" -eq 1 ]
-  [ -z "$output" ]
+@test "LD-1: no deadline and no one-time notice are left in the scripts or README, and no wrapper.sh" {
+  local w
+  for w in ATST_LEGACY_CRONTAB_DEADLINE atst_legacy_crontab_expired CRONTAB_LEGACY_NOTICE 2027-05-31; do
+    [ "$(cat "$repo"/*.sh "$repo"/lib/*.sh | grep -c -- "$w")" -eq 0 ] || { echo "$w"; false; }
+  done
+  [ "$(grep -c '2027-05-31' "$repo/README.md")" -eq 0 ]
+  [ ! -e "$repo/wrapper.sh" ]
 }
 
 @test "LD-3: atst_crontab_form prints one word and never the crontab (AC3)" {
@@ -196,95 +170,45 @@ EOS
 
 # ---- doctor.sh item 7 ----
 
-@test "LD-4: doctor.sh: old-style OK before the deadline, NG after it; new format OK on both days (AC4)" {
-  local ng_before ng_after l
+@test "LD-4: doctor.sh: an old-style crontab is NG, the new format is OK (AC4)" {
+  local l
   printf '%s\n' "$LEGACY_CRONTAB" > "$C"
-  run bash "$repo/doctor.sh"
-  l=$(printf '%s\n' "$output" | grep '^OK crontab -l 旧形式')
-  [ "$(printf '%s\n' "$l" | grep -c .)" -eq 1 ]
-  [[ "$l" == *2027-05-31*setup_cron.sh* ]]
-  [ "$(printf '%s\n' "$output" | grep -c '^NG crontab -l')" -eq 0 ]
-  ng_before=$(printf '%s\n' "$output" | grep -c '^NG ')
-  [[ "$output" != *SecretA* ]]
-
-  set_day 2027-06-01
   run bash "$repo/doctor.sh"
   [ "$status" -eq 1 ]
   l=$(printf '%s\n' "$output" | grep '^NG crontab -l 旧形式')
   [ "$(printf '%s\n' "$l" | grep -c .)" -eq 1 ]
-  [[ "$l" == *'猶予期限 2027-05-31'* ]]
+  [[ "$l" == *setup_cron.sh* ]]
+  [[ "$l" != *2027* ]]
   [ "$(printf '%s\n' "$output" | grep -c '^OK crontab -l')" -eq 0 ]
-  ng_after=$(printf '%s\n' "$output" | grep -c '^NG ')
-  [ "$ng_after" -eq $((ng_before + 1)) ]
+  [[ "$output" != *SecretA* ]]
 
   printf '%s\n' "$NEW_CRONTAB" > "$C"
-  for l in 2026-11-01 2027-06-01; do
-    set_day "$l"
-    run bash "$repo/doctor.sh"
-    [ "$(printf '%s\n' "$output" | grep -cx 'OK crontab -l new format (check_all\.sh)')" -eq 1 ]
-  done
+  run bash "$repo/doctor.sh"
+  [ "$(printf '%s\n' "$output" | grep -cx 'OK crontab -l new format (check_all\.sh)')" -eq 1 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^NG crontab -l')" -eq 0 ]
 }
 
 # ---- check_daily.sh ----
 
-@test "LD-5: before the deadline with the report: a line in each report and the notice once (AC5)" {
+@test "LD-5: with the report: a 【注意】 line in each report, no separate notice, nothing recorded (AC5)" {
   daily_config 1
   printf '%s\n' "$LEGACY_CRONTAB" > "$C"
   run_daily
   [ "$status" -eq 0 ]
   run_daily
   [ "$status" -eq 0 ]
-  [ "$(pushes | grep -c .)" -eq 3 ]
+  [ "$(pushes | grep -c .)" -eq 2 ]
   [ "$(report_pushes | grep -c .)" -eq 2 ]
-  [ "$(report_pushes | grep -c 'crontab: 旧形式 (wrapper.sh) です。2027-05-31 までに setup_cron.sh で移行してください')" -eq 2 ]
-  [ "$(notice_pushes)" -eq 1 ]
-  [ "$(grep -c '^CRONTAB_LEGACY_NOTICE,1,[0-9]*$' "$HOME/.atst/alert_status")" -eq 1 ]
-  [ -z "$(pushes | grep SecretA)" ]
-}
-
-@test "LD-6: before the deadline without the report: only the one-time notice is sent (AC5)" {
-  local n
-  daily_config 0
-  printf '%s\n' "$LEGACY_CRONTAB" > "$C"
-  run_daily
-  [ "$status" -eq 0 ]
-  run_daily
-  [ "$status" -eq 0 ]
-  [ "$(pushes | grep -c .)" -eq 1 ]
-  [ "$(notice_pushes)" -eq 1 ]
-  n=$(pushes)
-  [[ "$n" == *'【お知らせ】crontab が旧形式 (wrapper.sh)'* ]]
-  [[ "$n" == *2027-05-31* ]]
-  [[ "$n" == *setup_cron.sh* ]]
-  [[ "$n" == *crontab.bak* ]]
-  [[ "$n" == *'1 度だけ'* ]]
-  [[ "$n" != *'crontab: '* ]]
-  [[ "$n" != *SecretA* ]]
-  [ "$(recorded_notice)" -eq 1 ]
-}
-
-@test "LD-7: a failed notice push is not recorded and is sent again on the next run (AC5)" {
-  local c1
-  daily_config 1
-  printf '%s\n' "$LEGACY_CRONTAB" > "$C"
-  # curl calls: quota x2, daily push, notice push (500)
-  export ATST_TEST_CURL_HTTP_CODE_SEQ="200 200 200 500"
-  run_daily
-  unset ATST_TEST_CURL_HTTP_CODE_SEQ
+  [ "$(report_pushes | grep -c '【注意】crontab が旧形式 (wrapper.sh) です。wrapper.sh は撤去したため、旧形式の行は動きません。setup_cron.sh で移行してください')" -eq 2 ]
+  # crontab.bak is only in the reports (no one-time notice of its own)
+  [ "$(notice_pushes)" -eq 2 ]
+  [ "$(pushes | grep 'crontab\.bak' | grep -vc '稼働OK')" -eq 0 ]
   [ "$(recorded_notice)" -eq 0 ]
-  grep -q 'http=500' "$HOME/.atst/line_error.log"
-  c1=$(notice_pushes)
-  [ "$c1" -eq 1 ]
-  run_daily
-  [ "$status" -eq 0 ]
-  [ "$(notice_pushes)" -eq $((c1 + 1)) ]
-  [ "$(recorded_notice)" -eq 1 ]
-  grep -q '^CRONTAB_LEGACY_NOTICE,1,' "$HOME/.atst/alert_status"
+  [ -z "$(pushes | grep -e SecretA -e 2027)" ]
 }
 
-@test "LD-8: after the deadline: a warning line that sends the report every day and no notice (AC6)" {
+@test "LD-6: without the report (ATST_DAILY_REPORT=0) the 【注意】 line still sends one push a day (AC6)" {
   local p
-  set_day 2027-06-01
   daily_config 0
   printf '%s\n' "$LEGACY_CRONTAB" > "$C"
   run_daily
@@ -294,56 +218,52 @@ EOS
   [ "$(pushes | grep -c .)" -eq 2 ]
   [ "$(report_pushes | grep -c .)" -eq 2 ]
   p=$(pushes)
-  [ "$(printf '%s\n' "$p" | grep -c '【注意】crontab の旧形式 (wrapper.sh) の猶予期限 2027-05-31 を過ぎています')" -eq 2 ]
-  [ "$(printf '%s\n' "$p" | grep -c '監視は止まっていません')" -eq 2 ]
-  [ "$(notice_pushes)" -eq 0 ]
+  [ "$(printf '%s\n' "$p" | grep -c '【注意】crontab が旧形式 (wrapper.sh) です')" -eq 2 ]
+  [ "$(printf '%s\n' "$p" | grep -c 'setup_cron.sh')" -eq 2 ]
+  [[ "$p" != *'1 度だけ'* ]]
+  [[ "$p" != *SecretA* ]]
   [ "$(recorded_notice)" -eq 0 ]
 }
 
-@test "LD-9: a mixed crontab says 混在 before and after the deadline (AC6)" {
+@test "LD-9: a mixed crontab says 混在, also without the report (AC6)" {
   local p
   daily_config 1
   printf '%s\n%s\n' "$LEGACY_CRONTAB" "$NEW_CRONTAB" > "$C"
   run_daily
   [ "$status" -eq 0 ]
-  [ "$(report_pushes | grep -c 'crontab: 旧形式と新形式の混在 (wrapper.sh) です')" -eq 1 ]
-  [ "$(notice_pushes)" -eq 1 ]
-  [ "$(pushes | grep 'crontab\.bak' | grep -c '混在')" -eq 1 ]
-  set_day 2027-06-01
+  [ "$(report_pushes | grep -c '【注意】crontab が旧形式と新形式の混在 (wrapper.sh) です')" -eq 1 ]
   rm -f "$ATST_TEST_CURL_LOG"
   daily_config 0
   run_daily
   [ "$status" -eq 0 ]
   p=$(pushes)
   [ "$(printf '%s\n' "$p" | grep -c .)" -eq 1 ]
-  [[ "$p" == *'【注意】crontab の旧形式と新形式の混在 (wrapper.sh) の猶予期限 2027-05-31'* ]]
+  [[ "$p" == *'【注意】crontab が旧形式と新形式の混在 (wrapper.sh) です'* ]]
+  [ "$(recorded_notice)" -eq 0 ]
 }
 
 @test "LD-10: new format, no crontab or an empty one: no line, no notice, nothing recorded (AC7)" {
-  local kind day
+  local kind
   daily_config 1
   for kind in new missing empty; do
-    for day in 2026-11-01 2027-06-01; do
-      case "$kind" in
-        new) printf '%s\n' "$NEW_CRONTAB" > "$C" ;;
-        missing) rm -f "$C" ;;
-        empty) : > "$C" ;;
-      esac
-      set_day "$day"
-      rm -f "$ATST_TEST_CURL_LOG"
-      run_daily
-      [ "$status" -eq 0 ] || { echo "$kind $day"; false; }
-      [ "$(report_pushes | grep -c .)" -eq 1 ] || { echo "$kind $day"; false; }
-      [ -z "$(pushes | grep -e 'crontab:' -e '【注意】crontab')" ] || { echo "$kind $day"; false; }
-      [ "$(notice_pushes)" -eq 0 ] || { echo "$kind $day"; false; }
-      [ "$(recorded_notice)" -eq 0 ] || { echo "$kind $day"; false; }
-    done
+    case "$kind" in
+      new) printf '%s\n' "$NEW_CRONTAB" > "$C" ;;
+      missing) rm -f "$C" ;;
+      empty) : > "$C" ;;
+    esac
+    rm -f "$ATST_TEST_CURL_LOG"
+    run_daily
+    [ "$status" -eq 0 ] || { echo "$kind"; false; }
+    [ "$(report_pushes | grep -c .)" -eq 1 ] || { echo "$kind"; false; }
+    [ -z "$(pushes | grep -e 'crontab:' -e '【注意】crontab')" ] || { echo "$kind"; false; }
+    [ "$(notice_pushes)" -eq 0 ] || { echo "$kind"; false; }
+    [ "$(recorded_notice)" -eq 0 ] || { echo "$kind"; false; }
   done
 }
 
 # ---- heartbeat.sh ----
 
-@test "LD-11: CRONTAB_LEGACY_NOTICE,1 alone gives a ping, not /fail (AC8)" {
+@test "LD-11: a CRONTAB_LEGACY_NOTICE line left by an earlier version gives a ping, not /fail (AC8)" {
   atst_test_set_config ATST_HEARTBEAT_URL "$HB_U"
   printf 'CRONTAB_LEGACY_NOTICE,1,%s\n' "$(date +%s)" > "$HOME/.atst/alert_status"
   run bash "$repo/heartbeat.sh"
@@ -367,7 +287,8 @@ EOS
   [ "$(stat -c %a "$bak")" = 600 ]
   cmp "$bak" "$ATST_TEST_SANDBOX/orig"
   [[ "$output" == *"$bak"* ]]
-  [[ "$output" == *2027-05-31* ]]
+  [[ "$output" == *撤去* ]]
+  [[ "$output" != *2027* ]]
   [ ! -e "$C.bad" ]
 }
 
@@ -568,19 +489,4 @@ Y z" ]
   cmp "$C" "$ATST_TEST_SANDBOX/orig"
   [ "$(write_calls)" -eq 0 ]
   [ "$(grep -c '^ATST_TARGETS=' "$cfg")" -eq 0 ]
-}
-
-# ---- where the deadline is read ----
-
-@test "LD-21: only doctor.sh and check_daily.sh call atst_legacy_crontab_expired, once each (AC12)" {
-  local f n
-  [ "$(grep -c 'atst_legacy_crontab_expired' "$repo/doctor.sh")" -eq 1 ]
-  [ "$(grep -c 'atst_legacy_crontab_expired' "$repo/check_daily.sh")" -eq 1 ]
-  for f in "$repo"/*.sh "$repo"/lib/*.sh; do
-    case "${f##*/}" in
-      common.sh|doctor.sh|check_daily.sh) continue ;;
-    esac
-    n=$(grep -c 'atst_legacy_crontab_expired' "$f" || :)
-    [ "$n" -eq 0 ] || { echo "$f"; false; }
-  done
 }

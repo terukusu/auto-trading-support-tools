@@ -5,7 +5,7 @@
 uptime_file="$ATST_CONFIG_DIR/uptime"
 uptime_lock="$ATST_CONFIG_DIR/uptime.lock"
 
-# An old-style crontab line and check_all.sh (#95) can run this in the same minute. Serialise
+# A run by hand and check_all.sh can run this in the same minute. Serialise
 # read-compare-send-record so the later run compares with what the first one recorded. /proc/uptime is
 # read only after taking the lock: read before it, the value could be smaller than the one the first
 # run records afterwards and look like a reboot.

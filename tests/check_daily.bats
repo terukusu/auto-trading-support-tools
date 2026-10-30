@@ -13,8 +13,7 @@ setup() {
   unset ATST_IMAGE_REPORT_DESKTOP ATST_TEST_CURL_HTTP_CODE_SEQ
   mkdir -p "$ATST_TEST_SANDBOX/bin"
   atst_test_stub_script "$ATST_TEST_SANDBOX/bin" apt record
-  # #143: a fixed day before the deadline and a new-style crontab, never the developer's crontab.
-  atst_test_stub_date "$ATST_TEST_SANDBOX/bin" 2026-11-01
+  # a new-style crontab, never the developer's crontab
   printf '#!/bin/bash\n[ "$*" = -l ] || exit 1\necho "* * * * * check_all.sh"\n' > "$ATST_TEST_SANDBOX/bin/crontab"
   chmod 755 "$ATST_TEST_SANDBOX/bin/crontab"
   PATH="$ATST_TEST_SANDBOX/bin:$PATH"

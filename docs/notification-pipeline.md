@@ -1,6 +1,6 @@
 # 通知パイプラインの契約（atst）
 
-監視（`check_*.sh`）の判定結果が LINE 通知と `~/.atst/alert_status` に届くまでの契約をまとめる。状態・再通知・スプール・ロックは `common.sh`、LINE 送信と `line_error.log` は `lib/atst_line.sh`、回の流れは `check_all.sh`、外形監視は `heartbeat.sh` にあり、**通知の送り方・記録の仕方・順序・しきい値を変える PR はこの文書を同じ PR で更新する**。通知キーごとの運用者向けの確認・復旧手順は [docs/RUNBOOK.md](RUNBOOK.md)。
+監視（`check_*.sh`）の判定結果が LINE 通知と `~/.atst/alert_status` に届くまでの契約をまとめる。状態・再通知・スプール・ロックは `lib/atst_notify.sh`（common.sh が source する）、LINE 送信と `line_error.log` は `lib/atst_line.sh`、回の流れは `check_all.sh`、外形監視は `heartbeat.sh` にあり、**通知の送り方・記録の仕方・順序・しきい値を変える PR はこの文書を同じ PR で更新する**。通知キーごとの運用者向けの確認・復旧手順は [docs/RUNBOOK.md](RUNBOOK.md)。
 
 config の読み込み（`ATST_NOTIFY_SPOOL` の退避・復元、各項目の既定値）は [docs/config.md](config.md)、テストでの LINE push の数え方は [docs/testing.md](testing.md) にある。
 
@@ -56,8 +56,8 @@ config の読み込み（`ATST_NOTIFY_SPOOL` の退避・復元、各項目の�
 
 ## スプール無効時の経路
 
-- 対象は旧形式の crontab の行・直接実行・スプールを作れない回。
-- 遷移があるとき（または再通知が段階に達したとき）だけ、キー単位のロック（`~/.atst/alert_update.<key>.lock`。ファイル名は `atst_alert_lock_file`）の中で再判定してから送信・記録する。旧形式の crontab の行と `check_all.sh` が同じ遷移を同時に見ても、通知は 1 回になる。
+- 対象は直接実行・スプールを作れない回。
+- 遷移があるとき（または再通知が段階に達したとき）だけ、キー単位のロック（`~/.atst/alert_update.<key>.lock`。ファイル名は `atst_alert_lock_file`）の中で再判定してから送信・記録する。手で実行した check と `check_all.sh` が同じ遷移を同時に見ても、通知は 1 回になる。
 - ロックを取れなければ stderr に 1 行出して次の回へ。ロックファイルを開けなければロック無しで送る。
 
 ## 送信部と失敗の記録
@@ -88,12 +88,12 @@ config の読み込み（`ATST_NOTIFY_SPOOL` の退避・復元、各項目の�
 - `check_daily.sh` は quota が取れた回に `LINE_QUOTA`（8 割以上で 1、未満・上限なしで 0）を `atst_set_alert_status` で直接書く。LINE 通知の無い、heartbeat 用の状態だけのキー（P1 の例外）。
 - `check_daily.sh` は `ATST_IMAGE_REPORT_DESKTOP` の行が無い旧 config に、デスクトップ画像の既定 OFF を `atst_update_alert IMAGE_REPORT_DEFAULT_CHANGED` で 1 度だけ案内する。
 - `check_daily.sh` は外形監視の URL が未設定なら、稼働OK に「外形監視: 未設定」の 1 行を足す（この行のためだけには送らない）。
-- `check_daily.sh` は crontab が旧形式か混在（`atst_crontab_form`）のとき、期限 `ATST_LEGACY_CRONTAB_DEADLINE` の前は稼働OK の最後に `crontab: …` の 1 行（送る理由にならない）と `atst_update_alert CRONTAB_LEGACY_NOTICE` の 1 度だけの案内（verdict は 1 か空。`IMAGE_REPORT_DEFAULT_CHANGED` と同じ契約）、期限の後は `【注意】crontab …` の 1 行（`quota_warning` と同じく送る理由になる）を出し、案内は送らない（#143）。期限は文面を変えるだけで、監視・通知の経路は変えない。
-- 旧形式 crontab の期限と判定は common.sh にある。期限 `ATST_LEGACY_CRONTAB_DEADLINE`（.sh で日付を書くのはこの 1 行だけ。config 読み込みの後に代入するので config / 環境変数で動かせない）、crontab の形の判定 `atst_crontab_form`（`crontab -l` を読む）/ `atst_crontab_form_of`（文字列を受け取る）、期限の判定 `atst_legacy_crontab_expired <YYYY-MM-DD>`。呼ぶのは doctor.sh・check_daily.sh・setup_cron.sh だけで、監視・通知の経路からは呼ばない。
+- `check_daily.sh` は crontab が旧形式か混在（`atst_crontab_form`）のとき、稼働OK に【注意】の行を足す（`quota_warning` と同じく送る理由になり、毎朝。#176 で期限と 1 度だけの案内 `CRONTAB_LEGACY_NOTICE` は撤去）。
+- crontab の形の判定 `atst_crontab_form`（`crontab -l` を読む）/ `atst_crontab_form_of`（文字列を受け取る）は common.sh。呼ぶのは doctor.sh・check_daily.sh・setup_cron.sh だけで、監視・通知の経路からは呼ばない。
 
 ## 外形監視（heartbeat.sh）
 
-- `check_all.sh` の最後、または旧形式の crontab の行で呼ばれる。URL（決め方は [docs/config.md](config.md#秘匿ファイル)）が未設定なら何もしない。
+- `check_all.sh` の最後に呼ばれる。URL（決め方は [docs/config.md](config.md#秘匿ファイル)）が未設定なら何もしない。
 - `alert_status` の値 1 のキーのうち `PROCESS_` / `TARGET_` / `MONITORING_` / `TICK_` / `TRADE_` / `RUNNER_`（`RUNNER_TIMEOUT_HEARTBEAT` を除く）/ `LINE_` で始まるもの（許可リスト。ロックなしで読むだけ）と、`atst_line_send_failing`（N は `ATST_HEARTBEAT_LINE_FAIL_COUNT`、不正値・未設定は 3）が真なら `LINE_SEND_FAILED` を並べる。
 - 並べたものが空なら `<URL>` に ping（GET）、空でなければ `<URL>/fail` に POST する（本文はキー名だけ、`[A-Za-z0-9_ ]` 以外は `_`、1000 字まで）。
 - URL と本文は `curl -K` のプロセス置換で渡し、argv に載せない（`ps` で見えないように。URL を知っていれば誰でも生存を報告できる）。

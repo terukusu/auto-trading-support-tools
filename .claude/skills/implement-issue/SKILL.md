@@ -316,7 +316,7 @@ master マージ＝公開リリースのため、実環境でしか判定でき�
 次のいずれかに触れる変更は**「要」**。どれにも触れなければ「不要」として理由を報告し Phase 6 へ進む。
 
 - `install_required_for_mt.sh` / `setup_*.sh` / `templates/`（crontab・systemd・xstartup・config）
-- cron から起動される経路（`wrapper.sh` / `mtctl.sh` / `check_*.sh` / `common.sh` のうち実行時に通る部分）で、ローカルの静的検査・dry-run では挙動を判定できないもの
+- cron から起動される経路（`check_all.sh` / `mtctl.sh` / `self_heal.sh` / `check_*.sh` / `common.sh` のうち実行時に通る部分）で、ローカルの静的検査・dry-run では挙動を判定できないもの
 - MQL（`.mq4` / `.mq5`）
 
 ### 検証機の条件

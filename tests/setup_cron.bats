@@ -83,6 +83,8 @@ write_calls() {
   [ "$status" -eq 1 ]
   cmp "$C" "$ATST_TEST_SANDBOX/orig"
   [[ "$output" == *wrapper.sh* ]]
+  [[ "$output" != *2027* ]]
+  [[ "$output" == *撤去* ]]
   [[ "$output" == *既存の\ crontab\ からの移行* ]]
   [[ "$output" == *"ATST_TARGETS=('A')"* ]]
   [ ! -e "$C.bad" ]

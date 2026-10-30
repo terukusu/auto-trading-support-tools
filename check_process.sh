@@ -41,7 +41,7 @@ function check_target_found() {
   fi
 
   atst_update_alert "$alert_key" "$verdict" \
-    "【発生】監視対象のMetaTraderが見つかりません。監視と自動起動が無効になっています。~/.atst/config の ATST_TARGETS (旧形式の crontab では TARGET) とインストール先のフォルダ名を確認してください: $target_name" \
+    "【発生】監視対象のMetaTraderが見つかりません。監視と自動起動が無効になっています。~/.atst/config の ATST_TARGETS とインストール先のフォルダ名を確認してください: $target_name" \
     "【復帰】監視対象のMetaTraderが見つかりました: $target_name"
 }
 

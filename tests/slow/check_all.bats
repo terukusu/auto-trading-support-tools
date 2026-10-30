@@ -435,14 +435,15 @@ EOF
 
 @test "RUN-19: no eval in check_all.sh, run_with_targets.sh and common.sh (AC3)" {
   run grep -c eval "$repo/check_all.sh" "$repo/run_with_targets.sh" "$repo/common.sh" \
-    "$repo/lib/atst_config.sh" "$repo/lib/atst_line.sh" "$repo/lib/atst_mt.sh"
-  [ "${#lines[@]}" -eq 6 ]
+    "$repo/lib/atst_config.sh" "$repo/lib/atst_line.sh" "$repo/lib/atst_mt.sh" "$repo/lib/atst_notify.sh"
+  [ "${#lines[@]}" -eq 7 ]
   [[ "${lines[0]}" == *:0 ]]
   [[ "${lines[1]}" == *:0 ]]
   [[ "${lines[2]}" == *:0 ]]
   [[ "${lines[3]}" == *:0 ]]
   [[ "${lines[4]}" == *:0 ]]
   [[ "${lines[5]}" == *:0 ]]
+  [[ "${lines[6]}" == *:0 ]]
 }
 
 @test "RUN-20: an unclosed ATST_TARGETS in the template config still reaches LINE as RUNNER_TARGETS_EMPTY" {
