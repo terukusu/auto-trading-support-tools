@@ -116,6 +116,7 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
     * 緊急時の手動決済などのための備え
 * [スマートフォンで自動売買サーバーを操作する](../../wiki/setup_mobile_ssh)
     * これも緊急時の備え。スマートフォンからでもVMインスタンスのGUIに接続して操作できるようにしておく。
+    * 見るだけなら ssh で十分です ([スマホからの日常確認](#スマホからの日常確認-doctorsh--snapsh))
 * [VPS の選び方](../../wiki/best_vps)
     * メモリ・OS・仮想化方式・場所などの選ぶときの考慮事項と、年利 5% 有れば上等という投資・投機の世界でインフラ代は安ければ安いほど良いという話
 * [Google 以外のVPSでの例](../../wiki/setup_vps)
@@ -305,6 +306,22 @@ NG .line_token mode 644 (must be 600): ~/.atst/.line_token
 ```
 
 トークン・キー・URL は末尾 4 文字だけ (`****abcd`) を表示し、LINE ID は表示しません。ホームディレクトリは `~` で表示するので、出力はそのまま Issue に貼れます (貼る前に念のため目で確認してください)。
+
+### スマホからの日常確認 (doctor.sh / snap.sh)
+
+状態と画面を見るだけなら、スマートフォンの ssh クライアント (Termius など) から次のコマンドで足ります。VNC を開くのは、手動決済など操作が必要なときだけにしてください (見るだけのつもりで VNC を開き、クリック位置のずれで MT を閉じてしまう事故を避けるためです)。
+
+* 状態: `doctor.sh` で全体を ([自己診断](#自己診断-doctorsh))、`mtctl.sh status <name>` で MT ごとの稼働を、`mtctl.sh -s list` で検出した MT の一覧を見ます。どれも読み取りだけです。
+* 画面: `snap.sh` (引数なし) で VNC のデスクトップ (:1) を 1 枚撮り、`~/.atst/snap/<年月日-時分秒>.jpg` に保存して、そのファイルの絶対パスだけを 1 行出力します (ディレクトリは 700、ファイルは 600。画像には口座番号・残高が写ります)。
+  * `~/.atst/config` の `ATST_SNAP_KEEP` (1〜1000、既定 10。行が無い古い config も 10) 枚を残し、古いものから消します。消すのは `~/.atst/snap/` 直下の日時の名前の jpg だけです。1 枚は数十〜100 KB 程度です。
+  * `snap.sh --line` は、撮った画像を ImgBB 経由で LINE にも送ります。ImgBB の API キー (`setup_imgbb.sh`) が無いときは撮らずに終わります。画像は URL を知っていれば誰でも見られ、`ATST_IMGBB_EXPIRATION` 秒で消えます。定期レポートの `ATST_IMAGE_REPORT_DESKTOP` とは関係なく、`--line` を付けたときだけ送ります。
+  * `[error]` は stderr に出ます。`vncsnapshot not found` (パッケージが無い)、`~/.vnc/passwd` が読めない、ImgBB のキーが無い (`--line` のとき)、`vncsnapshot failed` (VNC サーバーが止まっているなど) のどれかです。終了コードは 0 (成功)、1 (引数の誤り)、2 (失敗。`--line` で LINE への送信だけ失敗したときは、画像は残してパスも出します)。
+* スマートフォンからの取り方: ssh のコマンド実行ではリポジトリが `PATH` に無いので、ディレクトリ付きで呼びます (既定の展開先 `auto-trading-support-tools-master/` の例)。
+  ```
+  ssh <vps> '~/auto-trading-support-tools-master/snap.sh'
+  scp "<vps>:$(ssh <vps> '~/auto-trading-support-tools-master/snap.sh')" .
+  ```
+  1 行目は撮ってパスを表示するだけ、2 行目は撮った画像を手元にコピーします。Termius などの SFTP で `~/.atst/snap/` を開き、いちばん新しいファイルを見る方法もあります。
 
 ### 困ったとき
 
