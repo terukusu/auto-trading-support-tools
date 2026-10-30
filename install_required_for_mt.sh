@@ -1,10 +1,39 @@
 #!/bin/bash
 
+# A random password for a new ~/.vnc/passwd (#146): 8 letters/digits (tightvnc uses the first 8 only).
+# Printed on stdout for the caller to keep in a variable; never written to a file, log or argument.
+function generate_vnc_password() {
+  local p
+  p=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 8)
+  [[ "$p" =~ ^[A-Za-z0-9]{8}$ ]] || return 1
+  printf '%s\n' "$p"
+}
+
+# A password given in VNC_PASSWORD: 6 to 8 printable characters without spaces.
+function vnc_password_ok() {
+  [[ "$1" =~ ^[[:graph:]]{6,8}$ ]]
+}
+
+# tests/install_vnc_password.bats reads only the functions above. Honored only when sourced, so the
+# variable in the environment can never make a real run skip the install.
+if [ "${BASH_SOURCE[0]}" != "$0" ] && [ -n "${ATST_INSTALL_SOURCE_ONLY:-}" ]; then
+  return 0
+fi
+
+# VNC_PASSWORD (optional) sets the password of a new ~/.vnc/passwd. Kept in a plain shell variable and
+# removed from the environment at once so no command run below (apt, wine, MetaTrader) inherits it.
+# A wrong value stops here, before anything is changed (the EXIT trap is not set yet either).
+VNC_PASS_GIVEN=${VNC_PASSWORD:-}
+unset VNC_PASSWORD
+if [ -n "$VNC_PASS_GIVEN" ] && ! vnc_password_ok "$VNC_PASS_GIVEN"; then
+  echo "[error] VNC_PASSWORD must be 6 to 8 printable characters without spaces." >&2
+  exit 1
+fi
+
 ########################################
 # Setup shell/environment variables
 ########################################
 
-VNC_PASSWORD=123123
 TARGET_LOCALE=ja_JP.UTF-8
 
 # MetaTrader installer to download and launch.
@@ -532,11 +561,30 @@ function setup_vncserver {
     install -m 755 -D "$DIR_TEMPLATES/xstartup" "$HOME/.vnc/xstartup"
   fi
 
-  # setting default password for vncserver
+  # A new VNC password: VNC_PASSWORD if given, otherwise random and shown once by verify_and_report
+  # (#146). An existing ~/.vnc/passwd is kept as it is. The file is made 600 from the start (umask in
+  # the subshell) and the password goes to vncpasswd on stdin, never as an argument.
   if [ ! -e "$HOME/.vnc/passwd" ]; then
-    echo 'Setting default password '123123' to VNC. Please change this yourself later :-)'
-    echo "$VNC_PASSWORD" | vncpasswd -f > "$HOME/.vnc/passwd"
-    chmod 600 "$HOME/.vnc/passwd"
+    local vnc_pass="$VNC_PASS_GIVEN"
+    VNC_PASS_STATE='env'
+    VNC_PASS_GENERATED=
+    if [ -z "$vnc_pass" ]; then
+      VNC_PASS_GENERATED=$(generate_vnc_password) || VNC_PASS_GENERATED=
+      vnc_pass=$VNC_PASS_GENERATED
+      VNC_PASS_STATE=generated
+    fi
+    # A failed or empty result is removed: an empty file would count as "already set" on every re-run.
+    if [ -z "$vnc_pass" ] \
+      || ! printf '%s\n' "$vnc_pass" | ( umask 077; vncpasswd -f > "$HOME/.vnc/passwd" ) \
+      || [ ! -s "$HOME/.vnc/passwd" ]; then
+      rm -f "$HOME/.vnc/passwd"
+      VNC_PASS_GENERATED=
+      VNC_PASS_STATE=failed
+      echo "[error] could not set the VNC password (~/.vnc/passwd not created)" >&2
+    fi
+    chmod 600 "$HOME/.vnc/passwd" 2>/dev/null
+  else
+    VNC_PASS_STATE=kept
   fi
 }
 
@@ -782,6 +830,19 @@ function verify_and_report() {
     fi
   fi
 
+  # Shown whether or not VNC started: a re-run keeps the file, so a generated password is never shown again.
+  # An empty ~/.vnc/passwd (left by an old failed run) is not a password: NG, not "unchanged".
+  local vnc_pass_state="${VNC_PASS_STATE:-}"
+  if [ "$vnc_pass_state" = kept ] && [ ! -s "$HOME/.vnc/passwd" ]; then
+    vnc_pass_state=failed
+  fi
+  case "$vnc_pass_state" in
+    generated) echo "[ OK ] VNC password: ${VNC_PASS_GENERATED} (generated now and shown only this once; note it. To change: vncpasswd)"; VNC_PASS_REPORTED=1 ;;
+    env)       echo "[ OK ] VNC password: set from VNC_PASSWORD (not shown)" ;;
+    kept)      echo "[ OK ] VNC password: unchanged (~/.vnc/passwd already exists; VNC_PASSWORD is not used. To change: vncpasswd)" ;;
+    *)         echo "[ NG ] VNC password: ~/.vnc/passwd was not created (set one with: vncpasswd)"; ng=1 ;;
+  esac
+
   if [ -z "$IS_SYSTEMD" ]; then
     echo "[ -- ] sshd: not checked (no systemd)"
   elif ensure_sshd_alive; then
@@ -824,6 +885,11 @@ function die() {
 function on_exit() {
   release_wine_hold
   ensure_sshd_alive
+  # A password generated in this run but not reported (the run stopped before verify_and_report) is
+  # shown here once; otherwise a re-run reports "unchanged" and the password is never seen (#146).
+  if [ "${VNC_PASS_STATE:-}" = generated ] && [ -n "${VNC_PASS_GENERATED:-}" ] && [ -z "${VNC_PASS_REPORTED:-}" ]; then
+    echo "[info] VNC password: ${VNC_PASS_GENERATED} (generated in this run, which stopped early; note it. To change: vncpasswd)"
+  fi
 }
 trap on_exit EXIT
 

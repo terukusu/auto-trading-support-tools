@@ -1,3 +1,15 @@
+# iptables-restore 用のルール (IPv4)。このままでは使えない。
+# 1. %%SSH_PORT%% を sshd の実際のポートに置き換えてから使う。ポートは次で確かめる:
+#      sudo sshd -T | grep -i '^port '
+#    ./setup_iptables.sh --port <ポート> が置き換えた結果を標準出力に表示する (適用はしない)。
+# 2. 置き換えずに iptables-restore に渡すと %%SSH_PORT%% をポート値として解釈できず、全体が拒否される
+#    (何も適用されないので締め出しは起きない)。
+# 3. 適用の前に sudo iptables-restore --test < <ファイル> で確かめる。sshd と ICMP の行は hashlimit を使うので、
+#    hashlimit の無いカーネルではここで失敗する。失敗したら適用しない。
+# 4. 適用は今の ssh セッションを開いたまま行い、別の端末から新しい ssh 接続ができることを
+#    確かめてから永続化する (締め出し防止)。
+# 5. HTTP/HTTPS の 2 行は公開サイトを同居させるときだけ行頭の # を外す。
+
 *filter
 
 :INPUT   DROP   [0:0]
@@ -15,9 +27,10 @@
 -A INPUT -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
 -A INPUT -p udp -m state --state ESTABLISHED,RELATED -j ACCEPT
 
--A INPUT -p tcp -m state --syn --state NEW --dport 22 -m hashlimit --hashlimit-name t_sshd --hashlimit 1/m --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-htable-expire 120000 -j ACCEPT
+-A INPUT -p tcp -m state --syn --state NEW --dport %%SSH_PORT%% -m hashlimit --hashlimit-name t_sshd --hashlimit 1/m --hashlimit-burst 10 --hashlimit-mode srcip --hashlimit-htable-expire 120000 -j ACCEPT
 
--A INPUT -p tcp --dport 80   -j ACCEPT
--A INPUT -p tcp --dport 443  -j ACCEPT
+# 公開サイト (HTTP/HTTPS) を同居させるときだけ、次の 2 行の行頭の # を外す。
+# -A INPUT -p tcp --dport 80   -j ACCEPT
+# -A INPUT -p tcp --dport 443  -j ACCEPT
 
 COMMIT
