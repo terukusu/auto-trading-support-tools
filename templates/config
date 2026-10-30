@@ -55,6 +55,20 @@ ATST_THRESHOLD_PRICE_UPPER=100
 # 異常時に10分間高値安値の差がこのpips以下になったら復帰と判定
 ATST_THRESHOLD_PRICE_LOWER=50
 
+# 1 にすると、mtctl.sh start が WINEPREFIX の drive_c/atst/startup_<名前>.ini (Windows から見て C:\atst\startup_<名前>.ini) を作り、
+# MetaTrader を /config: 付きで起動して、監視 EA (TerminalMonitoring) を下の通貨ペア・時間足の新しいチャートに起動時に載せます
+# (チャートへの手作業の配置が要らなくなります)。<名前> は mtctl.sh start に渡す名前 (ATST_TARGETS の名前) を小文字にしたものです。
+# 0 (既定) なら今までどおり手で配置します。この行が無い古い config も 0 と同じです。戻すときは 0 にして mtctl.sh stop / start し直します。
+# ini には口座番号・パスワードを書きません。実機での確認状況は README の「監視 EA の自動配置」を見てください。
+ATST_AUTO_ATTACH_EA=0
+
+# 自動配置のチャートの通貨ペア。ブローカーの気配値表示 (Market Watch) にある名前に合わせます (例: EURUSD、EURUSDm)。
+# 使える文字は英数字と . _ # & ! @ - (32 文字まで)。空や不正な値のときは自動配置せずに起動します。
+ATST_AUTO_ATTACH_SYMBOL=EURUSD
+
+# 自動配置のチャートの時間足。M1 M5 M15 M30 H1 H4 D1 W1 MN のどれか。
+ATST_AUTO_ATTACH_PERIOD=M5
+
 # 止まったままの異常 (MetaTrader のプロセス停止・監視データの停止・毎分の監視の停止) を、
 # 【発生】の通知から何分後に「継続中」として再通知するか (空白区切りの分、昇順、1〜3 個)。
 # 1 件の異常につき最大 3 通です。値動き・スプレッド・Ping などの異常は再通知しません。

@@ -23,6 +23,8 @@ doctor_env_prefix=${WINEPREFIX-}
 doctor_ok=0
 doctor_ng=0
 doctor_skip=0
+# csv result of item 6 per target (ok|ng), read by item 12 (auto_attach).
+declare -A doctor_csv_state=()
 
 # doctor_mask_home <text>
 # Prints <text> on one line with the home directory shown as ~ and newlines / CRs as ?.
@@ -240,18 +242,22 @@ function doctor_check_monitoring() {
     csv=$(atst_get_monitoring_csv_path "$t")
     if [ ! -f "$csv" ]; then
       doctor_line NG csv "$t not found: $csv"
+      doctor_csv_state["$t"]=ng
       continue
     fi
     t_last=$(tail -n 20 "$csv" | tr -d '\r' | awk -F, 'NF >= 8 && $1 ~ /^[0-9]+$/ {t = $1} END {print t}')
     if [ -z "$t_last" ]; then
       doctor_line NG csv "$t no data line: $csv"
+      doctor_csv_state["$t"]=ng
       continue
     fi
     elapsed=$(( $(date +%s) - t_last ))
     if [ "$elapsed" -ge "$th" ]; then
       doctor_line NG csv "$t last update ${elapsed}s ago (threshold ${th}s)"
+      doctor_csv_state["$t"]=ng
     else
       doctor_line OK csv "$t last update ${elapsed}s ago"
+      doctor_csv_state["$t"]=ok
     fi
   done
 }
@@ -372,6 +378,97 @@ function doctor_check_check_all_log() {
   done < <(grep -av '^===== START ' "$f" | tail -n 5)
 }
 
+# 12. The StartUp ini of mtctl.sh start (ATST_AUTO_ATTACH_EA=1, #133): whether the ini is there (mode
+# 600 in drive_c/atst of mode 700) with the content of the config, and whether the running MetaTrader
+# got /config:C:\atst\startup_<n>.ini. Whether the EA writes the CSV is item 6 (csv); OK here with csv
+# NG adds a note. Read only: the ini is neither made nor fixed, winepath / wine are not run. The
+# symbol / period values, the ini content and the cmdline are not shown.
+function doctor_check_auto_attach() {
+  local t idx rc ini win dir m pid cmd cmd_u reason
+
+  if ! atst_has_targets; then
+    doctor_line -- auto_attach "no targets"
+    return 0
+  fi
+
+  for t in "${ATST_TARGETS[@]}"; do
+    idx=$(atst_find_mt_index "$t")
+    if [ -z "$idx" ]; then
+      doctor_line -- auto_attach "$t no MetaTrader matches"
+      continue
+    fi
+    if ! atst_auto_attach_enabled; then
+      doctor_line -- auto_attach "$t ATST_AUTO_ATTACH_EA=0 (manual attach)"
+      continue
+    fi
+
+    atst_startup_ini_content "${mt_type[idx]}" "${ATST_AUTO_ATTACH_SYMBOL:-}" "${ATST_AUTO_ATTACH_PERIOD:-}" > /dev/null
+    rc=$?
+    case $rc in
+      0) ;;
+      2) doctor_line NG auto_attach "$t ATST_AUTO_ATTACH_SYMBOL is empty or invalid"; continue ;;
+      3) doctor_line NG auto_attach "$t ATST_AUTO_ATTACH_PERIOD is empty or invalid"; continue ;;
+      *) doctor_line NG auto_attach "$t unknown MetaTrader type"; continue ;;
+    esac
+
+    ini=$(atst_startup_ini_path "$t")
+    win=$(atst_startup_ini_win_path "$t")
+    if [ -z "$ini" ] || [ -z "$win" ]; then
+      doctor_line NG auto_attach "$t WINEPREFIX not found"
+      continue
+    fi
+    if [ ! -f "$ini" ]; then
+      doctor_line NG auto_attach "$t not found: $ini"
+      doctor_note "auto_attach $t: the next mtctl.sh start writes it (stop and start a running MetaTrader)"
+      continue
+    fi
+    dir=${ini%/*}
+    m=$(stat -c %a "$dir" 2>/dev/null)
+    if [ "$m" != 700 ]; then
+      doctor_line NG auto_attach "$t dir mode ${m:-unknown} (must be 700): $dir"
+      continue
+    fi
+    m=$(stat -c %a "$ini" 2>/dev/null)
+    if [ "$m" != 600 ]; then
+      doctor_line NG auto_attach "$t mode ${m:-unknown} (must be 600): $ini"
+      continue
+    fi
+    if ! cmp -s "$ini" <(atst_startup_ini_content "${mt_type[idx]}" "${ATST_AUTO_ATTACH_SYMBOL:-}" "${ATST_AUTO_ATTACH_PERIOD:-}"); then
+      doctor_line NG auto_attach "$t content differs from the config: $ini"
+      doctor_note "auto_attach $t: the next mtctl.sh start rewrites it"
+      continue
+    fi
+
+    pid=$(atst_find_pid "$t")
+    reason=""
+    if [ -n "$pid" ]; then
+      cmd=$(tr '\0' ' ' < "${ATST_PROC_ROOT:-/proc}/$pid/cmdline" 2>/dev/null)
+      cmd_u=${cmd^^}
+      case $cmd_u in
+        */CONFIG:*) ;;
+        *) reason="running without /config: (pid=$pid)" ;;
+      esac
+      if [ -z "$reason" ]; then
+        case $cmd_u in
+          *"/CONFIG:${win^^} "*|*"/CONFIG:${win^^}") ;;
+          *) reason="running with another /config: (pid=$pid)" ;;
+        esac
+      fi
+      if [ -n "$reason" ]; then
+        doctor_line NG auto_attach "$t $reason"
+        doctor_note "auto_attach $t: mtctl.sh stop and start pass /config:$win"
+        continue
+      fi
+      doctor_line OK auto_attach "$t ini ok, /config: passed (pid=$pid)"
+    else
+      doctor_line OK auto_attach "$t ini ok, not running"
+    fi
+    if [ "${doctor_csv_state[$t]:-}" = ng ]; then
+      doctor_note "auto_attach $t: /config: is passed but no fresh CSV; the StartUp may not work (see ~/.atst/wine_$(printf '%s' "$t" | atst_to_lower).log)"
+    fi
+  done
+}
+
 doctor_check_wine
 doctor_check_arch
 doctor_check_prefix
@@ -383,6 +480,7 @@ doctor_check_line_log
 doctor_check_secrets
 doctor_check_heartbeat
 doctor_check_check_all_log
+doctor_check_auto_attach
 
 if [ "$doctor_ng" -eq 0 ]; then
   echo "OK summary ok=$doctor_ok ng=0 skip=$doctor_skip"
