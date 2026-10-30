@@ -49,7 +49,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           rc=0
-          for f in *.sh scripts/*.sh tests/test_helper.bash tests/stubs/*; do
+          for f in *.sh lib/*.sh scripts/*.sh tests/test_helper.bash tests/stubs/*; do
             bash -n "$f" || { echo "::error file=${f}::bash -n failed"; rc=1; }
           done
           exit "$rc"
@@ -59,7 +59,7 @@ jobs:
         run: |
           [ "$(shellcheck --version | sed -n 's/^version: //p')" = "${SHELLCHECK_VERSION}" ] \
             || { echo "::error::shellcheck on PATH is not ${SHELLCHECK_VERSION}: $(command -v shellcheck)"; exit 1; }
-          shellcheck -S warning -f gcc *.sh scripts/*.sh tests/test_helper.bash tests/stubs/curl tests/stubs/winepath
+          shellcheck -S warning -f gcc *.sh lib/*.sh scripts/*.sh tests/test_helper.bash tests/stubs/curl tests/stubs/winepath
 
       - name: bats compat
         if: ${{ !cancelled() }}
@@ -71,4 +71,4 @@ jobs:
 
       - name: bats
         if: ${{ !cancelled() }}
-        run: bats tests/
+        run: bats tests/ tests/slow/

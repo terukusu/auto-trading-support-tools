@@ -1,7 +1,10 @@
 #!/bin/bash
-# Shared fixtures for tests/*.bats (read with "load test_helper").
+# Shared fixtures for tests/*.bats (read with "load test_helper", or "load ../test_helper" from tests/slow/).
 # Tests must call atst_test_setup_sandbox before reading common.sh so that the real ~/.atst,
 # ~/.wine, LINE and Wine are never touched.
+
+# The tests/ directory (this file's own place), so a test in tests/slow/ finds the same stubs and repository root.
+ATST_TEST_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # Creates a sandbox and points HOME / WINEPREFIX / PATH / ATST_TEST_CURL_LOG / ATST_PROC_ROOT into it.
 # WINEPREFIX itself is not created here (atst_test_make_mt creates it). ATST_PROC_ROOT is an empty fake
@@ -13,7 +16,7 @@ atst_test_setup_sandbox() {
   mkdir -p "$HOME" || return 1
   WINEPREFIX="$ATST_TEST_SANDBOX/prefix"
   unset WINEARCH
-  PATH="${BATS_TEST_DIRNAME:?}/stubs:$PATH"
+  PATH="${ATST_TEST_DIR:?}/stubs:$PATH"
   ATST_TEST_CURL_LOG="$ATST_TEST_SANDBOX/curl.log"
   ATST_PROC_ROOT="$ATST_TEST_SANDBOX/proc"
   mkdir -p "$ATST_PROC_ROOT" || return 1
@@ -65,7 +68,7 @@ atst_test_make_mt() {
 atst_test_source_common() {
   [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
   # shellcheck source=/dev/null
-  . "${BATS_TEST_DIRNAME:?}/../common.sh"
+  . "${ATST_TEST_DIR:?}/../common.sh"
 }
 
 # atst_test_make_monitoring_csv <name> <secs_ago> <bid> <spread> <pip> [<ping>]
@@ -184,7 +187,7 @@ atst_test_set_config() {
   conf="$HOME/.atst/config"
   mkdir -p "$HOME/.atst" || return 1
   if [ ! -e "$conf" ]; then
-    cp "${BATS_TEST_DIRNAME:?}/../templates/config" "$conf" || return 1
+    cp "${ATST_TEST_DIR:?}/../templates/config" "$conf" || return 1
   fi
   printf '%s=%q\n' "$key" "$value" >> "$conf"
 }
@@ -201,7 +204,7 @@ atst_test_set_targets() {
   conf="$HOME/.atst/config"
   mkdir -p "$HOME/.atst" || return 1
   if [ ! -e "$conf" ]; then
-    cp "${BATS_TEST_DIRNAME:?}/../templates/config" "$conf" || return 1
+    cp "${ATST_TEST_DIR:?}/../templates/config" "$conf" || return 1
   fi
   for name in "$@"; do
     list+="$(printf '%q' "$name") "
@@ -210,7 +213,7 @@ atst_test_set_targets() {
 }
 
 # atst_test_make_runner_home
-# Copies the repository's *.sh and templates/ (keeping the exec bits) to $ATST_TEST_SANDBOX/atst and
+# Copies the repository's *.sh, lib/ and templates/ (keeping the exec bits) to $ATST_TEST_SANDBOX/atst and
 # prints that path. check_all.sh / run_with_targets.sh run the scripts next to themselves, so a test
 # replaces some of them in the copy (atst_test_stub_script) without touching the repository.
 atst_test_make_runner_home() {
@@ -218,11 +221,12 @@ atst_test_make_runner_home() {
 
   [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
 
-  repo="${BATS_TEST_DIRNAME:?}/.."
+  repo="${ATST_TEST_DIR:?}/.."
   dir="$ATST_TEST_SANDBOX/atst"
   mkdir -p "$dir" || return 1
   cp -p "$repo"/*.sh "$dir/" || return 1
   cp -Rp "$repo/templates" "$dir/" || return 1
+  cp -Rp "$repo/lib" "$dir/" || return 1
   echo "$dir"
 }
 

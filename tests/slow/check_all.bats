@@ -7,14 +7,14 @@
 # back. Also covers the test_helper functions made for it.
 # LOG-xx (#144): the stderr of the runner and its checks goes to ~/.atst/log/check_all.log.
 
-load test_helper
+load ../test_helper
 
 CHECKS="check_reboot check_order check_process check_monitoring check_ping check_price check_spread heartbeat"
 
 setup() {
   local n
   atst_test_setup_sandbox
-  repo=$(cd "$BATS_TEST_DIRNAME/.." && pwd)
+  repo=$(cd "$BATS_TEST_DIRNAME/../.." && pwd)
   home=$(atst_test_make_runner_home)
   atst_test_set_targets A
   atst_test_set_config ATST_CHECK_TIMEOUT 2
@@ -425,11 +425,15 @@ EOF
 }
 
 @test "RUN-19: no eval in check_all.sh, run_with_targets.sh and common.sh (AC3)" {
-  run grep -c eval "$repo/check_all.sh" "$repo/run_with_targets.sh" "$repo/common.sh"
-  [ "${#lines[@]}" -eq 3 ]
+  run grep -c eval "$repo/check_all.sh" "$repo/run_with_targets.sh" "$repo/common.sh" \
+    "$repo/lib/atst_config.sh" "$repo/lib/atst_line.sh" "$repo/lib/atst_mt.sh"
+  [ "${#lines[@]}" -eq 6 ]
   [[ "${lines[0]}" == *:0 ]]
   [[ "${lines[1]}" == *:0 ]]
   [[ "${lines[2]}" == *:0 ]]
+  [[ "${lines[3]}" == *:0 ]]
+  [[ "${lines[4]}" == *:0 ]]
+  [[ "${lines[5]}" == *:0 ]]
 }
 
 @test "RUN-20: an unclosed ATST_TARGETS in the template config still reaches LINE as RUNNER_TARGETS_EMPTY" {
@@ -784,6 +788,7 @@ hb_ping_lines() {
   [[ "$output" == "$ATST_TEST_SANDBOX/"* ]]
   [ -x "$output/check_all.sh" ]
   [ -f "$output/common.sh" ]
+  [ -f "$output/lib/atst_config.sh" ]
   [ -f "$output/templates/crontab.txt" ]
 }
 

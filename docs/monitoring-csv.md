@@ -21,7 +21,7 @@ MQL の行番号は `iconv -f UTF-16LE -t UTF-8 <file> | tr -d '\r' | cat -n` �
 ## 対象ファイルと置き場
 
 - `<mt_data>/MQL4/Files/terminal_monitoring.csv`（MT5 は `<mt_data>/MQL5/Files/terminal_monitoring.csv`）。
-- `<mt_data>` は `common.sh` の `atst_find_mt_data_dir` が決める MT のデータフォルダ（グローバル配列 `mt_data`）。AppData 側（`.../MetaQuotes/Terminal/<hash>`）か、無ければインストール先。
+- `<mt_data>` は `lib/atst_mt.sh`（`common.sh` が source する）の `atst_find_mt_data_dir` が決める MT のデータフォルダ（グローバル配列 `mt_data`）。AppData 側（`.../MetaQuotes/Terminal/<hash>`）か、無ければインストール先。
 - パスは `atst_get_monitoring_csv_path <name>` で得る（= `atst_get_mql_folder_path` + `/Files/terminal_monitoring.csv`）。MT が見つからなければ空を返す。
 - `order_status` も同じ `Files/` 直下（`check_order.sh` は `$(atst_get_mql_folder_path <name>)/Files/order_status` を読む）。
 

@@ -2,7 +2,7 @@
 # atst_alert_transition / atst_update_alert (common.sh): the transition table without side effects,
 # and one push per due message with the state recorded only after a successful send (#92).
 
-load test_helper
+load ../test_helper
 
 setup() {
   atst_test_setup_sandbox
@@ -133,7 +133,7 @@ make_slow_curl() {
   {
     printf '#!/bin/bash\n'
     printf '%q 0.5\n' "$(command -v sleep)"
-    printf 'exec %q "$@"\n' "$BATS_TEST_DIRNAME/stubs/curl"
+    printf 'exec %q "$@"\n' "$BATS_TEST_DIRNAME/../stubs/curl"
   } > "$ATST_TEST_SANDBOX/bin/curl"
   chmod 755 "$ATST_TEST_SANDBOX/bin/curl"
   PATH="$ATST_TEST_SANDBOX/bin:$PATH"
