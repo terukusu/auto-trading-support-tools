@@ -15,7 +15,7 @@ fi
 ATST_CONFIG_FILE="$ATST_CONFIG_DIR/config"
 # These settings come from ~/.atst/config only. A value left in the environment (a manual run, a test)
 # would hide that an existing user's config lacks them (check_all.sh reports unset ATST_TARGETS).
-unset ATST_TARGETS ATST_CHECK_TIMEOUT ATST_ORDER_CHECK_INTERVAL
+unset ATST_TARGETS ATST_CHECK_TIMEOUT ATST_ORDER_CHECK_INTERVAL ATST_ALERT_REMIND_MINUTES
 # ATST_NOTIFY_SPOOL (the spool of one check_all.sh run, see atst_spool_begin) comes from the
 # environment only: a value written in ~/.atst/config would make every check keep its notices in a
 # spool nobody sends (P1). Keep the inherited value across the source and drop the config's.
@@ -710,9 +710,11 @@ function atst_traverse_mt() {
   done
 }
 
-# alert_status は "キー,値,更新時刻(epoch)" の行の集まり。check_* が毎分並行して更新するので、
+# alert_status は "キー,値,更新時刻(epoch)[,再通知の段階]" の行の集まり。check_* が毎分並行して更新するので、
 # 更新は flock で排他し、一時ファイル経由で置き換える (sed -i と >> の競合で行が重複・欠落しないように)。
 # キーは正規表現ではなく先頭列の完全一致で探す (PROCESS_X が PROCESS_X_2 に当たらないように)。
+# 4 列目 (再通知の段階、#141) は atst_set_alert_stage だけが書く。atst_set_alert_status は行を
+# "キー,値,現在時刻" の 3 列で置き換えるので、発生・復帰の記録で段階は消える (次の発生は 1 段目から)。
 # atst_set_alert_status <key> <value>
 # Returns 0 when recorded, 1 on an empty key, an empty ATST_ALERT_STATUS_FILE, or a lock/write failure.
 # With an empty ATST_ALERT_STATUS_FILE (a broken ~/.atst/config) it does nothing: no stdin is read and
@@ -744,7 +746,7 @@ function atst_set_alert_status() {
   ) 9>> "$ATST_ALERT_STATUS_FILE.lock"
 }
 
-# 指定キーの列 (2: 値, 3: 更新時刻) を返す。キーが無ければ default。
+# 指定キーの列 (2: 値, 3: 更新時刻, 4: 再通知の段階) を返す。キーが無い・列が空なら default。
 function atst_get_alert_status_field() {
   local key="$1" field="$2" default="$3" found
 
@@ -804,9 +806,163 @@ function atst_alert_lock_file() {
   printf '%s\n' "$ATST_CONFIG_DIR/alert_update.${lock_key:0:200}.lock"
 }
 
+# Reminders of an alert that goes on (#141)
+# While a target key stays 1 (no transition), atst_update_alert sends "【継続中 <label>】<fire_msg>" once
+# per stage of ATST_ALERT_REMIND_MINUTES (default 30 120 720 minutes after the fire notice was sent,
+# that is the 3rd column) and records the stage sent in the 4th column (atst_set_alert_stage).
+
+# atst_set_alert_stage <key> <stage>
+# Writes <stage> (1-3) as the 4th column of the key's line when its value is 1, keeping the 1st to 3rd
+# columns (the time the fire notice was sent). Same lock and temporary file as atst_set_alert_status.
+# Returns 0 when recorded, 1 on an empty key, an invalid stage, an empty ATST_ALERT_STATUS_FILE, a
+# lock/write failure, or when the key has no line with the value 1 (the file is then left as it was).
+function atst_set_alert_stage() {
+  local key=$1 stage=$2
+
+  if [ -z "$key" ]; then
+    echo "atst_set_alert_stage: key should not be empty" 1>&2
+    return 1
+  fi
+  if ! [[ "$stage" =~ ^[1-3]$ ]]; then
+    echo "atst_set_alert_stage: invalid stage: $stage" 1>&2
+    return 1
+  fi
+  # Before the subshell: its "9>>" redirection would create ".lock" in the current directory (#110).
+  if [ -z "$ATST_ALERT_STATUS_FILE" ]; then
+    echo "atst_set_alert_stage: ATST_ALERT_STATUS_FILE is empty (~/.atst/config may be broken); $key is not recorded" 1>&2
+    return 1
+  fi
+
+  (
+    flock -w 10 9 || { echo "cannot lock $ATST_ALERT_STATUS_FILE" 1>&2; exit 1; }
+    local tmp rc=0
+    if [ ! -e "$ATST_ALERT_STATUS_FILE" ]; then
+      echo "atst_set_alert_stage: $key is not 1 in alert_status; the stage is not recorded" 1>&2
+      exit 1
+    fi
+    tmp=$(mktemp "$ATST_ALERT_STATUS_FILE.XXXXXX") || exit 1
+    awk -F, -v OFS=, -v k="$key" -v s="$stage" '
+      $1 == k && !seen { seen = 1; if ($2 == "1") { print $1, $2, $3, s; done = 1; next } }
+      { print }
+      END { exit done ? 0 : 3 }
+    ' "$ATST_ALERT_STATUS_FILE" > "$tmp" || rc=$?
+    if [ "$rc" -eq 0 ]; then
+      mv "$tmp" "$ATST_ALERT_STATUS_FILE" || { rm -f "$tmp"; exit 1; }
+      exit 0
+    fi
+    rm -f "$tmp"
+    if [ "$rc" -eq 3 ]; then
+      echo "atst_set_alert_stage: $key is not 1 in alert_status; the stage is not recorded" 1>&2
+    fi
+    exit 1
+  ) 9>> "$ATST_ALERT_STATUS_FILE.lock"
+}
+
+# atst_alert_remind_is_target <key>
+# Returns 0 for the keys that are reminded (a stopped MT, stopped monitoring data, a stuck runner: they
+# do not recover by themselves), 1 otherwise. Fixed here, not in the config.
+function atst_alert_remind_is_target() {
+  case "$1" in
+    PROCESS_*|MONITORING_*|RUNNER_STUCK) return 0 ;;
+  esac
+  return 1
+}
+
+# atst_alert_remind_minutes
+# Prints the reminder stages in minutes on one line, from ATST_ALERT_REMIND_MINUTES (~/.atst/config):
+# unset (no line in an existing config) gives "30 120 720"; empty or blanks only print nothing (no
+# reminders); 1 to 3 numbers (1-999999) in strictly increasing order are printed as they are; anything
+# else gives one line on stderr (without the value) and "30 120 720". Returns 0.
+function atst_alert_remind_minutes() {
+  local def="30 120 720" v prev=0
+  local -a m=()
+
+  if [ -z "${ATST_ALERT_REMIND_MINUTES+x}" ]; then
+    printf '%s\n' "$def"
+    return 0
+  fi
+  read -r -d '' -a m <<< "$ATST_ALERT_REMIND_MINUTES" || true
+  [ "${#m[@]}" -gt 0 ] || return 0
+  if [ "${#m[@]}" -le 3 ]; then
+    for v in "${m[@]}"; do
+      if ! [[ "$v" =~ ^[1-9][0-9]{0,5}$ ]] || [ "$v" -le "$prev" ]; then
+        prev=-1
+        break
+      fi
+      prev=$v
+    done
+    if [ "$prev" -gt 0 ]; then
+      printf '%s\n' "${m[*]}"
+      return 0
+    fi
+  fi
+  echo "atst_update_alert: ATST_ALERT_REMIND_MINUTES is invalid; using $def" 1>&2
+  printf '%s\n' "$def"
+  return 0
+}
+
+# atst_alert_remind_due <key> <minutes> [<stage>]
+# <minutes>: the output of atst_alert_remind_minutes. Reads alert_status only; writes nothing.
+# Without <stage>: prints "<stage> <minutes of that stage>" for the furthest stage reached (elapsed
+# since the 3rd column >= its minutes) when it is past the stage recorded in the 4th column, and
+# returns 0. With <stage> (atst_spool_flush): prints the same for that stage when it is not recorded yet
+# and still reached. Prints nothing and returns 1 otherwise: a key that is not a target or not 1, no
+# stages, a 3rd column that is not a number or in the future (the clock went back).
+function atst_alert_remind_due() {
+  local key="$1" list="$2" want="${3:-}" t elapsed done_stage i best=0
+  local -a m=()
+
+  [ -n "$key" ] && atst_alert_remind_is_target "$key" || return 1
+  read -r -a m <<< "$list"
+  [ "${#m[@]}" -gt 0 ] && [ "${#m[@]}" -le 3 ] || return 1
+  for i in "${m[@]}"; do
+    [[ "$i" =~ ^[1-9][0-9]{0,5}$ ]] || return 1
+  done
+  [ "$(atst_get_alert_status "$key")" == 1 ] || return 1
+  t=$(atst_get_alert_status_time "$key")
+  [[ "$t" =~ ^[0-9]{1,12}$ ]] || return 1
+  elapsed=$(( $(date +%s) - 10#$t ))
+  [ "$elapsed" -ge 0 ] || return 1
+  done_stage=$(atst_get_alert_status_field "$key" 4 0)
+  [[ "$done_stage" =~ ^[1-3]$ ]] || done_stage=0
+
+  if [ -n "$want" ]; then
+    [[ "$want" =~ ^[1-3]$ ]] && [ "$want" -le "${#m[@]}" ] && [ "$done_stage" -lt "$want" ] || return 1
+    [ "$elapsed" -ge "$(( m[want - 1] * 60 ))" ] || return 1
+    printf '%s %s\n' "$want" "${m[want - 1]}"
+    return 0
+  fi
+  for i in "${!m[@]}"; do
+    if [ "$elapsed" -ge "$(( m[i] * 60 ))" ]; then
+      best=$(( i + 1 ))
+    fi
+  done
+  [ "$best" -gt "$done_stage" ] || return 1
+  printf '%s %s\n' "$best" "${m[best - 1]}"
+}
+
+# atst_alert_remind_text <fire_msg> <minutes>
+# Prints fire_msg with its leading 【発生】 replaced by 【継続中 <label>】 (put in front when there is no
+# 【発生】), without a trailing newline. The label is "<H> 時間" when <minutes> is a multiple of 60,
+# "<M> 分" otherwise.
+function atst_alert_remind_text() {
+  local msg="$1" min="$2" label
+
+  if [ "$(( min % 60 ))" -eq 0 ]; then
+    label="$(( min / 60 )) 時間"
+  else
+    label="$min 分"
+  fi
+  msg=${msg#【発生】}
+  printf '%s' "【継続中 $label】$msg"
+}
+
 # atst_update_alert <key> <verdict> <fire_msg> <recover_msg>
 # Sends fire_msg or recover_msg (one push) when atst_alert_transition says so, and records the new
 # state only when the send succeeded, so a failed send is tried again on the next run.
+# Without a transition, a target key (atst_alert_remind_is_target) still 1 with verdict 1 gets one
+# reminder per stage reached (atst_alert_remind_due, the furthest one only), under the same contract:
+# decided again inside the per-key lock or spooled, and its stage recorded only after a successful send.
 # Inside a check_all.sh run (a valid ATST_NOTIFY_SPOOL, see atst_spool_dir) a due notice is added to
 # the run's spool instead (no lock, no send, no record; returns 0) and atst_spool_flush decides again,
 # sends it with the other notices of the run in one push and records it when that push succeeded.
@@ -821,34 +977,45 @@ function atst_update_alert() {
   fi
 
   local key="$1" verdict="$2" fire_msg="$3" recover_msg="$4"
-  local transition msg
+  local transition msg remind="" mins=""
 
   transition=$(atst_alert_transition "$key" "$verdict") || return 2
   if [ -z "$transition" ]; then
-    return 0
-  fi
-
-  # Inside a check_all.sh run (#96) the notice goes to the run's spool and atst_spool_flush decides
-  # again, sends and records it. When it cannot be spooled, go on and send it now (P1).
-  if [ "$transition" == "1" ]; then
-    msg="$fire_msg"
+    # No transition: a reminder (#141), only for a target key still 1 with verdict 1. Without
+    # ATST_ALERT_STATUS_FILE (#110) nothing is due, as before. ATST_ALERT_REMIND_MINUTES is read here
+    # only, once per call (its warning is one line), and passed to the decision inside the lock.
+    if ! { [ "$verdict" == 1 ] && [ -n "$ATST_ALERT_STATUS_FILE" ] && atst_alert_remind_is_target "$key"; }; then
+      return 0
+    fi
+    mins=$(atst_alert_remind_minutes)
+    remind=$(atst_alert_remind_due "$key" "$mins") || return 0
+    msg=$(atst_alert_remind_text "$fire_msg" "${remind#* }")
+    if atst_spool_add "$key" "1:remind=${remind%% *}" "$msg"; then
+      return 0
+    fi
   else
-    msg="$recover_msg"
-  fi
-  # The state cannot be recorded (#110): sending would repeat the same notice every run. Leave a trace
-  # in line_error.log, as cron drops stderr (P1).
-  if [ -z "$ATST_ALERT_STATUS_FILE" ]; then
-    echo "atst_update_alert: ATST_ALERT_STATUS_FILE is empty (~/.atst/config may be broken); $key is not sent" 1>&2
-    atst_log_line_error no_alert_status "ATST_ALERT_STATUS_FILE is empty (~/.atst/config may be broken)" "$msg"
-    return 1
-  fi
-  if atst_spool_add "$key" "$verdict" "$msg"; then
-    return 0
+    # Inside a check_all.sh run (#96) the notice goes to the run's spool and atst_spool_flush decides
+    # again, sends and records it. When it cannot be spooled, go on and send it now (P1).
+    if [ "$transition" == "1" ]; then
+      msg="$fire_msg"
+    else
+      msg="$recover_msg"
+    fi
+    # The state cannot be recorded (#110): sending would repeat the same notice every run. Leave a trace
+    # in line_error.log, as cron drops stderr (P1).
+    if [ -z "$ATST_ALERT_STATUS_FILE" ]; then
+      echo "atst_update_alert: ATST_ALERT_STATUS_FILE is empty (~/.atst/config may be broken); $key is not sent" 1>&2
+      atst_log_line_error no_alert_status "ATST_ALERT_STATUS_FILE is empty (~/.atst/config may be broken)" "$msg"
+      return 1
+    fi
+    if atst_spool_add "$key" "$verdict" "$msg"; then
+      return 0
+    fi
   fi
 
   # An old-style crontab line and check_all.sh (#95) can see the same transition at the same time and
   # would both send it. Serialise decide-send-record per key and decide again inside the lock, so the
-  # later run reads the state the first one recorded. Only a due transition takes the lock: the usual
+  # later run reads the state the first one recorded. Only a due transition or a due reminder takes the lock: the usual
   # "nothing to send" path stays as cheap as before, and other keys are never held up.
   local lock
   lock=$(atst_alert_lock_file "$key")
@@ -860,25 +1027,38 @@ function atst_update_alert() {
         echo "atst_update_alert: cannot lock $lock; $key is left for the next run" 1>&2
         exit 1
       fi
-      transition=$(atst_alert_transition "$key" "$verdict") || exit 2
-      if [ -z "$transition" ]; then
-        exit 0
+      if [ -n "$remind" ]; then
+        # A reminder is decided again by its stage only, never as a transition (#141): a recovery or a
+        # stage recorded meanwhile leaves nothing to send.
+        remind=$(atst_alert_remind_due "$key" "$mins") || exit 0
+        msg=$(atst_alert_remind_text "$fire_msg" "${remind#* }")
+      else
+        transition=$(atst_alert_transition "$key" "$verdict") || exit 2
+        if [ -z "$transition" ]; then
+          exit 0
+        fi
       fi
     else
       # A duplicate notice is better than none (P1).
       echo "atst_update_alert: cannot open $lock; sending without the lock" 1>&2
     fi
 
-    if [ "$transition" == "1" ]; then
-      msg="$fire_msg"
-    else
-      msg="$recover_msg"
+    if [ -z "$remind" ]; then
+      if [ "$transition" == "1" ]; then
+        msg="$fire_msg"
+      else
+        msg="$recover_msg"
+      fi
     fi
 
     if ! printf '%s\n' "$msg" | atst_send_to_line; then
       exit 1
     fi
-    atst_set_alert_status "$key" "$transition" || exit 1
+    if [ -n "$remind" ]; then
+      atst_set_alert_stage "$key" "${remind%% *}" || exit 1
+    else
+      atst_set_alert_status "$key" "$transition" || exit 1
+    fi
     exit 0
   )
 }
@@ -890,7 +1070,7 @@ function atst_update_alert() {
 #   -> atst_spool_end.
 # The spool is $ATST_CONFIG_DIR/check_all.spool/run.<epoch>.<runner pid>/, one file per notice named
 # <6-digit sequence>.<random>: line 1 = key (empty for a text-only notice), line 2 = verdict (1/0,
-# empty for a text-only notice), the rest = the text. Only check_all.sh sets ATST_NOTIFY_SPOOL; any
+# "1:remind=<1-3>" for a reminder of that stage (#141), empty for a text-only notice), the rest = the text. Only check_all.sh sets ATST_NOTIFY_SPOOL; any
 # other run (a check started directly or by wrapper.sh, send_to_line.sh) sends at once as before.
 # atst_send_to_line always sends at once (check_order.sh needs its result to clear .pending).
 
@@ -933,7 +1113,7 @@ function atst_spool_add() {
       ;;
   esac
   case "$verdict" in
-    1|0|'') ;;
+    1|0|''|1:remind=[1-3]) ;;
     *)
       echo "atst_spool_add: invalid verdict: $verdict; not spooled" 1>&2
       return 1
@@ -1037,7 +1217,8 @@ function atst_spool_end() {
 # - Takes the per-key locks of atst_update_alert (in spool order, each lock file once), waiting 10
 #   seconds in all for every lock of this flush. A key whose lock is not free is left for the next run
 #   (not sent, not recorded). Decides again inside the lock: a transition another run (an old-style
-#   crontab line) has sent and recorded meanwhile is not sent again.
+#   crontab line) has sent and recorded meanwhile is not sent again. A reminder (#141) is sent only
+#   while the key is still 1, its stage is not recorded yet and still reached; only its stage is recorded.
 # - Joins the texts with an empty line under one "【host】" heading, up to 4900 characters per message
 #   and never splitting a notice (a notice longer than that alone is cut like atst_send_to_line), and
 #   up to 5 messages per push. At most <max_pushes> pushes; the rest is not sent nor recorded.
@@ -1058,8 +1239,9 @@ function atst_spool_flush() {
   dir=$(atst_spool_dir) || return 0
 
   (
-    local rc=0 f name i n key verdict text transition lockf fd deadline remain
-    local -a files=() keys=() verdicts=() texts=() send=() trans=()
+    local rc=0 f name i n key verdict text transition lockf fd deadline remain stage broken
+    local mins="" mins_read=0
+    local -a files=() keys=() verdicts=() texts=() send=() trans=() stages=()
     local -A last_of=() lock_state=()
 
     # Items in spool order. "[0-9]*" only: a ".tmp.*" file is a write that never finished.
@@ -1072,11 +1254,22 @@ function atst_spool_flush() {
 
     for f in "${files[@]}"; do
       name=${f##*/}
-      key="" verdict="" text=""
+      key="" verdict="" text="" stage=0 broken=0
       if ! [[ "$name" =~ ^[0-9]+\.[A-Za-z0-9]+$ ]] || [ ! -f "$f" ] || [ -L "$f" ] \
-        || ! { IFS= read -r key && IFS= read -r verdict && text=$(cat); } < "$f" \
-        || { [ -n "$key" ] && [ "$verdict" != 1 ] && [ "$verdict" != 0 ]; } \
-        || { [ -z "$key" ] && [ -n "$verdict" ]; }; then
+        || ! { IFS= read -r key && IFS= read -r verdict && text=$(cat); } < "$f"; then
+        broken=1
+      else
+        # A reminder (#141) is verdict 1 at a stage.
+        if [[ "$verdict" =~ ^1:remind=([1-3])$ ]]; then
+          stage=${BASH_REMATCH[1]}
+          verdict=1
+        fi
+        if { [ -n "$key" ] && [ "$verdict" != 1 ] && [ "$verdict" != 0 ]; } \
+          || { [ -z "$key" ] && [ -n "$verdict" ]; }; then
+          broken=1
+        fi
+      fi
+      if [ "$broken" == 1 ]; then
         echo "atst_spool_flush: skipping a broken item: $name" 1>&2
         rc=1
         continue
@@ -1087,6 +1280,7 @@ function atst_spool_flush() {
       texts+=("$text")
       send+=(1)
       trans+=("")
+      stages+=("$stage")
       [ -z "$key" ] || last_of["$key"]=$i
     done
 
@@ -1131,6 +1325,20 @@ function atst_spool_flush() {
         echo "atst_spool_flush: cannot lock $lockf; $key is left for the next run" 1>&2
         send[$i]=0
         rc=1
+        continue
+      fi
+      if [ "${stages[$i]}" -gt 0 ]; then
+        # A reminder (#141): decided by its stage only, never as a transition (a recovery recorded
+        # meanwhile must not turn it into a fire). The config is read once per flush.
+        if [ "$mins_read" == 0 ]; then
+          mins=$(atst_alert_remind_minutes)
+          mins_read=1
+        fi
+        if ! atst_alert_remind_due "$key" "$mins" "${stages[$i]}" >/dev/null; then
+          send[$i]=0
+          continue
+        fi
+        trans[$i]=1
         continue
       fi
       if ! transition=$(atst_alert_transition "$key" "${verdicts[$i]}"); then
@@ -1202,7 +1410,11 @@ function atst_spool_flush() {
       for (( n = first; n < first + ${#group[@]}; n++ )); do
         for item in ${msg_items[$n]}; do
           [ -n "${keys[$item]}" ] || continue
-          atst_set_alert_status "${keys[$item]}" "${trans[$item]}" || rc=1
+          if [ "${stages[$item]}" -gt 0 ]; then
+            atst_set_alert_stage "${keys[$item]}" "${stages[$item]}" || rc=1
+          else
+            atst_set_alert_status "${keys[$item]}" "${trans[$item]}" || rc=1
+          fi
         done
       done
     done

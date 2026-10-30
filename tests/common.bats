@@ -85,15 +85,17 @@ mt_index_of() {
   done
 }
 
-@test "D6-01: ATST_TARGETS, ATST_CHECK_TIMEOUT and ATST_ORDER_CHECK_INTERVAL come from the config only" {
+@test "D6-01: ATST_TARGETS, ATST_CHECK_TIMEOUT, ATST_ORDER_CHECK_INTERVAL and ATST_ALERT_REMIND_MINUTES come from the config only" {
   mkdir -p "$HOME/.atst"
   cp "$BATS_TEST_DIRNAME/../templates/config" "$HOME/.atst/config"
-  sed -i -e '/^ATST_TARGETS=/d' -e '/^ATST_CHECK_TIMEOUT=/d' -e '/^ATST_ORDER_CHECK_INTERVAL=/d' "$HOME/.atst/config"
-  export ATST_TARGETS=X ATST_CHECK_TIMEOUT=7 ATST_ORDER_CHECK_INTERVAL=7
+  sed -i -e '/^ATST_TARGETS=/d' -e '/^ATST_CHECK_TIMEOUT=/d' -e '/^ATST_ORDER_CHECK_INTERVAL=/d' \
+    -e '/^ATST_ALERT_REMIND_MINUTES=/d' "$HOME/.atst/config"
+  export ATST_TARGETS=X ATST_CHECK_TIMEOUT=7 ATST_ORDER_CHECK_INTERVAL=7 ATST_ALERT_REMIND_MINUTES=7
   atst_test_source_common || return 1
   [ -z "${ATST_TARGETS+x}" ]
   [ -z "${ATST_CHECK_TIMEOUT+x}" ]
   [ -z "${ATST_ORDER_CHECK_INTERVAL+x}" ]
+  [ -z "${ATST_ALERT_REMIND_MINUTES+x}" ]
   run atst_has_targets
   [ "$status" -eq 1 ]
 }
