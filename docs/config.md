@@ -12,6 +12,7 @@
 - [読み込みの失敗](#読み込みの失敗)
 - [秘匿ファイル](#秘匿ファイル)
 - [EA の自動配置（ATST_AUTO_ATTACH_EA）](#ea-の自動配置atst_auto_attach_ea)
+- [X の起動待ちと自己修復の有効化（#140）](#x-の起動待ちと自己修復の有効化140)
 - [導入スクリプトの入力（install_required_for_mt.sh）](#導入スクリプトの入力install_required_for_mtsh)
 - [宣言形式（#134）](#宣言形式134)
 
@@ -63,6 +64,12 @@
   - `atst_startup_ini_arg` — terminal.exe に渡す引数。MT4 は素の `C:\atst\startup_<n>.ini`（MT4 は `/config:` を無視する。実機確認）、MT5 は `/config:C:\atst\...`。
 - `mtctl.sh start` は `ATST_AUTO_ATTACH_EA=1` のとき ini（`drive_c/atst` は 700、ini は 600）を書いて `atst_startup_ini_arg` の 1 引数を付け、wine のログに `auto_attach: <その引数>` を書く。失敗・不正値は stderr に 1 行出して ini の引数無しで起動する（fail-open。値は出さない）。
 - `doctor.sh` の `auto_attach` は、StartUp ini と、動いている MT に ini の引数（MT4 は素のパス、MT5 は `/config:`）が渡っているかを見る。
+
+## X の起動待ちと自己修復の有効化（#140）
+
+- `ATST_X_WAIT`（`mtctl.sh start` / `restart` が最初の MT の前に X のソケットを待つ上限秒。未設定・空は 120、`0` で待たない、0〜600 の 10 進以外は 120 にして stderr に 1 行）と `ATST_X11_DIR`（ソケットの置き場所、既定 `/tmp/.X11-unix`）は、環境変数でも `~/.atst/config` でも渡せる（`ATST_` で始まるので宣言形式でも受理される）。`templates/config` には書かない（切り分けとテスト用）。ディスプレイ番号は `DISPLAY` の最後の `:` の後ろから `.` の前まで。
+- 自己修復（`self_heal.sh`）の有効化は `~/.atst/self_heal.enabled` の**存在**で、config のキーではない（`.heartbeat_url` と同じ「ファイルの存在 = 設定」）。自分の所有・mode 600 の通常ファイルのときだけ有効で、シンボリックリンク・他の所有者・他の mode は OFF（stderr に 1 行）。上限・クールダウン・対象キーは固定で、config・環境変数では変えられない。状態は `~/.atst/self_heal.log`（600）。猶予と `MONITORING_` のゲートには `ATST_MONITORING_THRESHOLD`（1〜99999 の 10 進以外は 180）を使う。
+- `mtctl.sh` の MT ごとのロックは `~/.atst/mtctl_<フォルダ名の小文字。a-z 0-9 _ 以外は _>.lock`（600、1 行目は最後の起動の epoch）。パスは `atst_mt_lock_path`（`lib/atst_mt.sh`）だけが決める。
 
 ## 導入スクリプトの入力（install_required_for_mt.sh）
 

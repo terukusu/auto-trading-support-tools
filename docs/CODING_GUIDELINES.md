@@ -40,6 +40,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 ## P1. 本番安全性（最優先・block）
 
 - MT プロセスの停止 (`mtctl.sh stop`, `kill`)、建玉に影響する操作、`sudo reboot`、cron の無効化/書き換え、`apt` 実行、リポジトリ/鍵の追加、ロケール/TZ 変更を**新規に自動実行**するコードは、承認フロー無しなら **block**。
+  - 例外: opt-in の自己修復（#140、`self_heal.sh`）。`~/.atst/self_heal.enabled` があるときだけ、`check_all.sh` の回の中で `mtctl.sh start` / `mtctl.sh restart` を呼ぶ。既定 OFF・対象キーの限定・回数上限・クールダウン・LINE 通知のいずれかを外す変更、`check_all.sh` 以外から `self_heal.sh` を呼ぶ経路の追加、`mtctl.sh` の MT 単位ロックを外す変更、および上限到達後も動かす変更は block。
 - 監視スクリプトが異常時に**通知せず握りつぶす**経路があれば block（例: エラーで `return 0` して無通知）。
 - 「監視が止まったこと自体の検知」(`check_monitoring.sh`, `check_process.sh`) を実質無効化する変更は block。
 - 状態を持つ異常通知（発生/復帰を `~/.atst/alert_status` で重複抑止するもの）は、`check_*.sh` に `atst_set_alert_status` と送信を個別に書かず `atst_update_alert` を使う（送信成功時だけ状態を更新し、失敗した回は次回に再送する。判定〜送信〜記録はキー単位のロックで直列化され、同じ遷移を複数のプロセスが同時に見ても通知は 1 回になる）。`check_all.sh` の回の中（`ATST_NOTIFY_SPOOL` が有効）では、`atst_update_alert` は送信も記録もせずスプールに追記するだけで、回の途中と最後の `atst_spool_flush` が 1 通にまとめて送り、push が 200 のときだけキーを記録する（記録は送信成功後のみ、の契約は変わらない）。自前で状態だけ先に更新して通知を取りこぼす実装は block。

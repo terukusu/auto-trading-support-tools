@@ -57,6 +57,7 @@ bats の自動テスト（`tests/`）、共通フィクスチャ `tests/test_hel
   - `ATST_TEST_CURL_HTTP_CODE_SEQ`（空白区切りの HTTP コード列）を置くと、n 回目の呼び出し（`$ATST_TEST_CURL_LOG` の追記後の行数。quota・画像アップロードも数える）が n 番目のコードを返し、尽きたら `ATST_TEST_CURL_HTTP_CODE`。
   - `ATST_TEST_CURL_FILE` を置くと、別引数の `-o <path>` があり終了コードが 0 のとき、そのファイルを `<path>` にコピーして本文は出さない。
 - `tests/stubs/winepath` — Wine を起動せずパスを `C:\...` 形式に変換する。`atst_find_pid` は使わないが、`mtctl.sh start` の経路が実 `winepath` を呼ぶため、実 Wine を起動しない安全網として残す。
+- `mtctl.sh start` / `restart` を実際に動かすテストは、`ATST_X11_DIR` を sandbox のディレクトリに向け、待たないテストでは `ATST_X_WAIT=0` にする（開発機・CI の本物の `/tmp/.X11-unix` を見ない。既定のままだと最大 120 秒待つ）。wine は `atst_test_stub_script` の record スタブを `WINE` に置く（#140）。
 - stub を足したら `ci.yml` の列挙も足す（[CI](#ci)）。
 
 ## ERR trap と run bash -c

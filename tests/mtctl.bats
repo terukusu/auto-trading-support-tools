@@ -1,15 +1,30 @@
 #!/usr/bin/env bats
 # mtctl.sh: exit status and output of list / status / stop on the sandbox (#101, #132). start runs wine only
 # as the record stub of the sandbox (WINE=<sandbox>/wine, calls.log), never the real Wine (#133).
+# MC-15..28 (#140): the X wait that does not wait, the MT lock and its stamp, restart of a stopped MT,
+# setsid. The waits and the restarts of real processes are in tests/slow/mtctl.bats.
 
 load test_helper
 
 setup() {
   atst_test_setup_sandbox
   atst_test_make_mt A_MT4 MT4
+  # #140: never the real /tmp/.X11-unix of the host; MC-1..14c do not wait for X.
+  mkdir -p "$ATST_TEST_SANDBOX/x11"
+  ATST_X11_DIR="$ATST_TEST_SANDBOX/x11"
+  ATST_X_WAIT=0
+  export ATST_X11_DIR ATST_X_WAIT
 }
 
 teardown() {
+  local f pid
+  for f in holder.pid child.pid; do
+    pid=$(cat "$ATST_TEST_SANDBOX/$f" 2>/dev/null)
+    case "$pid" in
+      ''|*[!0-9]*) ;;
+      *) kill "$pid" 2>/dev/null ;;
+    esac
+  done
   atst_test_teardown_sandbox
 }
 
@@ -291,4 +306,292 @@ Expert=TerminalMonitoring" ]
   [ "$(stat -c %a "$WINEPREFIX/drive_c/atst/startup_a_mt4.ini")" = 600 ]
   [ "$(mc_wine_lines)" = "$(mc_base_args A_MT4) [C:\\atst\\startup_a_mt4.ini]" ]
   [ "$(grep -c 'Z:' "$ATST_TEST_SANDBOX/calls.log")" -eq 0 ]
+}
+
+# --- #140: X wait (no waiting here), MT lock, stamp, restart of a stopped MT, setsid ---
+
+# mc_run_err <mtctl args...>: runs mtctl.sh with stdout in $output and stderr in $E.
+mc_run_err() {
+  E="$ATST_TEST_SANDBOX/err"
+  run bash -c 'f=$1; shift; bash "$@" 2>"$f"' _ "$E" "$BATS_TEST_DIRNAME/../mtctl.sh" "$@"
+}
+
+# Milliseconds since $1 (date +%s%N).
+mc_ms_since() {
+  echo $(( ($(date +%s%N) - $1) / 1000000 ))
+}
+
+mc_wine_count() {
+  mc_wine_lines | wc -l
+}
+
+# mc_wine_body <shell lines>: the wine record stub with <shell lines> run after the record line.
+mc_wine_body() {
+  mc_stub_wine || return 1
+  sed -i '$d' "$ATST_TEST_SANDBOX/wine"
+  printf '%s\nexit 0\n' "$1" >> "$ATST_TEST_SANDBOX/wine"
+}
+
+# Starts a process holding the lock on $1 (as another mtctl.sh would) and waits until it holds it.
+hold_lock() {
+  local i
+  mkdir -p "$(dirname "$1")" || return 1
+  ( exec 8>>"$1"; flock 8; exec sleep 30 ) >/dev/null 2>&1 </dev/null 3>&- &
+  echo "$!" > "$ATST_TEST_SANDBOX/holder.pid"
+  for i in $(seq 1 20); do
+    flock -n "$1" true || return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+release_lock() {
+  local pid
+  pid=$(cat "$ATST_TEST_SANDBOX/holder.pid")
+  kill "$pid"
+  wait "$pid" 2>/dev/null || true
+  rm -f "$ATST_TEST_SANDBOX/holder.pid"
+}
+
+@test "MC-15: ATST_X_WAIT=0 does not wait, says nothing and writes x_wait: skipped (ATST_X_WAIT=0)" {
+  local t0 ms
+  mc_stub_wine
+  t0=$(date +%s%N)
+  DISPLAY=:1 mc_run_err start A_MT4
+  ms=$(mc_ms_since "$t0")
+  [ "$status" -eq 0 ]
+  [ "$ms" -lt 1000 ]
+  [ ! -s "$E" ]
+  [ "$(mc_wine_count)" -eq 1 ]
+  grep -qxF 'x_wait: skipped (ATST_X_WAIT=0)' "$HOME/.atst/wine_a_mt4.log"
+}
+
+@test "MC-16: the socket of :1 / :1.0 / localhost:1 / unix:1 already there gives x_wait: ready (0 s)" {
+  local d t0 ms
+  mc_stub_wine
+  touch "$ATST_X11_DIR/X1"
+  for d in :1 :1.0 localhost:1 unix:1; do
+    rm -f "$HOME/.atst/wine_a_mt4.log"
+    t0=$(date +%s%N)
+    DISPLAY=$d ATST_X_WAIT=5 mc_run_err start A_MT4
+    ms=$(mc_ms_since "$t0")
+    [ "$status" -eq 0 ]
+    [ "$ms" -lt 1000 ]
+    [ ! -s "$E" ]
+    grep -qxF 'x_wait: ready (0 s)' "$HOME/.atst/wine_a_mt4.log"
+  done
+  [ "$(mc_wine_count)" -eq 4 ]
+}
+
+@test "MC-17: an empty DISPLAY (in the config) does not wait: x_wait: skipped (no display number)" {
+  local t0 ms
+  mc_stub_wine
+  atst_test_set_config DISPLAY ''
+  t0=$(date +%s%N)
+  ATST_X_WAIT=5 mc_run_err start A_MT4
+  ms=$(mc_ms_since "$t0")
+  [ "$status" -eq 0 ]
+  [ "$ms" -lt 1000 ]
+  [ ! -s "$E" ]
+  [ "$(mc_wine_count)" -eq 1 ]
+  grep -qxF 'x_wait: skipped (no display number)' "$HOME/.atst/wine_a_mt4.log"
+}
+
+@test "MC-18: a wrong ATST_X_WAIT gives one stderr line and 120; -q says nothing; 600 and 1 are taken" {
+  local v
+  mc_stub_wine
+  touch "$ATST_X11_DIR/X1"
+  for v in abc 601 08 -1; do
+    rm -f "$HOME/.atst/wine_a_mt4.log"
+    DISPLAY=:1 ATST_X_WAIT=$v mc_run_err start A_MT4
+    [ "$status" -eq 0 ]
+    [ "$(wc -l < "$E")" -eq 1 ]
+    grep -q 'ATST_X_WAIT' "$E"
+    grep -qxF 'x_wait: ready (0 s)' "$HOME/.atst/wine_a_mt4.log"
+
+    DISPLAY=:1 ATST_X_WAIT=$v mc_run_err -q start A_MT4
+    [ "$status" -eq 0 ]
+    [ ! -s "$E" ]
+    [ -z "$output" ]
+  done
+  for v in 600 1; do
+    DISPLAY=:1 ATST_X_WAIT=$v mc_run_err start A_MT4
+    [ "$status" -eq 0 ]
+    [ ! -s "$E" ]
+  done
+}
+
+@test "MC-19: x_wait: comes right after ===== START, auto_attach: right after it" {
+  local log="$HOME/.atst/wine_a_mt4.log"
+  mc_stub_wine
+  touch "$ATST_X11_DIR/X1"
+  mc_enable
+  DISPLAY=:1 ATST_X_WAIT=5 mc_run_err start A_MT4
+  [ "$status" -eq 0 ]
+  [ "$(grep -A1 '^===== START' "$log" | tail -1)" = 'x_wait: ready (0 s)' ]
+  [[ "$(grep -A1 '^x_wait: ' "$log" | tail -1)" == 'auto_attach: '* ]]
+
+  rm -f "$log"
+  atst_test_set_config ATST_AUTO_ATTACH_EA 0
+  DISPLAY=:1 ATST_X_WAIT=5 mc_run_err start A_MT4
+  [ "$status" -eq 0 ]
+  [ "$(grep -A1 '^===== START' "$log" | tail -1)" = 'x_wait: ready (0 s)' ]
+  [ "$(tail -1 "$log")" = 'x_wait: ready (0 s)' ]
+}
+
+@test "MC-20: while another mtctl.sh holds the MT lock, start skips (0) and restart does nothing (2)" {
+  local L="$HOME/.atst/mtctl_a_mt4.lock"
+  mc_stub_wine
+  hold_lock "$L" || return 1
+  mc_run_err start A_MT4
+  [ "$status" -eq 0 ]
+  [ "$(mc_wine_count)" -eq 0 ]
+  [ "$(wc -l < "$E")" -eq 1 ]
+  grep -q busy "$E"
+  [ ! -e "$HOME/.atst/wine_a_mt4.log" ]
+
+  mc_run_err restart A_MT4
+  [ "$status" -eq 2 ]
+  [ "$(mc_wine_count)" -eq 0 ]
+  [ "$(wc -l < "$E")" -eq 1 ]
+  grep -q busy "$E"
+
+  mc_run_err -q start A_MT4
+  [ "$status" -eq 0 ]
+  [ ! -s "$E" ]
+  [ -z "$output" ]
+
+  release_lock
+  mc_run_err start A_MT4
+  [ "$status" -eq 0 ]
+  [ "$(mc_wine_count)" -eq 1 ]
+}
+
+@test "MC-21: a process left by wine does not keep the MT lock (fd 6 is not passed on)" {
+  local L="$HOME/.atst/mtctl_a_mt4.lock"
+  mc_wine_body "sleep 30 >/dev/null 2>&1 </dev/null &
+echo \$! > \"\$ATST_TEST_SANDBOX/child.pid\""
+  mc_run_err start A_MT4
+  [ "$status" -eq 0 ]
+  [ "$(mc_wine_count)" -eq 1 ]
+  kill -0 "$(cat "$ATST_TEST_SANDBOX/child.pid")"
+  flock -n "$L" true
+}
+
+@test "MC-21b: the wineserver that winepath leaves does not keep the MT lock (fd 6 is closed for winepath)" {
+  local L="$HOME/.atst/mtctl_a_mt4.lock"
+  export ATST_TEST_WINEPATH_CHILD="$ATST_TEST_SANDBOX/wp_child.pid"
+  mc_run_err start A_MT4
+  unset ATST_TEST_WINEPATH_CHILD
+  [ "$status" -eq 0 ]
+  kill -0 "$(cat "$ATST_TEST_SANDBOX/wp_child.pid")"
+  flock -n "$L" true
+  kill "$(cat "$ATST_TEST_SANDBOX/wp_child.pid")" 2>/dev/null || true
+}
+
+@test "MC-22: restart of a MetaTrader that is not running starts it (0) without stopping anything" {
+  mc_stub_wine
+  mc_run_err restart A_MT4
+  [ "$status" -eq 0 ]
+  [ "$(mc_wine_count)" -eq 1 ]
+  [[ "$output" != *restarting:* ]]
+  [[ "$output" == *executing:* ]]
+  [ "$(grep -c '^x_wait: ' "$HOME/.atst/wine_a_mt4.log")" -eq 1 ]
+}
+
+@test "MC-23: start writes the epoch of the start to the MT lock (600); the alias A uses the same file" {
+  local L="$HOME/.atst/mtctl_a_mt4.lock" now s1 s2
+  mc_stub_wine
+  mc_run_err start A_MT4
+  [ "$status" -eq 0 ]
+  now=$(date +%s)
+  s1=$(head -1 "$L")
+  [[ "$s1" =~ ^[0-9]+$ ]]
+  [ "$s1" -le "$now" ]
+  [ "$s1" -ge $(( now - 5 )) ]
+  [ "$(stat -c %a "$L")" = 600 ]
+  mc_run_err start A
+  [ "$status" -eq 0 ]
+  [ "$(ls "$HOME"/.atst/mtctl_*.lock | wc -l)" -eq 1 ]
+  s2=$(head -1 "$L")
+  [ "$s2" -ge "$s1" ]
+  [ "$(wc -l < "$L")" -eq 1 ]
+}
+
+@test "MC-24: the usage lists restart and ATST_X_WAIT; an unknown operation prints it and exits 1" {
+  run bash "$BATS_TEST_DIRNAME/../mtctl.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *restart* ]]
+  [[ "$output" == *ATST_X_WAIT* ]]
+  run bash "$BATS_TEST_DIRNAME/../mtctl.sh" foo A_MT4
+  [ "$status" -eq 1 ]
+  [[ "$output" == *restart* ]]
+  [[ "$output" == *ATST_X_WAIT* ]]
+}
+
+@test "MC-25: atst_mt_lock_path gives one lock per MetaTrader folder and creates nothing" {
+  atst_test_make_mt "X Y-1" MT4
+  atst_test_source_common || return 1
+  run atst_mt_lock_path A_MT4
+  [ "$status" -eq 0 ]
+  [ "$output" = "$ATST_CONFIG_DIR/mtctl_a_mt4.lock" ]
+  run atst_mt_lock_path A
+  [ "$status" -eq 0 ]
+  [ "$output" = "$ATST_CONFIG_DIR/mtctl_a_mt4.lock" ]
+  run atst_mt_lock_path "X Y-1"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$ATST_CONFIG_DIR/mtctl_x_y_1.lock" ]
+  run atst_mt_lock_path NO_SUCH
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+  run atst_mt_lock_path ""
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+  ATST_CONFIG_DIR='' run atst_mt_lock_path A_MT4
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+  [ -z "$(ls "$HOME"/.atst/mtctl_*.lock 2>/dev/null)" ]
+}
+
+@test "MC-26: wine is started in a new session and process group (setsid)" {
+  local ids own_sid own_pgid
+  command -v setsid > /dev/null || skip "no setsid"
+  mc_wine_body 'ps -o pid=,pgid=,sid= -p $$ > "$ATST_TEST_SANDBOX/ids"'
+  mc_run_err start A_MT4
+  [ "$status" -eq 0 ]
+  read -r _ pgid sid < "$ATST_TEST_SANDBOX/ids"
+  own_sid=$(ps -o sid= -p "$BASHPID" | tr -d ' ')
+  own_pgid=$(ps -o pgid= -p "$BASHPID" | tr -d ' ')
+  [ -n "$sid" ]
+  [ "$sid" != "$own_sid" ]
+  [ "$pgid" = "$sid" ]
+  [ "$pgid" != "$own_pgid" ]
+}
+
+@test "MC-27: a setsid without --wait is not used and wine runs once" {
+  mkdir -p "$ATST_TEST_SANDBOX/bin"
+  printf '#!/bin/bash\ncase "$1" in --help) echo "usage: setsid program" ; exit 0 ;; esac\necho setsid-called >> %q\nexec "$@"\n' \
+    "$ATST_TEST_SANDBOX/calls.log" > "$ATST_TEST_SANDBOX/bin/setsid"
+  chmod 755 "$ATST_TEST_SANDBOX/bin/setsid"
+  PATH="$ATST_TEST_SANDBOX/bin:$PATH"
+  export PATH
+  mc_stub_wine
+  mc_run_err start A_MT4
+  [ "$status" -eq 0 ]
+  [ "$(mc_wine_count)" -eq 1 ]
+  [ "$(grep -c setsid-called "$ATST_TEST_SANDBOX/calls.log")" -eq 0 ]
+  [ ! -s "$E" ]
+}
+
+@test "MC-28: a lock file that cannot be opened starts anyway with one line (no path)" {
+  local L="$HOME/.atst/mtctl_a_mt4.lock"
+  mc_stub_wine
+  mkdir -p "$L"
+  mc_run_err start A_MT4
+  [ "$status" -eq 0 ]
+  [ "$(mc_wine_count)" -eq 1 ]
+  [ "$(wc -l < "$E")" -eq 1 ]
+  grep -q 'ロック' "$E"
+  [ "$(grep -cF "$HOME" "$E")" -eq 0 ]
+  [ -d "$L" ]
 }
