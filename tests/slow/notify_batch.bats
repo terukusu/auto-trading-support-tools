@@ -7,14 +7,14 @@
 # checks are recording stubs unless a test puts the real one back or writes its own. The function
 # tests read common.sh in the test itself (atst_test_source_common).
 
-load test_helper
+load ../test_helper
 
 CHECKS="check_reboot check_order check_process check_monitoring check_ping check_price check_spread heartbeat"
 
 setup() {
   local n
   atst_test_setup_sandbox
-  repo=$(cd "$BATS_TEST_DIRNAME/.." && pwd)
+  repo=$(cd "$BATS_TEST_DIRNAME/../.." && pwd)
   home=$(atst_test_make_runner_home)
   atst_test_set_config ATST_CHECK_TIMEOUT 2
   atst_test_set_config ATST_ORDER_CHECK_INTERVAL 0
@@ -110,7 +110,7 @@ nojq_path() {
     done
     unset IFS
   fi
-  printf '%s\n' "$BATS_TEST_DIRNAME/stubs:$nojq"
+  printf '%s\n' "$BATS_TEST_DIRNAME/../stubs:$nojq"
 }
 
 # Spools 12 notices of about 2000 characters (K01 .. K12: 2 per message, 6 messages).

@@ -6,14 +6,14 @@
 # window in which two runs overlap; the result is still decided by the locks (atst_update_alert per
 # key, uptime.lock, check_order.lock), not by timing.
 
-load test_helper
+load ../test_helper
 
 CHECKS="check_reboot check_order check_process check_monitoring check_ping check_price check_spread heartbeat"
 
 setup() {
   local n
   atst_test_setup_sandbox
-  repo=$(cd "$BATS_TEST_DIRNAME/.." && pwd)
+  repo=$(cd "$BATS_TEST_DIRNAME/../.." && pwd)
   home=$(atst_test_make_runner_home)
   atst_test_set_targets A_MT4
   atst_test_set_config ATST_CHECK_TIMEOUT 2
@@ -26,7 +26,7 @@ setup() {
   {
     printf '#!/bin/bash\n'
     printf '%q 0.5\n' "$(command -v sleep)"
-    printf 'exec %q "$@"\n' "$BATS_TEST_DIRNAME/stubs/curl"
+    printf 'exec %q "$@"\n' "$BATS_TEST_DIRNAME/../stubs/curl"
   } > "$ATST_TEST_SANDBOX/bin/curl"
   chmod 755 "$ATST_TEST_SANDBOX/bin/curl"
   PATH="$ATST_TEST_SANDBOX/bin:$repo:$PATH"

@@ -2,7 +2,7 @@
 # check_process.sh: alert when a MetaTrader process is not running (do_check) and when a TARGET
 # name matches no installed MetaTrader (check_target_found).
 
-load test_helper
+load ../test_helper
 
 setup() {
   atst_test_setup_sandbox
@@ -38,7 +38,7 @@ no_line() {
 
 @test "P1: an installed MetaTrader without a process sends one 【発生】 and records PROCESS_<NAME>,1" {
   atst_test_make_mt A_MT4 MT4
-  run bash "$BATS_TEST_DIRNAME/../check_process.sh" A_MT4
+  run bash "$BATS_TEST_DIRNAME/../../check_process.sh" A_MT4
   [ "$status" -eq 0 ]
   [ "$(atst_test_push_count)" -eq 1 ]
   [ "$(grep -c '【発生】' "$ATST_TEST_CURL_LOG")" -eq 1 ]
@@ -53,7 +53,7 @@ no_line() {
   set_status 'PROCESS_ATSTTEST_MT4,1,0'
   export ATST_PROC_ROOT=/proc
   ATST_TEST_FAKE_PID=$(atst_test_fake_mt_process ATSTTEST_MT4)
-  run bash "$BATS_TEST_DIRNAME/../check_process.sh" ATSTTEST_MT4
+  run bash "$BATS_TEST_DIRNAME/../../check_process.sh" ATSTTEST_MT4
   [ "$status" -eq 0 ]
   [ "$(atst_test_push_count)" -eq 1 ]
   [ "$(grep -c '【復帰】' "$ATST_TEST_CURL_LOG")" -eq 1 ]
@@ -64,13 +64,13 @@ no_line() {
 
 @test "T1: a TARGET matching no MetaTrader sends one 【発生】 with a normalized key, only once" {
   atst_test_make_mt A_MT4 MT4
-  run bash "$BATS_TEST_DIRNAME/../check_process.sh" "No Such-MT"
+  run bash "$BATS_TEST_DIRNAME/../../check_process.sh" "No Such-MT"
   [ "$status" -eq 0 ]
   [ "$(atst_test_push_count)" -eq 1 ]
   [ "$(grep -c '【発生】' "$ATST_TEST_CURL_LOG")" -eq 1 ]
   grep -q '監視対象のMetaTraderが見つかりません' "$ATST_TEST_CURL_LOG"
   grep -q '^TARGET_No_Such_MT,1,' "$HOME/.atst/alert_status"
-  run bash "$BATS_TEST_DIRNAME/../check_process.sh" "No Such-MT"
+  run bash "$BATS_TEST_DIRNAME/../../check_process.sh" "No Such-MT"
   [ "$(atst_test_push_count)" -eq 1 ]
   no_bearer
 }
@@ -80,7 +80,7 @@ no_line() {
   set_status 'TARGET_ATSTTEST_MT4,1,0'
   export ATST_PROC_ROOT=/proc
   ATST_TEST_FAKE_PID=$(atst_test_fake_mt_process ATSTTEST_MT4)
-  run bash "$BATS_TEST_DIRNAME/../check_process.sh" ATSTTEST_MT4
+  run bash "$BATS_TEST_DIRNAME/../../check_process.sh" ATSTTEST_MT4
   [ "$status" -eq 0 ]
   [ "$(atst_test_push_count)" -eq 1 ]
   [ "$(grep -c '【復帰】' "$ATST_TEST_CURL_LOG")" -eq 1 ]
@@ -92,10 +92,10 @@ no_line() {
 
 @test "T3: a failed TARGET 【発生】 (500) is not recorded and is sent again on the next run" {
   atst_test_make_mt A_MT4 MT4
-  ATST_TEST_CURL_HTTP_CODE=500 run bash "$BATS_TEST_DIRNAME/../check_process.sh" "No Such-MT"
+  ATST_TEST_CURL_HTTP_CODE=500 run bash "$BATS_TEST_DIRNAME/../../check_process.sh" "No Such-MT"
   [ "$(atst_test_push_count)" -eq 1 ]
   no_line TARGET_
-  run bash "$BATS_TEST_DIRNAME/../check_process.sh" "No Such-MT"
+  run bash "$BATS_TEST_DIRNAME/../../check_process.sh" "No Such-MT"
   [ "$(atst_test_push_count)" -eq 2 ]
   grep -q '^TARGET_No_Such_MT,1,' "$HOME/.atst/alert_status"
   no_bearer
@@ -103,7 +103,7 @@ no_line() {
 
 @test "F2: a failed 【発生】 (500) for a stopped process is not recorded" {
   atst_test_make_mt A_MT4 MT4
-  ATST_TEST_CURL_HTTP_CODE=500 run bash "$BATS_TEST_DIRNAME/../check_process.sh" A_MT4
+  ATST_TEST_CURL_HTTP_CODE=500 run bash "$BATS_TEST_DIRNAME/../../check_process.sh" A_MT4
   [ "$(atst_test_push_count)" -eq 1 ]
   no_line PROCESS_
   [ -e "$HOME/.atst/line_error.log" ]

@@ -27,7 +27,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 
 ## 4. 共通処理は common.sh に寄せる
 
-全スクリプトは `common.sh` を source し、`atst_*` 関数・`ATST_*` 変数を使う。ロジックの重複を見つけたら `common.sh` の関数化を検討する（ただし 3 回ルール: 2 回目までは重複を許容し、3 回目で抽象化）。
+全スクリプトは `common.sh` を source し、`atst_*` 関数・`ATST_*` 変数を使う。ロジックの重複を見つけたら `common.sh` の関数化を検討する（ただし 3 回ルール: 2 回目までは重複を許容し、3 回目で抽象化）。`common.sh` は内部で `lib/atst_config.sh` / `atst_line.sh` / `atst_mt.sh` を source する。呼び出し側は `common.sh` だけを source し、`lib/*.sh` を直接 source しない。
 
 ---
 
@@ -114,7 +114,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 
 ## P12. 命名・構成の一貫性（warn）
 
-- 公開関数・共通変数は `atst_*` / `ATST_*`。新規共通処理は `common.sh` に置く。
+- 公開関数・共通変数は `atst_*` / `ATST_*`。新規共通処理は `common.sh`（または内容の合う `lib/*.sh`）に置く。
   - 例外: `mt_home` / `mt_data` / `mt_name` / `mt_type` / `mt_term` は `atst_load_mt_list` が設定するグローバル配列で、`ATST_*` 命名の意図的な例外（これら以外の新規共通変数は `ATST_*` にする）。
 - 1 スクリプト 1 責務。cron から叩く監視は `check_*.sh`、セットアップは `setup_*.sh` の命名に合わせる。
 - テンプレート化すべき設定ファイルは `templates/` に置き、`%%PLACEHOLDER%%` 置換の既存流儀に合わせる。
