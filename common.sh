@@ -739,6 +739,66 @@ function atst_is_weekend_epoch() {
   [ "$dow" -eq 6 ] || [ "$dow" -eq 0 ] || { [ "$dow" -eq 5 ] && [ "$hour" -ge 20 ]; }
 }
 
+# The old-style crontab (TARGET and wrapper.sh "$TARGET" check_*.sh, #143)
+# It keeps working until the deadline below and after it too: the deadline only changes what doctor.sh
+# and check_daily.sh say (doctor.sh NG, a warning line in the morning report). Nothing that monitors or
+# notifies looks at it. Removing wrapper.sh is a separate issue after the deadline. Defined here, after
+# ~/.atst/config is read, so neither the config nor the environment can move it. Not readonly: some tests
+# source common.sh twice.
+ATST_LEGACY_CRONTAB_DEADLINE=2027-05-31
+
+# atst_legacy_crontab_expired <YYYY-MM-DD>
+# Returns 0 when the date is after the deadline (ATST_LEGACY_CRONTAB_DEADLINE), 1 on or before it and for
+# anything that is not YYYY-MM-DD (the safe side: before the deadline). Plain arithmetic, no external
+# command. Prints nothing and changes no variable.
+function atst_legacy_crontab_expired() {
+  local d="${1-}" deadline="$ATST_LEGACY_CRONTAB_DEADLINE"
+
+  [[ "$d" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || return 1
+  [[ "$deadline" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || return 1
+  [ "$((10#${d//-/}))" -gt "$((10#${deadline//-/}))" ]
+}
+
+# atst_crontab_form_of <crontab text>
+# Prints one word on one line for the form of the crontab text: "new" (check_all.sh), "legacy"
+# (wrapper.sh), "mixed" (both) or "none" (neither). Comment lines do not count. Never prints the text.
+# Returns 0.
+function atst_crontab_form_of() {
+  local active has_new=0 has_old=0
+
+  active=$(printf '%s\n' "${1-}" | grep -v '^[[:space:]]*#')
+  if grep -q 'check_all\.sh' <<< "$active"; then
+    has_new=1
+  fi
+  if grep -q 'wrapper\.sh' <<< "$active"; then
+    has_old=1
+  fi
+  if [ "$has_new" -eq 1 ] && [ "$has_old" -eq 1 ]; then
+    echo mixed
+  elif [ "$has_new" -eq 1 ]; then
+    echo new
+  elif [ "$has_old" -eq 1 ]; then
+    echo legacy
+  else
+    echo none
+  fi
+  return 0
+}
+
+# atst_crontab_form
+# Reads the user's crontab (timeout 10 crontab -l) and prints the word of atst_crontab_form_of, or
+# "unknown" when crontab -l fails (no crontab, an error, the timeout). Never prints the crontab, writes
+# nothing, prints nothing on stderr. Returns 0.
+function atst_crontab_form() {
+  local out
+
+  if ! out=$(timeout 10 crontab -l 2>/dev/null); then
+    echo unknown
+    return 0
+  fi
+  atst_crontab_form_of "$out"
+}
+
 # atst_has_targets
 # Returns 0 when ATST_TARGETS (~/.atst/config) has at least one element and none of them is empty,
 # 1 otherwise (unset, (), ('') or ('a' '')). A scalar counts as one element. Prints nothing.

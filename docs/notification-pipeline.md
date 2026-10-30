@@ -88,6 +88,7 @@ config の読み込み（`ATST_NOTIFY_SPOOL` の退避・復元、各項目の�
 - `check_daily.sh` は quota が取れた回に `LINE_QUOTA`（8 割以上で 1、未満・上限なしで 0）を `atst_set_alert_status` で直接書く。LINE 通知の無い、heartbeat 用の状態だけのキー（P1 の例外）。
 - `check_daily.sh` は `ATST_IMAGE_REPORT_DESKTOP` の行が無い旧 config に、デスクトップ画像の既定 OFF を `atst_update_alert IMAGE_REPORT_DEFAULT_CHANGED` で 1 度だけ案内する。
 - `check_daily.sh` は外形監視の URL が未設定なら、稼働OK に「外形監視: 未設定」の 1 行を足す（この行のためだけには送らない）。
+- `check_daily.sh` は crontab が旧形式か混在（`atst_crontab_form`）のとき、期限 `ATST_LEGACY_CRONTAB_DEADLINE` の前は稼働OK の最後に `crontab: …` の 1 行（送る理由にならない）と `atst_update_alert CRONTAB_LEGACY_NOTICE` の 1 度だけの案内（verdict は 1 か空。`IMAGE_REPORT_DEFAULT_CHANGED` と同じ契約）、期限の後は `【注意】crontab …` の 1 行（`quota_warning` と同じく送る理由になる）を出し、案内は送らない（#143）。期限は文面を変えるだけで、監視・通知の経路は変えない。
 
 ## 外形監視（heartbeat.sh）
 

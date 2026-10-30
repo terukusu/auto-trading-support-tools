@@ -47,6 +47,7 @@ bats の自動テスト（`tests/`）、共通フィクスチャ `tests/test_hel
 - `atst_test_make_runner_home` — リポジトリの `*.sh`・`lib/`・`templates/` を実行権限ごと sandbox の `atst/` にコピーしてそのパスを出力する。`check_all.sh` / `run_with_targets.sh` は隣のスクリプトを実行するので、コピー側のスクリプトを差し替えて試す。
 - `atst_test_make_dummy_zip <zip_path> <top> [<install_body>]` — sandbox 内に GitHub archive 形の zip を作る。中身は `<top>/install_required_for_mt.sh`（既定は `$ATST_TEST_SANDBOX/marker` を作り `install.log` に 1 行追記）と `<top>/README.md`。sandbox 外・不正な `<top>` は return 1。
 - `atst_test_stub_script <dir> <name> <mode>` — `<dir>/<name>` にスタブを書く。呼び出しを `$ATST_TEST_SANDBOX/calls.log` に記録し、mode は `record`（exit 0）/ `fail`（exit 3）/ `exit1` / `hang`（sleep 300）/ `hang_ignore_term`（TERM 無視）/ `slow`（3 秒）。`<dir>` は sandbox 内に限る。
+- `atst_test_stub_date <dir> <YYYY-MM-DD>` — `<dir>/date` に、`date +%Y-%m-%d`（引数がちょうどそれ 1 つ）のときだけ固定日を出し、他は `/bin/date` に渡すスタブを書く（期限 `ATST_LEGACY_CRONTAB_DEADLINE` の前後を決めるため。#143）。`<dir>` は sandbox 内に限る。
 
 ## stub
 

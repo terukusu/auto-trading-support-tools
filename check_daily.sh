@@ -60,17 +60,42 @@ elif [ "$quota_line_state" = 0 ]; then
   atst_set_alert_status LINE_QUOTA 0
 fi
 
+# Issue #143: the old-style crontab (wrapper.sh) works until ATST_LEGACY_CRONTAB_DEADLINE and after it.
+# Before the deadline: a line at the end of the report that is not a reason to send, and a notice sent
+# once (CRONTAB_LEGACY_NOTICE, below). After it: a warning line that is a reason to send (one push a
+# day, like quota_warning) and no notice. The deadline only changes these texts; monitoring goes on.
+crontab_line=""
+crontab_warning=""
+crontab_notice=""
+form_label=""
+case "$(atst_crontab_form)" in
+  legacy) form_label="旧形式" ;;
+  mixed) form_label="旧形式と新形式の混在" ;;
+esac
+if [ -n "$form_label" ]; then
+  today=$(date +%Y-%m-%d)
+  if atst_legacy_crontab_expired "$today"; then
+    crontab_warning="【注意】crontab の${form_label} (wrapper.sh) の猶予期限 ${ATST_LEGACY_CRONTAB_DEADLINE} を過ぎています。setup_cron.sh で移行してください (監視は止まっていません)"
+  else
+    crontab_line="crontab: ${form_label} (wrapper.sh) です。${ATST_LEGACY_CRONTAB_DEADLINE} までに setup_cron.sh で移行してください"
+    crontab_notice=1
+  fi
+fi
+
 # Everything in one message (one push = one of the 200). With ATST_DAILY_REPORT=0 it is sent only when
 # there is something to act on.
-if [ "$ATST_DAILY_REPORT" != "0" ] || [ -n "$upgrade_msg$mt_update_msg$quota_warning" ]; then
+if [ "$ATST_DAILY_REPORT" != "0" ] || [ -n "$upgrade_msg$mt_update_msg$quota_warning$crontab_warning" ]; then
   {
     echo "稼働OK！$(uptime)"
     [ -n "$quota_msg" ] && echo "$quota_msg"
     [ -n "$quota_warning" ] && echo "$quota_warning"
+    [ -n "$crontab_warning" ] && echo "$crontab_warning"
     [ -n "$mt_update_msg" ] && echo "$mt_update_msg"
     [ -n "$upgrade_msg" ] && echo "$upgrade_msg"
     # Only whether a URL is set (never the URL). Not a reason to send on its own (see the condition above).
     [ -z "${ATST_HEARTBEAT_URL:-}" ] && echo "外形監視: 未設定（推奨。setup_heartbeat.sh で設定）"
+    # Not a reason to send on its own either.
+    [ -n "$crontab_line" ] && echo "$crontab_line"
   } | atst_send_to_line
 fi
 
@@ -83,3 +108,14 @@ if [ -z "${ATST_IMAGE_REPORT_DESKTOP+x}" ] && [ "${ATST_IMAGE_REPORT_TERM:-}" !=
   image_notice=1
 fi
 atst_update_alert IMAGE_REPORT_DEFAULT_CHANGED "$image_notice" "【お知らせ】デスクトップ画像の通知は既定 OFF になりました (口座番号・残高が写るため)。朝の定期レポートは文字要約 (ImgBB の API キーがあればグラフ画像も) になります。デスクトップ画像も送るには、setup_imgbb.sh で ImgBB の API キーを設定し、~/.atst/config に ATST_IMAGE_REPORT_DESKTOP=1 を書いてください。この通知は 1 度だけです。" ""
+image_rc=$?
+
+# Issue #143: the notice about the old-style crontab, once (same contract as IMAGE_REPORT_DEFAULT_CHANGED:
+# recorded only when the push succeeded, verdict 1 or empty, never 0). Not sent after the deadline.
+atst_update_alert CRONTAB_LEGACY_NOTICE "$crontab_notice" "【お知らせ】crontab が${form_label} (wrapper.sh) のままです。${ATST_LEGACY_CRONTAB_DEADLINE} までは今のまま動きます。期限後も監視は止まりませんが、毎朝の報告に【注意】が付き、doctor.sh が NG になります。setup_cron.sh で移行してください (元の crontab は ~/.atst/crontab.bak.<日時> に残ります)。この通知は 1 度だけです。" ""
+crontab_rc=$?
+# The exit code is the one of the first notice that failed (as before #143, when the #135 notice was last).
+if [ "$image_rc" -ne 0 ]; then
+  exit "$image_rc"
+fi
+exit "$crontab_rc"

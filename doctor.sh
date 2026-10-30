@@ -294,33 +294,34 @@ function doctor_check_monitoring() {
   done
 }
 
-# 7. The form of the crontab, by the same patterns as setup_cron.sh (comment lines do not count).
-# Its content is not shown.
+# 7. The form of the crontab (atst_crontab_form; comment lines do not count). Its content is not shown.
+# The old-style form is OK until ATST_LEGACY_CRONTAB_DEADLINE and NG after it (#143).
 function doctor_check_cron() {
-  local cron_out cron_rc active has_new=0 has_old=0
+  local form today
 
-  cron_out=$(timeout 10 crontab -l 2>/dev/null); cron_rc=$?
-  if [ "$cron_rc" -ne 0 ]; then
-    doctor_line NG "crontab -l" "failed or no crontab"
-    return 0
-  fi
-  active=$(printf '%s\n' "$cron_out" | grep -v '^[[:space:]]*#')
-  if grep -q 'check_all\.sh' <<< "$active"; then
-    has_new=1
-  fi
-  if grep -q 'wrapper\.sh' <<< "$active"; then
-    has_old=1
-  fi
-
-  if [ "$has_new" -eq 1 ] && [ "$has_old" -eq 1 ]; then
-    doctor_line NG "crontab -l" "mixed: both check_all.sh and wrapper.sh"
-  elif [ "$has_new" -eq 1 ]; then
-    doctor_line OK "crontab -l" "new format (check_all.sh)"
-  elif [ "$has_old" -eq 1 ]; then
-    doctor_line OK "crontab -l" "旧形式 (wrapper.sh). README の「既存の crontab からの移行」を参照"
-  else
-    doctor_line NG "crontab -l" "no atst line (check_all.sh)"
-  fi
+  form=$(atst_crontab_form)
+  case "$form" in
+    unknown)
+      doctor_line NG "crontab -l" "failed or no crontab"
+      ;;
+    mixed)
+      doctor_line NG "crontab -l" "mixed: both check_all.sh and wrapper.sh"
+      ;;
+    new)
+      doctor_line OK "crontab -l" "new format (check_all.sh)"
+      ;;
+    legacy)
+      today=$(date +%Y-%m-%d)
+      if atst_legacy_crontab_expired "$today"; then
+        doctor_line NG "crontab -l" "旧形式 (wrapper.sh). 猶予期限 ${ATST_LEGACY_CRONTAB_DEADLINE} を過ぎています。setup_cron.sh で移行してください"
+      else
+        doctor_line OK "crontab -l" "旧形式 (wrapper.sh). ${ATST_LEGACY_CRONTAB_DEADLINE} までに setup_cron.sh で移行してください (README「既存の crontab からの移行」)"
+      fi
+      ;;
+    *)
+      doctor_line NG "crontab -l" "no atst line (check_all.sh)"
+      ;;
+  esac
 }
 
 # 8. The last 5 headings of ~/.atst/line_error.log (shown only). The response: / message: lines hold

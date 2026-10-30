@@ -82,7 +82,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 ## P7. eval の安全性（block〜warn）
 
 - `eval` は入力が**信頼できる文字列**（管理者が書いたもの等）に限る。外部・ネットワーク由来を `eval` するのは block。
-  - 許容例: `wrapper.sh` の `eval "target_mt=$1"`（crontab 管理者が書いた配列リテラル）。入力元が**信頼できる管理者の記述**である前提で、旧形式の crontab（`wrapper.sh "$TARGET" ...`）を動かし続けるためだけに残している。新しい経路（`check_all.sh` / `run_with_targets.sh`）は `~/.atst/config` の `ATST_TARGETS` 配列をそのまま渡し、eval を使わない。新規コードで `wrapper.sh` を使わない。
+  - 許容例: `wrapper.sh` の `eval "target_mt=$1"`（crontab 管理者が書いた配列リテラル）。入力元が**信頼できる管理者の記述**である前提で、旧形式の crontab（`wrapper.sh "$TARGET" ...`）を動かし続けるためだけに残している。新しい経路（`check_all.sh` / `run_with_targets.sh`）は `~/.atst/config` の `ATST_TARGETS` 配列をそのまま渡し、eval を使わない。新規コードで `wrapper.sh` を使わない。期限 `ATST_LEGACY_CRONTAB_DEADLINE`（common.sh）まで。期限後に撤去する（#143）。
   - ファイルシステム由来の値（フォルダ名など）は `eval` しない。`common.sh` の MT 一覧は `atst_load_mt_list` が配列へ直接代入する（#93）。
 
 ## P8. apt / 鍵 / リポジトリ（block）

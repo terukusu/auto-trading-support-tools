@@ -21,6 +21,7 @@
 - `~/.atst/config` が無ければ `templates/config` から初回生成する（`lib/atst_config.sh`）。以後は利用者のファイルで、既存の config に新しい行は自動では入らない。
 - 全スクリプトは `common.sh` を source した時点で config を読み、`ATST_*` 変数で参照する。全行が [宣言形式](#宣言形式134) なら source せずに代入し、それ以外（現在の `templates/config` を含む旧形式）は従来どおり source する。
 - config の source の直後に `atst_load_heartbeat_url` が外形監視の URL を決める（[秘匿ファイル](#秘匿ファイル)）。
+- `setup_cron.sh` は旧形式の crontab からの移行（`Y`）で、条件を満たすときだけ config の末尾に `ATST_TARGETS=...` を 1 行追記する（config を自動で書き換える唯一の経路。値は評価しない。条件は README「既存の crontab からの移行」）。
 - `ATST_ALERT_STATUS_FILE` / `ATST_CONFIG_DIR` が空のときの通知側の挙動は [docs/notification-pipeline.md](notification-pipeline.md#送信部と失敗の記録)。
 
 ## 末尾に置く 3 項目

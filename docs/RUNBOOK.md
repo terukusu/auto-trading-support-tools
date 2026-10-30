@@ -7,7 +7,7 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
 - [通知ごとの確認・復旧手順](#通知ごとの確認復旧手順)
   - [REBOOT](#key-reboot) / [PROCESS_](#key-process) / [TARGET_](#key-target) / [MONITORING_](#key-monitoring) / [MONITORING_AUTO_ATTACH_](#key-monitoring-auto-attach) / [TICK_](#key-tick) / [TRADE_](#key-trade) / [PING_](#key-ping) / [PRICE_](#key-price) / [SPREAD_](#key-spread) / [ORDER](#key-order)
   - [RUNNER_STUCK](#key-runner-stuck) / [RUNNER_TIMEOUT_](#key-runner-timeout) / [RUNNER_TARGETS_EMPTY](#key-runner-targets-empty) / [自己修復](#key-self-heal)
-  - [IMAGE_REPORT_DEFAULT_CHANGED](#key-image-report-default-changed) / [LINE_QUOTA](#key-line-quota) / [IMAGE_UPLOAD_FAILED](#key-image-upload-failed) / [HEARTBEAT](#key-heartbeat)
+  - [IMAGE_REPORT_DEFAULT_CHANGED](#key-image-report-default-changed) / [CRONTAB_LEGACY_NOTICE](#key-crontab-legacy-notice) / [LINE_QUOTA](#key-line-quota) / [IMAGE_UPLOAD_FAILED](#key-image-upload-failed) / [HEARTBEAT](#key-heartbeat)
 - [MT の固まりの切り分け](#mt-の固まりの切り分け)
 - [VNC の既知の罠](#vnc-の既知の罠)
 - [秘匿値の扱い](#秘匿値の扱い)
@@ -54,6 +54,8 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
 | 監視対象が設定されていません | `RUNNER_TARGETS_EMPTY` | [RUNNER_TARGETS_EMPTY](#key-runner-targets-empty) |
 | `【自己修復】<MT 名>: …`／`【自己修復停止】<MT 名>: …`（書き出しそのもの） | （キー無し） | [自己修復](#key-self-heal) |
 | 【お知らせ】デスクトップ画像の通知は既定 OFF になりました | `IMAGE_REPORT_DEFAULT_CHANGED` | [IMAGE_REPORT_DEFAULT_CHANGED](#key-image-report-default-changed) |
+| 【お知らせ】crontab が旧形式 (wrapper.sh) のままです | `CRONTAB_LEGACY_NOTICE` | [CRONTAB_LEGACY_NOTICE](#key-crontab-legacy-notice) |
+| 毎朝の報告の `crontab: 旧形式 …` の行／`【注意】crontab の旧形式 (wrapper.sh) の猶予期限 … を過ぎています` | （キー無し） | [CRONTAB_LEGACY_NOTICE](#key-crontab-legacy-notice) |
 | 【注意】LINE の今月の送信数が上限の8割を超えました | `LINE_QUOTA` | [LINE_QUOTA](#key-line-quota) |
 | 本文の末尾に (画像アップロード失敗: N枚) | （キー無し） | [IMAGE_UPLOAD_FAILED](#key-image-upload-failed) |
 | 外部サービス（Healthchecks.io など）からのメール等 | （外部サービス側） | [HEARTBEAT](#key-heartbeat) |
@@ -586,6 +588,37 @@ grep -n 'ATST_IMAGE_REPORT_DESKTOP' ~/.atst/config
 **それでも直らないとき**: 該当なし（運用への影響は無い）。
 
 **関連**: [README](../README.md)「デスクトップ画像の通知の移行」、#135。
+
+<a id="key-crontab-legacy-notice"></a>
+
+### CRONTAB_LEGACY_NOTICE: crontab が旧形式のまま（お知らせ・期限後は注意）
+
+**キー名**: `CRONTAB_LEGACY_NOTICE`（期限前の 1 度だけの案内。送れたら値 1 のまま残る。復帰の通知は無い。heartbeat の `/fail` の理由にならない）。毎朝の報告の行にはキーが無い。
+
+**通知文の例**:
+- 1 度だけ（期限前）: `【お知らせ】crontab が旧形式 (wrapper.sh) のままです。2027-05-31 までは今のまま動きます。期限後も監視は止まりませんが、毎朝の報告に【注意】が付き、doctor.sh が NG になります。setup_cron.sh で移行してください (元の crontab は ~/.atst/crontab.bak.<日時> に残ります)。この通知は 1 度だけです。`
+- 毎朝の報告の行（期限前。この行のためだけには送らない）: `crontab: 旧形式 (wrapper.sh) です。2027-05-31 までに setup_cron.sh で移行してください`
+- 毎朝の報告の行（期限後。`ATST_DAILY_REPORT=0` でも毎朝 1 通）: `【注意】crontab の旧形式 (wrapper.sh) の猶予期限 2027-05-31 を過ぎています。setup_cron.sh で移行してください (監視は止まっていません)`
+- 混在のときは「旧形式」が「旧形式と新形式の混在」になる。
+
+**意味**: 毎朝 9:00 の `check_daily.sh` が、crontab に旧形式の行（`wrapper.sh`）があると知らせる（期限は `common.sh` の `ATST_LEGACY_CRONTAB_DEADLINE`）。期限の前後とも監視は止まっていない。期限後の別 Issue で `wrapper.sh` が撤去されると旧形式の行は動かなくなるので、それまでに移行する。
+
+**確認コマンド**:
+```bash
+./doctor.sh | grep ' crontab -l '
+ls -l ~/.atst/crontab.bak.*
+```
+`OK crontab -l new format (check_all.sh)` なら移行済み（記録が残っていても通知はもう来ない）。
+
+**安全な復旧手順**:
+1. 独自に足した crontab の行があれば、先に `crontab -l` を手元に控える（`Y` は crontab 全体をテンプレートに置き換える）。
+2. `./setup_cron.sh` を実行し、案内と退避先を読んでから `Y`。元の crontab は `~/.atst/crontab.bak.<日時>`（600）に退避され、条件を満たせば `~/.atst/config` の末尾に `ATST_TARGETS` が追記される（されなければ、表示された 1 行を手で末尾に書く）。
+3. `grep '^ATST_TARGETS=' ~/.atst/config` で監視対象を確かめ、1〜2 分後に `ls -l ~/.atst/check_all.started` が直近で、`./doctor.sh | grep ' crontab -l '` が `new format` になっていることを確かめる。
+4. 元に戻すときは `crontab ~/.atst/crontab.bak.<日時>`。
+
+**それでも直らないとき**: `./doctor.sh` の出力（crontab の内容そのものは貼らない）を Issue に貼って相談する。
+
+**関連**: [README](../README.md)「既存の crontab からの移行」、#143。
 
 <a id="key-line-quota"></a>
 
