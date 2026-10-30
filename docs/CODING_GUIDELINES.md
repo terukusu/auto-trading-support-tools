@@ -106,7 +106,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 - MT の検出・特定は `common.sh` の `atst_find_mt_index`（フォルダ名の前方一致・大文字小文字無視）に合わせる。独自の照合ロジックを増やさない。
 - MT プロセスの特定は `common.sh` の `atst_find_pid`（`/proc` 走査）に合わせる。`ps | grep` や `winepath` で独自に探さない。
 
-## P11. cron / wrapper の堅牢性（warn）
+## P11. cron から動くスクリプトの堅牢性（warn）
 
 - cron から動く前提のスクリプトは `PATH`・`cwd`・環境変数に依存しない（`common.sh` を絶対パス解決で source する既存パターン `. "$(cd "$(dirname "$BASH_SOURCE")"; pwd)/common.sh"` を踏襲）。
 - 毎分の監視は `check_all.sh` が固定の順で 1 つずつ実行する（同時多発の負荷を避ける設計。実行タイミングを散らす `sleep_random.sh` / `atst_random_sleep` は旧形式の crontab の行用）。毎分の監視を足すときは crontab に行を足さず `check_all.sh` の固定リストに足し、`run_check` の `timeout` の対象にして、打ち切りの通知（`RUNNER_TIMEOUT_*`）も付ける。毎分の監視の通知は `atst_update_alert`（状態あり）か `atst_notify_text`（文面だけ）で出す。`atst_send_to_line` を直接呼ぶと、その回のまとめ送信に入らず即時の個別 push になる（`check_order` の約定通知は即時でよい例外）。
