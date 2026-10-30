@@ -171,7 +171,11 @@ ia_exec_min() {
 }
 
 @test "IA-06: the placeholder pin stops before downloading" {
-  cp "$BATS_TEST_DIRNAME/../scripts/init_atst.sh" "$S/init_atst.sh"
+  # The repository pins a release since v1.5.0; the test makes the placeholder form itself.
+  sed -e 's/^ATST_VERSION=.*/ATST_VERSION=v0.0.0/' \
+    -e 's/^ATST_ZIP_SHA256=.*/ATST_ZIP_SHA256=0000000000000000000000000000000000000000000000000000000000000000/' \
+    "$BATS_TEST_DIRNAME/../scripts/init_atst.sh" > "$S/init_atst.sh"
+  [ "$(grep -c '^ATST_ZIP_SHA256=0\{64\}$' "$S/init_atst.sh")" -eq 1 ]
   ia_exec
   [ "$status" -eq 1 ]
   [[ "$output" == *"[error]"* ]]
