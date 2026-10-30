@@ -59,7 +59,24 @@ function prepare_mt_installer_dir() {
   printf '%s\n' "$WINEPREFIX/drive_c/atst/installer"
 }
 
-# tests/install_vnc_password.bats and tests/install_zdrive.bats read only the functions above.
+# Prints the fingerprint (40 upper-case hex) of the primary key in keyring file $1 and returns 0,
+# only when the file holds exactly one public primary key and no secret key (an apt keyring never has
+# one, and a secret key would be a second primary key not seen as "pub"); otherwise prints nothing
+# and returns 1 (#152).
+# A throwaway GnuPG home is used so the user's ~/.gnupg is neither read nor created.
+function keyring_primary_fpr() {
+  local keyring=$1 gnupg_home fpr
+  gnupg_home=$(mktemp -d) || return 1
+  fpr=$(gpg --batch --homedir "$gnupg_home" --show-keys --with-colons "$keyring" 2>/dev/null \
+    | awk -F: '$1=="pub"{p++} $1=="sec"{x++} $1=="fpr"&&!f{f=$10} END{if(p==1&&x==0)print f}')
+  [ -n "$gnupg_home" ] && [ -d "$gnupg_home" ] && rm -rf -- "$gnupg_home"
+  fpr=$(printf '%s' "$fpr" | tr -d '[:space:]' | tr 'a-f' 'A-F')
+  [[ "$fpr" =~ ^[0-9A-F]{40}$ ]] || return 1
+  printf '%s\n' "$fpr"
+}
+
+# tests/install_vnc_password.bats, tests/install_zdrive.bats and tests/install_required_for_mt.bats
+# read only the functions above.
 # Honored only when sourced, so the variable in the environment can never make a real run skip the
 # install.
 if [ "${BASH_SOURCE[0]}" != "$0" ] && [ -n "${ATST_INSTALL_SOURCE_ONLY:-}" ]; then
@@ -135,6 +152,12 @@ esac
 # reference them with signed-by. Works on apt 1.1+, i.e. Ubuntu 16.04+ / Debian 9+).
 APT_KEYRINGS_DIR=/etc/apt/keyrings
 WINE_KEY_URL=https://dl.winehq.org/wine-builds/winehq.key
+# Fingerprint of the primary key of WineHQ's official signing key (#152). A new key is registered
+# only when the downloaded keyring holds exactly this one primary key. Sources (checked 2026-10-30):
+# the key at WINE_KEY_URL read with gpg, and keyserver.ubuntu.com (UID "WineHQ packages
+# <wine-devel@winehq.org>"). Never taken from the environment or arguments. If WineHQ rotates its key,
+# confirm the new value from both sources and update this line by hand.
+WINE_KEY_FINGERPRINT=D43F640145369C51D786DDEA76F1A20FF987672F
 WINE_KEYRING=$APT_KEYRINGS_DIR/winehq-archive.gpg
 FAUDIO_KEYRING=$APT_KEYRINGS_DIR/winehq-faudio-archive.gpg
 WINE_LIST=/etc/apt/sources.list.d/winehq.list
@@ -422,6 +445,7 @@ function ensure_time_sync() {
 # Install packages required by MetaTrader
 #####################################################
 function install_packages_misc_and_needed_by_mt4() {
+  local fpr_actual fpr_expected
   # install misc
   # gnupg (gpg --dearmor) and wget are needed for the keyring/repo setup below.
   # (Time sync is handled separately by ensure_time_sync so a conflict there cannot sink this line.)
@@ -448,9 +472,17 @@ function install_packages_misc_and_needed_by_mt4() {
   elif [ ! -e "$WINE_LIST" ]; then
     wget -q --timeout=30 --tries=3 -O - "$WINE_KEY_URL" | sudo gpg --dearmor --yes -o "$WINE_KEYRING"
     sudo chmod 0644 "$WINE_KEYRING"
-    # Only write the repo list once the key is actually present; otherwise apt would break with
-    # NO_PUBKEY and the leftover list would make every re-run skip the key step (permanent break).
+    # Only write the repo list once the key is actually present and its primary key matches
+    # WINE_KEY_FINGERPRINT; otherwise apt would break with NO_PUBKEY (or trust a substituted key) and
+    # the leftover list would make every re-run skip the key step (permanent break).
     if [ -s "$WINE_KEYRING" ]; then
+      fpr_actual=$(keyring_primary_fpr "$WINE_KEYRING")
+      fpr_expected=$(printf '%s' "$WINE_KEY_FINGERPRINT" | tr 'a-f' 'A-F')
+      if [ -z "$fpr_actual" ] || [ "$fpr_actual" != "$fpr_expected" ]; then
+        sudo rm -f "$WINE_KEYRING"
+        echo "[error] WineHQ key fingerprint mismatch for $WINE_KEY_URL: expected $fpr_expected, got ${fpr_actual:-none (not exactly one primary key and no secret key, or gpg could not read the keyring)}. Removed $WINE_KEYRING; not writing $WINE_LIST. If WineHQ has rotated its key, confirm the new fingerprint from the official sources and update WINE_KEY_FINGERPRINT in this script." >&2
+        return 1
+      fi
       echo "$WINE_REPOS" | sudo tee "$WINE_LIST" > /dev/null
     else
       echo "[error] failed to fetch/import WineHQ key from $WINE_KEY_URL; not writing $WINE_LIST" >&2
@@ -789,7 +821,7 @@ INSTALLER_STATUS=""
 
 # Saved inside drive_c (C:\atst\installer) so it starts whether or not the Z: drive exists (#145).
 function download_and_start_mt4_installer() {
-  local name installer dir
+  local name installer dir sha256
   name=$(basename "$MT_INSTALLER_URL")
 
   if [ "$(wineprefix_arch)" = "win32" ]; then
@@ -816,6 +848,15 @@ function download_and_start_mt4_installer() {
     echo "[error] MT installer download failed: $MT_INSTALLER_URL" >&2
     INSTALLER_STATUS=download-failed
     return 1
+  fi
+
+  # Shown only, never checked: brokers replace their installers. Lets the install log tell which
+  # build was installed (#152).
+  sha256=$(sha256sum "$installer" 2>/dev/null | cut -d' ' -f1)
+  if [[ "$sha256" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "MetaTrader installer sha256: $sha256  $name"
+  else
+    echo "[warn] could not compute the sha256 of $installer (continuing)." >&2
   fi
 
   echo Staring MetaTrader installer...
