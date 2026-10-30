@@ -1,6 +1,6 @@
 # 契約テンプレ: シェルスクリプト / CLI
 
-対象: `check_*.sh` / `setup_*.sh` / `install_required_for_mt.sh` / `mtctl.sh` / `report_image.sh` / `draw_graph.sh` / `wrapper.sh` などの実行可能スクリプト。**AI や cron が引数を組み立てて呼ぶ**ため、「呼び出し側が指定できる軸」と「副作用の全列挙」が契約の中心になる。
+対象: `check_*.sh` / `setup_*.sh` / `install_required_for_mt.sh` / `mtctl.sh` / `report_image.sh` / `draw_graph.sh` / `check_all.sh` / `self_heal.sh` などの実行可能スクリプト。**AI や cron が引数を組み立てて呼ぶ**ため、「呼び出し側が指定できる軸」と「副作用の全列挙」が契約の中心になる。
 
 ## 記入項目
 
