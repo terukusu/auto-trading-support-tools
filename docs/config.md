@@ -18,7 +18,7 @@
 ## 生成と読み込み
 
 - `~/.atst/config` が無ければ `templates/config` から初回生成する（`lib/atst_config.sh`）。以後は利用者のファイルで、既存の config に新しい行は自動では入らない。
-- 全スクリプトは `common.sh` を source した時点で config を source し、`ATST_*` 変数で参照する。
+- 全スクリプトは `common.sh` を source した時点で config を読み、`ATST_*` 変数で参照する。全行が [宣言形式](#宣言形式134) なら source せずに代入し、それ以外（現在の `templates/config` を含む旧形式）は従来どおり source する。
 - config の source の直後に `atst_load_heartbeat_url` が外形監視の URL を決める（[秘匿ファイル](#秘匿ファイル)）。
 - `ATST_ALERT_STATUS_FILE` / `ATST_CONFIG_DIR` が空のときの通知側の挙動は [docs/notification-pipeline.md](notification-pipeline.md#送信部と失敗の記録)。
 
@@ -74,4 +74,16 @@
 
 ## 宣言形式（#134）
 
-- config の宣言形式は未導入。#134 で置き換える（入ったらこの節に正を書く）。
+- `atst_config_parse <file>`（`lib/atst_config.sh`）が bash の組み込みだけで 1 行ずつ判定する。**全行**が下の形なら新形式（`ATST_CONFIG_FORMAT=strict`）として、ファイル順に代入する（同じキーは後の行が勝つ。source も `eval` もしない）。1 行でも外れると旧形式（`legacy`）で何も代入せず、従来の source 経路で読む（行単位の部分適用はしない）。読めないファイルも旧形式（`ATST_CONFIG_FORMAT_LINE=0`）。
+- 受理する行:
+  - 空行・空白とタブだけの行、先頭（空白の後）が `#` の行（無視）。
+  - `KEY=値`。値は `[A-Za-z0-9_./:@%+,=-]*`（空も可。`KEY=` は空文字列の代入で unset ではない）。
+  - `KEY="値"`（中に `"` `\` `` ` `` `$` を含まない）、`KEY='値'`（中に `'` を含まない）。中身をそのまま代入する（展開・アンエスケープしない）。
+  - `ATST_TARGETS=('a' "b")`（1 行。各要素は上の 2 つの引用形で空白区切り。`()` は空配列）。配列を受けるのは `ATST_TARGETS` だけで、スカラー形 `ATST_TARGETS=x` は拒否。
+- 共通: `KEY` は `ATST_[A-Z0-9_]+` / `WINEPREFIX` / `WINEARCH` / `WINEDEBUG` / `WINEDLLOVERRIDES` / `DISPLAY`。ただし `ATST_HOME` / `ATST_TEMPLATES_DIR` / `ATST_CONFIG_DIR` / `ATST_CONFIG_FILE` / `ATST_NOTIFY_SPOOL` / `ATST_CONFIG_FORMAT` / `ATST_CONFIG_FORMAT_LINE` は拒否。`=` の前後に空白なし、値の後は末尾の空白・タブだけ（行末コメントは拒否）。CR を含む行は拒否。`$HOME` 等は展開されないので `WINEPREFIX` は絶対パスで書く。
+- 新形式は bash の構文の部分集合なので、`bash -c '. config'` でも同じ値に読める。
+- 結果は `ATST_CONFIG_FORMAT`（`strict` / `legacy`）と `ATST_CONFIG_FORMAT_LINE`（旧形式のとき最初に外れた行の番号、新形式は空）。どちらも export しない。パーサは何も出力しない（値は秘匿値のことがある）。
+- 新形式でも、値は各スクリプトにそのまま渡る。数値の項目を算術式で使うスクリプトがあるので、数値の項目には数字だけを書く（値の型検証は後段の課題。読み込みの段階ではコマンドを実行しない）。
+- `templates/config` がコードで決めていた値（`ATST_ALERT_STATUS_FILE`、`.line_token` / `.line_id` からの `ATST_LINE_TOKEN` / `ATST_LINE_ID`、`WINEPREFIX` / `WINEARCH` / `WINEDEBUG` / `DISPLAY` と後ろ 4 つの export）は `atst_config_defaults` が template と同じ式で、空のときだけ埋める。呼ぶのは新形式のときと、`ATST_CONFIG_DIR=` の行を持たない旧形式（新形式のつもりで 1 行書き損じた config。書き損じても通知が届くように）のとき。config を読めない（権限が無い等）ときも呼ぶ（行の判定ができないため、通知が届く側に倒す）。template のコードを含む旧形式では呼ばない（そのコードが決めた値のまま。途中で壊れて空なら空のまま、#110）。
+- 旧形式のとき stderr には何も足さない。どちらの形式かは `doctor.sh` の `config` 行で見る（旧形式も NG にしない。値は表示せず、最初に外れた行の番号とキー名だけを出す）。
+- `templates/config` の新形式への書き換えと source 経路の撤去は後段（#134 のスコープ外）。
