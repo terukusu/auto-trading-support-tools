@@ -168,6 +168,13 @@ ATST_TARGETS=('Land Prime')
 * `report_image.sh` は毎朝、MT ごとの値動き・スプレッドの文字要約を送ります。ImgBB の API キー (`setup_imgbb.sh`) があればグラフ画像を付け、`~/.atst/config` に `ATST_IMAGE_REPORT_DESKTOP=1` を書くとデスクトップ画像も付けます (既定は送りません。口座番号・残高が写るため)。画像は ImgBB に置かれ、24 時間で消えます (`ATST_IMGBB_EXPIRATION` で変更できます)。
 
 
+### ~/.atst/config の書き方
+
+* 今の `~/.atst/config` (雛形のまま、または追記したもの) はこれまでどおり読めます。
+* 全部の行を `KEY=値` / `KEY="値"` / `KEY='値'` / `ATST_TARGETS=('名前' "名前")` (1 行) とコメント・空行だけで書くと、config を bash として source せずに値だけを読みます（読み込みの段階ではコマンドを実行しません。ただし値はそのまま各スクリプトに渡るので、数値の項目には数字だけを書きます）。`$HOME` などは展開されないので、`WINEPREFIX` は絶対パスで書きます。受け付ける形の詳細は [docs/config.md](docs/config.md#宣言形式134) にあります。
+* この形に合わない行が 1 行でもあると、ファイル全体がこれまでどおりの読み方になります (一部の行だけが新しい読み方になることはありません)。書き換えたら `./doctor.sh` の `config` の行で確かめてください。
+
+
 ### 監視するMT4/5の指定 (ATST_TARGETS)
 
 * 「Land Prime」となっている部分はMT4/5がインストールされているフォルダ名なら何でもよく、複数指定可能です。例: `ATST_TARGETS=('Land Prime' 'MetaTrader 5' 'MetaTrader 4')`
@@ -302,6 +309,7 @@ mtctl.sh のメッセージ(`list` の 1 行目、`status` の各行、`stop` / 
 1. `wine --version`: wine が PATH にあり、版を表示できるか。
 2. `arch`: 使用中の WINEPREFIX (config 読み込み後) があり、`system.reg` の `#arch=` の値。
 3. `WINEPREFIX`: 対話シェルの環境変数 (`env=`)、config 読み込み後 (`config=`)、環境変数を外して config を読んだ値 (`cron=`、cron で使われる値) を並べ、`config=` と `cron=` が違えば NG (文字列で比較するので、シンボリックリンク経由で同じ場所を指していても NG になります)。
+   - `config`: `~/.atst/config` が KEY=VALUE 形式 (`OK config KEY=VALUE 形式 ...`) か旧形式 (`OK config 旧形式 ... N 行目 (KEY) ...`) か。旧形式も NG にはしません。値は表示しません。
 4. `target` / `mt`: `ATST_TARGETS` の各名前が検出した MT4/5 に前方一致するか (未設定・空は NG)。どの名前にも選ばれない MT4/5 は `--` (監視対象外) で表示します。前方一致で複数に当たるときは、check_*.sh と同じく最初の 1 つだけが監視対象です。
 5. `process`: 対象の MT4/5 が起動しているか。
 6. `ea` / `csv`: 監視 EA (`TerminalMonitoring.ex4` / `.ex5`) が置かれているか、`terminal_monitoring.csv` の最終行が `ATST_MONITORING_THRESHOLD` 秒より新しいか (check_monitoring.sh と同じ基準)。CSV の各列の意味は [docs/monitoring-csv.md](docs/monitoring-csv.md) を参照してください。

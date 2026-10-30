@@ -138,6 +138,33 @@ function doctor_check_prefix() {
   fi
 }
 
+# 3a. The form of ~/.atst/config (atst_config_parse in lib/atst_config.sh). The old form (read as bash)
+# is not NG: it is still read during the grace period. Only the key of the first line out of the
+# KEY=VALUE form is shown, never the line itself (the value may be a secret, P5).
+function doctor_check_config() {
+  local n=${ATST_CONFIG_FORMAT_LINE:-0} i=0 l='' key='not readable'
+
+  if [ "${ATST_CONFIG_FORMAT-}" = strict ]; then
+    doctor_line OK config "KEY=VALUE 形式 (source しない)"
+    return 0
+  fi
+  if [ "$n" -gt 0 ] 2>/dev/null; then
+    key='not an assignment'
+    {
+      while IFS= read -r l || [ -n "$l" ]; do
+        i=$((i + 1))
+        if [ "$i" -eq "$n" ]; then
+          if [[ $l =~ ^([A-Za-z_][A-Za-z0-9_]*)= ]]; then
+            key=${BASH_REMATCH[1]}
+          fi
+          break
+        fi
+      done < "$ATST_CONFIG_FILE"
+    } 2>/dev/null
+  fi
+  doctor_line OK config "旧形式 (bash として source). $n 行目 ($key) が KEY=VALUE 形式でない. README の「~/.atst/config の書き方」を参照"
+}
+
 # Returns 0 when some element of ATST_TARGETS selects MetaTrader <index> (atst_find_mt_index gives the
 # first match only, as check_*.sh do), 1 otherwise.
 function doctor_is_target_index() {
@@ -480,6 +507,7 @@ function doctor_check_auto_attach() {
 doctor_check_wine
 doctor_check_arch
 doctor_check_prefix
+doctor_check_config
 doctor_check_targets
 doctor_check_process
 doctor_check_monitoring
