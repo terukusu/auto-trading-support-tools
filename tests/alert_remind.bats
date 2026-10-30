@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Reminders of an alert that goes on (#141): atst_update_alert sends "【継続中 <label>】<fire_msg>" once
-# per stage of ATST_ALERT_REMIND_MINUTES (30 120 720 by default) while a PROCESS_* / MONITORING_* /
+# per stage of ATST_ALERT_REMIND_MINUTES (30 120 720 by default) while a PROCESS_* / MONITORING_* / TICK_* /
 # RUNNER_STUCK key stays 1, and records the stage sent in the 4th column of alert_status only after a
 # successful send. Inside a check_all.sh run the reminder goes to the spool as "1:remind=<stage>" and
 # atst_spool_flush decides again by its stage. The time is made by writing a past epoch in the 3rd
@@ -630,4 +630,46 @@ make_slow_curl() {
   [[ "$output" == *'ATST_ALERT_STATUS_FILE is empty'* ]]
   [ -z "$(ls -A)" ]
   grep -qE '^PROCESS_A,1,[0-9]+$' "$ST"
+}
+
+@test "RM-25: TICK_* (stopped ticks, #137) is reminded like PROCESS_*" {
+  local e
+  e=$(ago 31)
+  printf 'TICK_A,1,%s\n' "$e" > "$ST"
+  run atst_update_alert TICK_A 1 '【発生】fire-t' '【復帰】rec-t'
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(sent '【継続中 30 分】fire-t')" -eq 1 ]
+  [ "$(grep -c "^TICK_A,1,$e,1$" "$ST")" -eq 1 ]
+  no_bearer
+}
+
+@test "RM-26: XTICK_A, tick_a and RUNNER_TIMEOUT_CHECK_TICK are not reminded (#137)" {
+  local k line
+  for k in XTICK_A tick_a RUNNER_TIMEOUT_CHECK_TICK; do
+    line="$k,1,$(ago 1500)"
+    printf '%s\n' "$line" > "$ST"
+    run atst_update_alert "$k" 1 '【発生】x' r
+    [ "$status" -eq 0 ] || { echo "$k: status=$status"; false; }
+    [ "$(atst_test_push_count)" -eq 0 ] || { echo "$k: pushed"; false; }
+    [ "$(cat "$ST")" = "$line" ] || { echo "$k: line changed"; false; }
+  done
+}
+
+@test "RM-27: atst_alert_remind_is_target takes TICK_* by its exact prefix (#137)" {
+  local k
+  for k in TICK_A TICK_A_B PROCESS_A; do
+    run atst_alert_remind_is_target "$k"
+    [ "$status" -eq 0 ] || { echo "$k: status=$status"; false; }
+    [ -z "$output" ]
+  done
+  for k in XTICK_A tick_a RUNNER_TIMEOUT_CHECK_TICK ''; do
+    run atst_alert_remind_is_target "$k"
+    [ "$status" -eq 1 ] || { echo "$k: status=$status"; false; }
+    [ -z "$output" ]
+  done
+  run atst_alert_remind_is_target
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
 }

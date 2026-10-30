@@ -9,7 +9,7 @@
 
 load ../test_helper
 
-CHECKS="check_reboot check_order check_process check_monitoring check_ping check_price check_spread heartbeat"
+CHECKS="check_reboot check_order check_process check_monitoring check_tick check_ping check_price check_spread heartbeat"
 
 setup() {
   local n
@@ -98,10 +98,10 @@ runlog() {
 }
 
 # What every run that could not use the log must still do (LOG-04a/b/c, LOG-09): all checks once
-# (check_order twice: 9 lines in calls.log), no push, and the check's stderr where it was (in $output), without a START line.
+# (check_order twice: 10 lines in calls.log), no push, and the check's stderr where it was (in $output), without a START line.
 assert_ran_unlogged() {
   [ "$status" -eq 0 ] || return 1
-  [ "$(wc -l < "$CALLS")" -eq 9 ] || return 1
+  [ "$(wc -l < "$CALLS")" -eq 10 ] || return 1
   [ "$(calls_of check_order.sh)" -eq 2 ] || return 1
   [ "$(atst_test_push_count)" -eq 0 ] || return 1
   [[ "$output" == *PING-STDERR-7f3a* ]] || return 1
@@ -134,6 +134,7 @@ release_lock() {
 check_order.sh [it's] [a  b] [*]
 check_process.sh [it's] [a  b] [*]
 check_monitoring.sh [it's] [a  b] [*]
+check_tick.sh [it's] [a  b] [*]
 check_ping.sh [it's] [a  b] [*]
 check_price.sh [it's] [a  b] [*]
 check_spread.sh [it's] [a  b] [*]
@@ -202,10 +203,11 @@ heartbeat.sh"
   [ "$status" -eq 0 ]
   [ "$(atst_test_push_count)" -eq 0 ]
   [ -s "$HOME/.atst/uptime" ]
-  [ "$(wc -l < "$CALLS")" -eq 8 ]
+  [ "$(wc -l < "$CALLS")" -eq 9 ]
   [ "$(calls_of check_order.sh)" -eq 2 ]
   [ "$(calls_of check_process.sh)" -eq 1 ]
   [ "$(calls_of check_monitoring.sh)" -eq 1 ]
+  [ "$(calls_of check_tick.sh)" -eq 1 ]
   [ "$(calls_of check_ping.sh)" -eq 1 ]
   [ "$(calls_of check_price.sh)" -eq 1 ]
   [ "$(calls_of check_spread.sh)" -eq 1 ]
@@ -231,6 +233,7 @@ heartbeat.sh"
   el=$(( $(date +%s) - t0 ))
   [ "$status" -eq 0 ]
   [ "$el" -le 12 ]
+  [ "$(calls_of check_tick.sh)" -eq 1 ]
   [ "$(calls_of check_price.sh)" -eq 1 ]
   [ "$(calls_of check_spread.sh)" -eq 1 ]
   [ "$(calls_of heartbeat.sh)" -eq 1 ]
@@ -301,7 +304,7 @@ heartbeat.sh"
 
   wait "$pid"
   rm -f "$ATST_TEST_SANDBOX/bg.pid"
-  [ "$(wc -l < "$CALLS")" -eq 9 ]
+  [ "$(wc -l < "$CALLS")" -eq 10 ]
   [ "$(calls_of check_reboot.sh)" -eq 1 ]
   [ "$(calls_of check_order.sh)" -eq 2 ]
   [ "$(calls_of check_process.sh)" -eq 1 ]
@@ -315,7 +318,7 @@ heartbeat.sh"
   hold_lock "$HOME/.atst/check_all.lock"
   now=$(date +%s)
 
-  # TIMEOUT 2 gives 8 * 2 + 865 = 881 seconds; shorter or unknown elapsed times say nothing.
+  # TIMEOUT 2 gives 9 * 2 + 975 = 993 seconds; shorter or unknown elapsed times say nothing.
   for v in "$(( now - 60 ))" "$(( now - 870 ))" abc "$(( now + 1000 ))" none; do
     if [ "$v" = none ]; then
       rm -f "$HOME/.atst/check_all.started"
@@ -472,11 +475,12 @@ EOF
   [ "$(stat -c %a "$HOME/.atst/check_all.started")" = "$ref" ]
   [ "$(stat -c %a "$HOME/.atst/check_all.lock")" = "$ref" ]
   [ "$(atst_test_push_count)" -eq 0 ]
-  [ "$(wc -l < "$CALLS")" -eq 9 ]
+  [ "$(wc -l < "$CALLS")" -eq 10 ]
   [ "$(calls_of check_order.sh)" -eq 2 ]
   [ "$(calls_of check_reboot.sh)" -eq 1 ]
   [ "$(calls_of check_process.sh)" -eq 1 ]
   [ "$(calls_of check_monitoring.sh)" -eq 1 ]
+  [ "$(calls_of check_tick.sh)" -eq 1 ]
   [ "$(calls_of check_ping.sh)" -eq 1 ]
   [ "$(calls_of check_price.sh)" -eq 1 ]
   [ "$(calls_of check_spread.sh)" -eq 1 ]
@@ -658,7 +662,7 @@ EOF
   [ "$(runlog | grep -c PING-STDERR-7f3a)" -eq 1 ]
   [[ "$output" != *PING-STDERR-7f3a* ]]
   [ "$(runlog | grep -c '^===== START ')" -eq 1 ]
-  [ "$(wc -l < "$CALLS")" -eq 9 ]
+  [ "$(wc -l < "$CALLS")" -eq 10 ]
 }
 
 @test "LOG-12: an argument exits before the log is touched" {
@@ -696,7 +700,7 @@ EOF
   [ "$(runlog | grep -c PING-STDERR-7f3a)" -eq 1 ]
   [[ "$output" != *PING-STDERR-7f3a* ]]
   [ "$(runlog | grep -c '^===== START ')" -eq 1 ]
-  [ "$(wc -l < "$CALLS")" -eq 9 ]
+  [ "$(wc -l < "$CALLS")" -eq 10 ]
   [ "$(atst_test_push_count)" -eq 0 ]
 }
 
@@ -816,4 +820,65 @@ hb_ping_lines() {
   rc=0; atst_test_stub_script "$out" o.sh record || rc=$?
   rmdir "$out"
   [ "$rc" -eq 1 ]
+}
+
+@test "RUN-25: a hung check_tick is cut off as RUNNER_TIMEOUT_CHECK_TICK, the later checks still run (#137)" {
+  local t0 el
+  atst_test_stub_script "$home" check_tick.sh hang
+  t0=$(date +%s)
+  run timeout 60 bash "$home/check_all.sh"
+  el=$(( $(date +%s) - t0 ))
+  [ "$status" -eq 0 ]
+  [ "$el" -le 12 ]
+  [ "$(calls_of check_ping.sh)" -eq 1 ]
+  [ "$(calls_of check_price.sh)" -eq 1 ]
+  [ "$(calls_of check_spread.sh)" -eq 1 ]
+  [ "$(calls_of heartbeat.sh)" -eq 1 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(status_lines '^RUNNER_TIMEOUT_CHECK_TICK,1,')" -eq 1 ]
+  grep -qF '【発生】チェックが 2 秒で終わらず打ち切りました: check_tick.sh' "$ATST_TEST_CURL_LOG"
+
+  run timeout 60 bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+
+  atst_test_stub_script "$home" check_tick.sh record
+  run timeout 60 bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 2 ]
+  [ "$(status_lines '^RUNNER_TIMEOUT_CHECK_TICK,0,')" -eq 1 ]
+  grep -qF '【復帰】チェックが時間内に終わるようになりました: check_tick.sh' "$ATST_TEST_CURL_LOG"
+  run pgrep -f "$home/check_tick.sh"
+  [ "$status" -ne 0 ]
+}
+
+@test "RUN-26: a missing check_tick.sh is one exit 127 line in the log, not a cut-off (#137)" {
+  rm "$home/check_tick.sh"
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 0 ]
+  [ "$(status_lines '^RUNNER_TIMEOUT_')" -eq 0 ]
+  [ "$(runlog | grep -c 'check_tick.sh: exit 127')" -eq 1 ]
+  [ "$(calls_of check_ping.sh)" -eq 1 ]
+}
+
+@test "RUN-27: stopped ticks are reported once through the runner with the real check_tick.sh (#137)" {
+  local n
+  cp -p "$repo/check_tick.sh" "$home/"
+  atst_test_make_mt A_MT4 MT4
+  # Every 60 s (no gap of ATST_MONITORING_THRESHOLD in the window), field 2 unchanged.
+  for n in 720 660 600 540 480 420 360 300 240 180 120 60 0; do
+    atst_test_make_monitoring_csv A_MT4 "$n" 150.0 10 0.01 12 100
+  done
+  atst_test_set_targets A_MT4
+  # Judged on any day the test runs (the weekend gate is covered by tests/check_tick.bats).
+  atst_test_set_config ATST_TICK_WEEKEND_SKIP 0
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(status_lines '^TICK_A_MT4,1,')" -eq 1 ]
+  grep -qF '価格データ（ティック）が 10 分以上' "$ATST_TEST_CURL_LOG"
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
 }

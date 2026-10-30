@@ -8,7 +8,7 @@
 
 load ../test_helper
 
-CHECKS="check_reboot check_order check_process check_monitoring check_ping check_price check_spread heartbeat"
+CHECKS="check_reboot check_order check_process check_monitoring check_tick check_ping check_price check_spread heartbeat"
 
 setup() {
   local n
