@@ -76,8 +76,12 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
     * WineHQ の stable 版を 10 系に固定してインストール(`/etc/apt/preferences.d/winehq-stable-pin`)
     * Wine の環境(`~/.wine`)は 64bit で作成。MT4 本体は 32bit アプリとしてその上で動く
     * 既に `~/.wine` が有る場合は消さずにそのまま使う(作り直すかは対話実行時にだけ確認する)
+    * 環境変数 `ATST_INSTALL_NO_ZDRIVE=1` を付けて導入すると(例: `ATST_INSTALL_NO_ZDRIVE=1 bash init_atst.sh`)、Wine の `Z:` ドライブ(Windows 側から Linux の `/` 全体が見える)を外します。Windows 側のドライブとして `/` が見えなくなるだけの緩和策で、隔離ではありません(Wine は `\\?\unix\` 形式のパスなど別の経路で Unix のファイルを開けるため、悪意ある DLL までは防げません。本当の隔離は実行ユーザーの分離です)。なお winecfg でフォルダをホームにリンクすると、そのフォルダ経由で見えるようになります。新規導入向けの試験的な選択肢で、既定では外しません(既存環境は変わりません)。値は `1` のときだけ有効で、結果表示に `[ OK ] wine Z: drive: removed` が出ます
+    * 既存環境で外すなら MetaTrader を止めてから `rm ~/.wine/dosdevices/z:`(戻すときは同じく止めてから `ln -s / ~/.wine/dosdevices/z:`)
+    * MetaTrader を動かすユーザーを管理ユーザー(sudo できるユーザー)と分ける構成例は [docs/MT_USER_SEPARATION.md](docs/MT_USER_SEPARATION.md)(未検証の構成例。スクリプトは対応していません)
 * MT4 インストーラ の起動
     * MT4 のインストールは GUI での操作が必要なためインストーラ起動後は手動で進める必要あり
+    * インストーラは `~/.wine/drive_c/atst/installer/`(Windows からは `C:\atst\installer\`)に保存して起動します(`Z:` ドライブの有無に関係なく動くため。既定でもこの場所です)。以前の版が使った `~/.cache/wine` は残っていれば手で消してかまいません
     * MT5を使う場合は[インストーラの起動も手動](../../wiki/install_mt#mt5-%E3%82%92%E3%82%A4%E3%83%B3%E3%82%B9%E3%83%88%E3%83%BC%E3%83%AB%E3%81%99%E3%82%8B%E6%89%8B%E9%A0%86)
 * スプレッド等のモニタリングデータをファイルに書き出すためのEA
 
