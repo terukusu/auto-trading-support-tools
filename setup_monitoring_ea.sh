@@ -18,3 +18,4 @@ for target_name in "${mt_name[@]}"; do
   fi
   echo "done"
 done
+echo "チャートへの EA の配置は手作業です。起動時に自動で載せるには ~/.atst/config の ATST_AUTO_ATTACH_EA を参照してください (README)。"

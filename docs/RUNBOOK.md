@@ -5,7 +5,7 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
 - [最初の 3 手](#最初の-3-手)
 - [安全の原則](#安全の原則)
 - [通知ごとの確認・復旧手順](#通知ごとの確認復旧手順)
-  - [REBOOT](#key-reboot) / [PROCESS_](#key-process) / [TARGET_](#key-target) / [MONITORING_](#key-monitoring) / [PING_](#key-ping) / [PRICE_](#key-price) / [SPREAD_](#key-spread) / [ORDER](#key-order)
+  - [REBOOT](#key-reboot) / [PROCESS_](#key-process) / [TARGET_](#key-target) / [MONITORING_](#key-monitoring) / [MONITORING_AUTO_ATTACH_](#key-monitoring-auto-attach) / [PING_](#key-ping) / [PRICE_](#key-price) / [SPREAD_](#key-spread) / [ORDER](#key-order)
   - [RUNNER_STUCK](#key-runner-stuck) / [RUNNER_TIMEOUT_](#key-runner-timeout) / [RUNNER_TARGETS_EMPTY](#key-runner-targets-empty)
   - [IMAGE_REPORT_DEFAULT_CHANGED](#key-image-report-default-changed) / [LINE_QUOTA](#key-line-quota) / [IMAGE_UPLOAD_FAILED](#key-image-upload-failed) / [HEARTBEAT](#key-heartbeat)
 - [MT の固まりの切り分け](#mt-の固まりの切り分け)
@@ -37,6 +37,7 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
 | MetaTraderプロセスが動作していません | `PROCESS_<MT名>` | [PROCESS_](#key-process) |
 | 監視対象のMetaTraderが見つかりません | `TARGET_<名前>` | [TARGET_](#key-target) |
 | `<MT 名>` のモニタリングデータが … 更新されていません／ありません | `MONITORING_<MT名>` | [MONITORING_](#key-monitoring) |
+| `<MT 名>` の自動配置 (ATST_AUTO_ATTACH_EA=1) が有効ですが … モニタリングデータが出ていません | `MONITORING_AUTO_ATTACH_<MT名>` | [MONITORING_AUTO_ATTACH_](#key-monitoring-auto-attach) |
 | `<MT 名>` のPingが … 異常値 | `PING_<MT名>` | [PING_](#key-ping) |
 | `<MT 名>` の過去10分の値幅が … 異常値 | `PRICE_<MT名>` | [PRICE_](#key-price) |
 | `<MT 名>` の5分間のスプレッド最高値が … 異常値 | `SPREAD_<MT名>` | [SPREAD_](#key-spread) |
@@ -211,6 +212,37 @@ env -u WINEPREFIX ./mtctl.sh monitor "<MT 名>"
 **それでも直らないとき**: MT の再インストールはせず、`./doctor.sh` の出力を Issue に貼って相談する。その間はスマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）で建玉を見て、必要なら手動決済する。固まっている MT では EA の決済も動かないので、建玉があるなら朝まで待たない。
 
 **関連**: [docs/monitoring-csv.md](monitoring-csv.md)、[README](../README.md)「毎分の監視 (check_all.sh) の動き」、Wiki [setup_monitoring](../../../wiki/setup_monitoring)、#141（継続中の通知）、#149（CSV の列契約）。
+
+<a id="key-monitoring-auto-attach"></a>
+
+### MONITORING_AUTO_ATTACH_<MT名>: 自動配置したのに監視データが出ない
+
+**キー名**: `MONITORING_AUTO_ATTACH_<MT名>`（`~/.atst/config` が `ATST_AUTO_ATTACH_EA=1` のときだけ使う。既存の `MONITORING_<MT名>` とは別のキー）。
+
+**通知文の例**:
+- `【発生】<MT 名> の自動配置 (ATST_AUTO_ATTACH_EA=1) が有効ですが、起動から <N> 分たってもモニタリングデータが出ていません。StartUp ini が効いていない可能性があります。確認: WINEPREFIX の drive_c/atst/startup_<名前>.ini (C:\atst\startup_<名前>.ini)、~/.atst/wine_<名前>.log、doctor.sh の auto_attach`
+- `【継続中 30 分】…`（30 分 / 2 時間 / 12 時間後。上と同じ文面）
+- `【復帰】<MT 名> の自動配置 (ATST_AUTO_ATTACH_EA=1) でモニタリングデータが出るようになりました。`
+- `【復帰】<MT 名> の自動配置の確認を終了しました (ATST_AUTO_ATTACH_EA が 1 ではありません)。`（`0` に戻したとき）
+
+**意味**: `mtctl.sh start` が作った StartUp ini（MT4 は ini のパスを素の引数、MT5 は `/config:<パス>` で渡す）で監視 EA を載せる設定なのに、MT が起動して `ATST_MONITORING_THRESHOLD` 秒たっても、起動後に書かれた CSV の行が無い。ini が読まれていない、通貨ペア・時間足がブローカーに無い、EA が自動売買の許可で動いていない、などが考えられる。止まっている MT や起動直後の MT は判定しない（止まっているときは `PROCESS_` の担当）。`MONITORING_<MT名>` も同時に出ることがあり、その場合はこちらの確認を先に、その後 [MONITORING_](#key-monitoring) を見る。
+
+**確認コマンド**:
+```bash
+./doctor.sh
+ls -l "$WINEPREFIX/drive_c/atst/"
+tail -n 20 ~/.atst/wine_<名前を小文字にしたもの>.log
+```
+`doctor.sh` の `auto_attach` 行で、通貨ペア・時間足の値、ini の有無・権限（ディレクトリ 700・ファイル 600）、config との一致、動いている MT に ini の引数が渡っているか（MT4 は `C:\atst\startup_<名前>.ini`、MT5 は `/config:C:\atst\startup_<名前>.ini`）を見る。MT4 で `running with /config:, which MT4 ignores` なら旧版の起動のままなので `mtctl.sh stop` → `start` する。wine のログの `auto_attach:` 行は、ini を渡して起動したか（MT4 は `auto_attach: C:\atst\startup_<名前>.ini`、MT5 は `auto_attach: /config:C:\atst\startup_<名前>.ini`）、渡さずに起動した理由（`skipped (<理由>)`）が分かる。
+
+**安全な復旧手順**:
+- `doctor.sh` が `NG` の項目を直す（通貨ペア・時間足の値は `~/.atst/config` の `ATST_AUTO_ATTACH_SYMBOL` / `ATST_AUTO_ATTACH_PERIOD`。ブローカーの気配値表示にある名前にする）。
+- MT を止めて `start` し直すときは、[安全の原則](#安全の原則)の (a)〜(c) を済ませてから `env -u WINEPREFIX ./mtctl.sh stop "<MT 名>"` → `start "<MT 名>"`。手で `start` するときは `ATST_TARGETS` と同じ名前を使う。
+- 直らないときは VNC で手作業の配置（[MONITORING_](#key-monitoring) の手順）に切り替え、`ATST_AUTO_ATTACH_EA=0` に戻して `stop` → `start` すると、この通知は【復帰】で閉じる。
+
+**それでも直らないとき**: MT の再インストールはせず、`./doctor.sh` の出力を Issue に貼って相談する。その間は手作業で EA を載せれば監視は動く。手で置いたチャートと自動配置のチャートで EA が二重にならないよう注意する（同じ CSV に 2 つの EA が書く）。
+
+**関連**: [docs/monitoring-csv.md](monitoring-csv.md)、[README](../README.md)「監視 EA の自動配置」、#133、#141（継続中の通知）。
 
 <a id="key-ping"></a>
 

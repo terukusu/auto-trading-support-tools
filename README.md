@@ -251,6 +251,31 @@ Usage: mtctl.sh [-qsh] <list|start|status|stop|monitor> <MetaTrader Name1> [<Met
 
 mtctl.sh のメッセージ(`list` の 1 行目、`status` の各行、`stop` / `start` で対象が見つからないときの行)には、判定に使った WINEPREFIX が ` (WINEPREFIX=...)` の形で付きます。`-q` のときはこれまでどおり何も出しません。
 
+`~/.atst/config` が `ATST_AUTO_ATTACH_EA=1` のとき、`start` は StartUp ini を付けて起動します。MT4 は ini のパスを素の引数 (`terminal.exe C:\atst\startup_<名前>.ini`)、MT5 は `/config:C:\atst\startup_<名前>.ini` で渡します (下の「監視 EA の自動配置」)。通貨ペア・時間足の値が空・不正なときや ini を書けないときは、stderr に 1 行出して ini を付けずに起動します (起動は止めません)。
+
+### 監視 EA の自動配置 (ATST_AUTO_ATTACH_EA、試験導入)
+
+監視 EA (TerminalMonitoring) のチャートへの配置は、これまで VNC での手作業でした。`~/.atst/config` で有効にすると、`mtctl.sh start` (再起動時の `@reboot` の自動起動を含む) が MetaTrader の起動設定ファイル (StartUp ini) を作り、起動時に EA を新しいチャートに載せます。既定は無効 (`0`) です。
+
+* 有効にする: `~/.atst/config` に次の 3 行を書き (雛形にあります。行が無い古い config は `0` と同じ)、次の `mtctl.sh start` から効きます。動いている MT4/5 には `mtctl.sh stop` → `start` が要ります (本番では止めてよい時間に)。手で `start` するときは `ATST_TARGETS` と同じ名前を使ってください (ini の名前は start に渡した名前から作ります)。
+  ```
+  ATST_AUTO_ATTACH_EA=1
+  ATST_AUTO_ATTACH_SYMBOL=EURUSD   # ブローカーの気配値表示にある名前。英数字と . _ # & ! @ - (32 文字まで)
+  ATST_AUTO_ATTACH_PERIOD=M5       # M1 M5 M15 M30 H1 H4 D1 W1 MN のどれか
+  ```
+* ini の場所と内容: `$WINEPREFIX/drive_c/atst/startup_<名前を小文字にして英数字と _ 以外を _ にしたもの>.ini` (MT4/5 から見て `C:\atst\startup_<名前>.ini`。ディレクトリ 700・ファイル 600)。Z: ドライブを使わないので、Z: を外した prefix でも動きます。中身はコメント 1 行と `[StartUp]` の `Symbol=` / `Period=` / `Expert=` (MT5 は `Advisors\TerminalMonitoring`) だけで、`[Common]` (口座番号・パスワード)・`[Experts]` は書きません。起動のたびに同じ内容で上書きします。
+* 渡し方: MT4 は ini のパスを素の引数で渡します (`terminal.exe C:\atst\startup_<名前>.ini`)。MT4 は `/config:<パス>` を無視するためです (実機で確認)。MT5 は MetaQuotes の仕様どおり `/config:C:\atst\startup_<名前>.ini` で渡します。`~/.atst/wine_<名前>.log` の `auto_attach:` 行に、渡した引数がそのまま残ります。
+* 戻し方: `ATST_AUTO_ATTACH_EA=0` にして `mtctl.sh stop` → `start` すると、ini を付けない今までの起動に戻ります。ini を消しても `1` のままなら次の `start` で作り直すので、切り替えは変数で行ってください。
+* 通知: 有効なのに、MT4/5 が起動してから `ATST_MONITORING_THRESHOLD` 秒たっても起動後のモニタリングデータが出ていなければ、キー `MONITORING_AUTO_ATTACH_<MT名>` で【発生】を送ります (既存の `MONITORING_<MT名>` とは別のキー。データが出れば【復帰】、`0` に戻したときも【復帰】で閉じます)。再通知・外形監視 (heartbeat) の対象にもなります (`MONITORING_` で始まるキーのため)。確認先は ini、`~/.atst/wine_<名前>.log` の `auto_attach:` 行、`doctor.sh` の `auto_attach`。
+* 名前の注意: `A-MT4` と `A_MT4` のように、小文字化・置換した後に同じ名前になる MT を同時に使うと、同じ ini を共有して衝突します。そのような名前は避けてください。
+* 実機での確認結果 (MT4 build 1492 / Wine 10.0、デモ口座):
+  * ini のパスを素の引数で渡すと `[StartUp]` が効き、指定した通貨ペア・時間足の新しいチャートに監視 EA が載りました。CRLF と先頭のコメント行は問題ありません。ディレクトリ 700・ファイル 600 でも MT4 は読めます (同じユーザーで動くため)。
+  * `/config:<パス>` で渡すと MT4 は ini を無視しました (チャートが開かない)。そのため MT4 は素の引数で渡します。
+  * StartUp で開いたチャートはプロファイルに保存されないので、再起動を繰り返してもチャートは増えません。
+  * 手で置いた監視 EA のチャートがあると、それとは別に StartUp のチャートが開き、EA が 2 つ載ります (両方が同じ CSV に書きます)。自動配置にしたら、手で置いた監視 EA のチャートは閉じてかまいません。同じ通貨ペア・時間足のチャートが既にあるときの挙動は未確認です。
+  * `mtctl.sh status` と `doctor.sh` の `process` は、ini の引数付きで動いている MT4 を正しく見つけます。
+  * MT5 (`/config:`) は実機で未確認です。`MN` の表記も未確認です。
+
 ### 自己診断 (doctor.sh)
 
 `./doctor.sh` (引数なし) で、atst の設定と監視の状態を項目ごとに 1 行で表示します。**読み取り専用**で、ファイル・crontab・MT4/5・Wine を一切変更せず、LINE への送信やネットワークアクセスもしません (`wine --version` と `crontab -l` を実行するだけです。`~/.atst/config` が無い初回だけは、共通処理が雛形を作ります)。
@@ -269,6 +294,7 @@ mtctl.sh のメッセージ(`list` の 1 行目、`status` の各行、`stop` / 
 9. `.line_token` / `.line_id` / `.imgbb_key`: 存在と権限 (600 でなければ NG)。`.imgbb_key` は任意です (定期レポートにグラフ・デスクトップの画像を付けるのに必要。無ければ文字要約だけを送ります)。
 10. `heartbeat`: 外形監視の URL。`~/.atst/.heartbeat_url` (setup_heartbeat.sh) が有効なら `OK heartbeat .heartbeat_url=****abcd`、config の `ATST_HEARTBEAT_URL` なら `OK heartbeat ATST_HEARTBEAT_URL=****abcd` (末尾 4 文字のみ)。`.heartbeat_url` が 600 でなければ NG。未設定は `-- heartbeat not set (recommended: run setup_heartbeat.sh)` (推奨ですが必須ではないので NG にはしません)。疎通確認はしません。
 11. `check_all.log`: `~/.atst/log/check_all.log` の権限・最後の START 行の日時・START 行以外の末尾 5 行。表示のみです (権限が 600 でなくても NG にしません)。**末尾の行は各チェックの出力そのままなので、Issue に貼る前に目で確認してください。**
+12. `auto_attach`: 監視 EA の自動配置。`ATST_AUTO_ATTACH_EA` が `1` でなければ `-- auto_attach <名前> ATST_AUTO_ATTACH_EA=0 (manual attach)`。`1` なら、通貨ペア・時間足の値、`C:\atst\startup_<名前>.ini` (`$WINEPREFIX/drive_c/atst/`) の有無・権限 (ディレクトリ 700・ファイル 600)・config との一致、動いている MT4/5 にその ini の引数が渡っているか (MT4 は `C:\atst\startup_<名前>.ini`、MT5 は `/config:C:\atst\startup_<名前>.ini`)、を見て、外れていれば NG (MT4 が `/config:` 付きで動いていれば `running with /config:, which MT4 ignores` で NG。`mtctl.sh stop` → `start` で直ります)。OK でも `csv` が NG なら「StartUp が効いていない可能性」の補足行を出します。
 
 NG の例:
 ```

@@ -29,6 +29,67 @@ function pm () {
   fi
 }
 
+# start_mt_startup_ini <MT name>
+# ATST_AUTO_ATTACH_EA=1 (#133): writes the StartUp ini of <MT name> (atst_startup_ini_path, mode 600 in
+# drive_c/atst of mode 700, replaced through a temporary file in the same directory) and sets
+# start_ini_arg to the argument of atst_startup_ini_arg: the bare C:\atst\startup_<n>.ini for MT4 (MT4
+# ignores /config:, checked on the real host) and /config:C:\atst\startup_<n>.ini for MT5
+# (atst_to_win_path; winepath is not used, so no Z:). On any failure start_ini_arg stays empty and
+# start_ini_reason says why, without the symbol / period values or the home path; MetaTrader is then
+# started without the ini (fail-open, never skipped).
+function start_mt_startup_ini() {
+  local name="$1"
+  local idx type ini prefix_l win dir rc
+
+  start_ini_arg=""
+  start_ini_reason=""
+
+  idx=$(atst_find_mt_index "$name")
+  type=""
+  [ -n "$idx" ] && type=${mt_type[idx]}
+  ini=$(atst_startup_ini_path "$name")
+  prefix_l=$(cd "$WINEPREFIX" 2>/dev/null && pwd)
+  if [ -z "$ini" ] || [ -z "$prefix_l" ]; then
+    start_ini_reason="WINEPREFIX not found"
+  else
+    atst_startup_ini_content "$type" "${ATST_AUTO_ATTACH_SYMBOL:-}" "${ATST_AUTO_ATTACH_PERIOD:-}" > /dev/null
+    rc=$?
+    case $rc in
+      0) ;;
+      2) start_ini_reason="ATST_AUTO_ATTACH_SYMBOL is empty or invalid" ;;
+      3) start_ini_reason="ATST_AUTO_ATTACH_PERIOD is empty or invalid" ;;
+      *) start_ini_reason="unknown MetaTrader type" ;;
+    esac
+  fi
+
+  if [ -z "$start_ini_reason" ]; then
+    win=$(atst_to_win_path "$ini" "$prefix_l")
+    [ -n "$win" ] || start_ini_reason="cannot convert the ini path to a C: path"
+  fi
+
+  if [ -z "$start_ini_reason" ]; then
+    dir=$prefix_l/drive_c/atst
+    # A symlink is not followed; a file in the way is not removed. tmp is removed only when mktemp made it.
+    if [ -L "$dir" ] ||
+      ! ( umask 077
+          mkdir -p -- "$dir" && chmod 700 -- "$dir" || exit 1
+          tmp=$(mktemp "$dir/.startup.XXXXXX") || exit 1
+          if atst_startup_ini_content "$type" "${ATST_AUTO_ATTACH_SYMBOL:-}" "${ATST_AUTO_ATTACH_PERIOD:-}" > "$tmp" &&
+            chmod 600 -- "$tmp" && [ ! -d "$ini" ] && mv -f -- "$tmp" "$ini"; then
+            exit 0
+          fi
+          rm -f -- "$tmp"
+          exit 1 ) 2>/dev/null; then
+      start_ini_reason="cannot write drive_c/atst/${ini##*/} in WINEPREFIX"
+    fi
+  fi
+
+  if [ -z "$start_ini_reason" ]; then
+    start_ini_arg=$(atst_startup_ini_arg "$type" "$win")
+    [ -n "$start_ini_arg" ] || start_ini_reason="unknown MetaTrader type"
+  fi
+}
+
 function start_mt() {
   target_names=("$@")
   target_num=${#target_names[@]}
@@ -55,7 +116,21 @@ function start_mt() {
 
     echo -e "\n===== START `date +'%Y-%m-%d %H:%M:%S'` =====" >> "$wine_log"
 
-    nohup "$WINE" start /b /d "$work_dir" /unix "$target_path" >> "$wine_log" 2>&1
+    # ATST_AUTO_ATTACH_EA=1: one more argument, the StartUp ini (MT4: the bare C:\ path, MT5:
+    # /config:<path>, #133). Never skips the start.
+    extra_args=()
+    if atst_auto_attach_enabled; then
+      start_mt_startup_ini "$target_name"
+      if [ -n "$start_ini_arg" ]; then
+        extra_args=("$start_ini_arg")
+        echo "auto_attach: $start_ini_arg" >> "$wine_log"
+      else
+        pm "[warn] 自動配置 (ATST_AUTO_ATTACH_EA=1) を使わずに起動します ($start_ini_reason): $target_name" 1>&2
+        echo "auto_attach: skipped ($start_ini_reason)" >> "$wine_log"
+      fi
+    fi
+
+    nohup "$WINE" start /b /d "$work_dir" /unix "$target_path" "${extra_args[@]}" >> "$wine_log" 2>&1
 
     i=$((i + 1))
   done
