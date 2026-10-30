@@ -1,6 +1,6 @@
 # 監視 CSV の列契約（atst）
 
-監視 EA（`MQL4/Experts/TerminalMonitoring.mq4` / `MQL5/Experts/Advisors/TerminalMonitoring.mq5`）が書く `terminal_monitoring.csv` と `order_status` の契約をまとめる。`terminal_monitoring.csv` は外形監視（`check_monitoring.sh` / `check_price.sh` / `check_spread.sh` / `check_ping.sh`、`report_image.sh`、`truncate_monitoring.sh`、`doctor.sh`）の唯一の入力なので、**列・書式・書き方を変える PR はこの文書を同じ PR で更新する**。
+監視 EA（`MQL4/Experts/TerminalMonitoring.mq4` / `MQL5/Experts/Advisors/TerminalMonitoring.mq5`）が書く `terminal_monitoring.csv` と `order_status` の契約をまとめる。`terminal_monitoring.csv` は外形監視（`check_monitoring.sh` / `check_tick.sh` / `check_price.sh` / `check_spread.sh` / `check_ping.sh`、`report_image.sh`、`truncate_monitoring.sh`、`doctor.sh`）の唯一の入力なので、**列・書式・書き方を変える PR はこの文書を同じ PR で更新する**。
 
 MQL の行番号は `iconv -f UTF-16LE -t UTF-8 <file> | tr -d '\r' | cat -n` で数えたもの（BOM の行が 1 行目）。bash 側は行番号を書かず、スクリプト名と awk の式で示す。
 
@@ -32,7 +32,7 @@ MQL の行番号は `iconv -f UTF-16LE -t UTF-8 <file> | tr -d '\r' | cat -n` �
 | # | 名前 | 意味 | 型・書式 | 単位・時刻基準 | MQL4（行） | MQL5（行） | 読み手と用途 |
 |---|---|---|---|---|---|---|---|
 | 1 | time_gmt | 書き込んだ時刻 | epoch 秒の 10 進整数 | **UTC**。`TimeGMT()` は端末（Wine）のローカル時計と TZ から算出する（Wine 側の TZ が誤っているとずれる）。読み手は Linux の `date +%s` と直接比較する | M4:138 `(string)TimeGMT()` | M5:143 `(string)(long)TimeGMT()` | `check_monitoring.sh` / `doctor.sh`（鮮度）、`check_price.sh`（直近 600 秒）、`check_spread.sh`（直近 300 秒）、`report_image.sh`（期間の絞り込み・最終データ時刻・グラフの x）、`truncate_monitoring.sh`（保持期間）、`draw_graph.sh`（x 軸。`3600*9` を足す） |
-| 2 | time_server | 最後のティックのサーバー時刻 | epoch 形式の整数 | 取引サーバーの時刻（**ブローカーの TZ。UTC ではない**）。`TimeCurrent()` は最後のティック受信時刻で、ティックが止まると進まない | M4:139 `(string)TimeCurrent()` | M5:144 `(string)(long)TimeCurrent()` | 現行の読み手なし（#137 の `check_tick.sh` が列 1 との差に使う予定）。テストの行は 0 |
+| 2 | time_server | 最後のティックのサーバー時刻 | epoch 形式の整数 | 取引サーバーの時刻（**ブローカーの TZ。UTC ではない**）。`TimeCurrent()` は最後のティック受信時刻で、ティックが止まると進まない | M4:139 `(string)TimeCurrent()` | M5:144 `(string)(long)TimeCurrent()` | `check_tick.sh`（`ATST_TICK_THRESHOLD` 秒の窓の中で値が変わったか。列 1 との差は使わない）。テストの行は既定 0（`atst_test_make_monitoring_csv` の第 7 引数で指定） |
 | 3 | bid | Bid | 小数。double を `(string)` で文字列化した既定の書式（桁数は保証しない） | 価格 | M4:140 `(string)Bid` | M5:145 `(string)Bid`（M5:124-127 で `SymbolInfoTick` の `last_tick.bid` を代入） | `check_price.sh`（min/max）、`report_image.sh`（要約の安値・高値、グラフの y） |
 | 4 | ask | Ask | 列 3 と同じ | 価格 | M4:141 `(string)Ask` | M5:146 `(string)Ask`（`last_tick.ask`） | 現行の読み手なし |
 | 5 | spread | スプレッド | 整数（MQL4 は `MarketInfo` の double を `(string)` 化するため書式は実機未確認。K8） | **point**（pip ではない。5 桁ブローカーでは pip × 10）。`ATST_THRESHOLD_SPREAD_*` と同じ単位。`report_image.sh` のグラフの軸ラベルは「pips x 10」 | M4:142 `(string)MarketInfo(Symbol(),MODE_SPREAD)` | M5:147 `(string)SymbolInfoInteger(Symbol(),SYMBOL_SPREAD)` | `check_spread.sh`（最大値）、`report_image.sh`（要約の最小・最大、グラフ） |
@@ -71,6 +71,7 @@ MQL の行番号は `iconv -f UTF-16LE -t UTF-8 <file> | tr -d '\r' | cat -n` �
 | スクリプト | 使う列 | 区分 | 読み方 | 前提・判定 |
 |---|---|---|---|---|
 | `check_monitoring.sh` | 1 | 監視 | `tail -n 20 \| tr -d '\r' \| awk -F, 'NF >= 8 && $1 ~ /^[0-9]+$/ {t = $1} END {print t}'`（最後の完全な行） | `now - t >= ATST_MONITORING_THRESHOLD`（既定 180 秒）で発生。行が無ければ MT プロセスの有無と起動からの経過を見て、稼働中かつ猶予を過ぎていれば「データがありません」 |
+| `check_tick.sh` | 1 2 | 監視 | `tr -d '\r'` した全体を `awk -F,` で 1 回走査し、`NF >= 8 && $1 ~ /^[0-9]+$/ && $2 ~ /^[1-9][0-9]*$/` の行だけを使う（最後の行の列 1 = last1、`last1 - T <= 列 1 <= last1` を窓、`T` = `ATST_TICK_THRESHOLD`（既定 600 秒）。列 1 > last1 の行は窓に入れない） | 判定しない: CSV・完全な行が無い、`now - last1 >= ATST_MONITORING_THRESHOLD`（CSV の停止は `MONITORING_`）、last1 が UTC の金 20:00〜月 00:00（`ATST_TICK_WEEKEND_SKIP=0` で判定）、窓の外側（`列 1 < last1 - T`）に行が無い、窓の中の行の列 1 の間隔（窓内の最初の行は直前の窓外の行から）に `ATST_MONITORING_THRESHOLD` 秒以上の空白がある（MT / 監視 EA の再開直後。EA は CSV を切り詰めないので停止前の行が窓外に残る）。窓内の列 2 の最小と最大が同じなら `TICK_<MT>` 発生、違えば復帰 |
 | `doctor.sh` | 1 | 診断 | `check_monitoring.sh` と同じ式 | ファイル無し・行無し・`ATST_MONITORING_THRESHOLD` 秒以上古いときに NG |
 | `check_price.sh` | 1 3 7 | 監視 | 列 1・3: ファイル全体を `awk -F, 'BEGIN{min=10000; max=0} NF >= 8 { if ($1 > from) ...}'`（`from` = 600 秒前）で列 3 の min/max。CR 除去なし、列 1 の数値ガードなし。列 7: `tail -n 20 \| tr -d '\r' \| awk -F, 'NF >= 8 {p = $7} END {print p}'` | 列 7 は `^[0-9]*\.?[0-9]+$` かつ 0 でないこと。`(max - min) / pip` を `ATST_THRESHOLD_PRICE_UPPER` / `LOWER`（pips）と比較 |
 | `check_spread.sh` | 1 5 | 監視 | ファイル全体を `awk -F, 'BEGIN{max=0} NF >= 8 { if ($1 > from) ...}'`（`from` = 300 秒前）で列 5 の最大。CR 除去なし、列 1 の数値ガードなし | 結果が `^[0-9]+$` であること。`ATST_THRESHOLD_SPREAD_UPPER` / `LOWER`（point）と比較 |
@@ -80,17 +81,17 @@ MQL の行番号は `iconv -f UTF-16LE -t UTF-8 <file> | tr -d '\r' | cat -n` �
 | `truncate_monitoring.sh` | 1 | 保守 | `awk -F, '{if ($1 > from) print}'`（`from` = `ATST_MONITORING_TRUNCATE_BEFORE` 日前）で同じディレクトリの `mktemp` に書き、`mv` で置換 | `NF` ガード・CR 除去なし。awk の読み終わりから `mv` までに EA が追記した行は失われうる（最大 1 行。次の `INTERVAL` で回復） |
 | `mtctl.sh` | なし | 表示 | `monitor` サブコマンドが `tail -f` で生のまま表示する | 列を解釈しない |
 | `check_order.sh` | なし | 注文通知 | CSV は読まない。`order_status` だけ（[order_status](#order_status)） | — |
-| `tests/test_helper.bash` | 1 2 3 4 5 6 7 8 | テスト | `atst_test_make_monitoring_csv` が `<epoch>,0,<bid>,<bid>,<spread>,<ping>,<pip>,USDJPY` を `MQL4/Files/terminal_monitoring.csv` に追記（sandbox 内のみ） | 列 2 は 0、列 4 は bid と同値、ping の既定は 12（マイクロ秒）。`tests/check_monitoring.bats` は書きかけの行（列 1 の途中まで、改行無し）を実際に作って試す |
+| `tests/test_helper.bash` | 1 2 3 4 5 6 7 8 | テスト | `atst_test_make_monitoring_csv` が `<epoch>,<time_server>,<bid>,<bid>,<spread>,<ping>,<pip>,USDJPY` を `MQL4/Files/terminal_monitoring.csv` に追記（sandbox 内のみ） | 列 2 は第 7 引数（既定 0）、列 4 は bid と同値、ping の既定は 12（マイクロ秒）。`tests/check_monitoring.bats` は書きかけの行（列 1 の途中まで、改行無し）を実際に作って試す |
 
-- 現行の読み手が使わない列: 2・4。
+- 現行の読み手が使わない列: 4。
 - `heartbeat.sh` は CSV を読まない（`check_monitoring.sh` が立てた `MONITORING_*` の状態を見るだけ）。
 
 ## 部分行・空行・CR の規則
 
 - 読み手は「`NF >= 8` を満たす最後の行」を **最後の完全な行** として使う。末尾の書きかけの行（列が 8 に満たない行）と空行は無視する。
-- 最新値を見る読み手は `tail -n 20` の範囲だけを見る（15 秒間隔で約 5 分ぶん）。20 行すべてが書きかけということは通常無い。
+- 最新値を見る読み手は `tail -n 20` の範囲だけを見る（15 秒間隔で約 5 分ぶん）。20 行すべてが書きかけということは通常無い。`check_tick.sh` は時刻の窓で判定するので全件を走査する（行数に依存しない。K10）。
 - CR は行末の列（列 8）や最後の値を読むときに `tr -d '\r'` で除去する。行末でない列だけを比較する全件走査では除去しないものがある（影響なし）。
-- 列 1 が数値（`^[0-9]+$`）でない行を無視するのは `check_monitoring.sh` / `doctor.sh` だけ。
+- 列 1 が数値（`^[0-9]+$`）でない行を無視するのは `check_monitoring.sh` / `check_tick.sh` / `doctor.sh` だけ（`check_tick.sh` は列 2 も正の整数であることを要求する）。
 - 読み手ごとの実装は [読み手](#読み手) の表、揃っていない点は [既知の不一致](#既知の不一致) を参照。
 
 ## 時刻の基準
@@ -143,14 +144,14 @@ MQL の行番号は `iconv -f UTF-16LE -t UTF-8 <file> | tr -d '\r' | cat -n` �
 
 ## 状態ファイルの予約（#137）
 
-時系列ではない「今の状態」（接続・取引可否など）は、CSV の列ではなく別の状態ファイルで渡す予定。本書は次の形だけを予約し、KEY の一覧と列 9 以降の中身は #137 が決める。
+時系列ではない「今の状態」（接続・取引可否など）は、CSV の列ではなく別の状態ファイルで渡す予定。本書は次の形だけを予約し、KEY の一覧と列 9 以降の中身は #158 が決める。
 
-- 置き場: CSV と同じ `Files/` 直下。名前は #137 で確定する（候補 `terminal_status`）。
+- 置き場: CSV と同じ `Files/` 直下。名前は #158 で確定する（候補 `terminal_status`）。
 - 形式: `KEY=VALUE` を 1 行 1 項目、LF、ASCII。
 - 書き手: 一時ファイルに書いてから `FileMove` で置き換える（原子的な更新。読み手は書きかけを見ない）。
 - 読み手: ファイルが無い・KEY が無い場合は「不明」として扱い、エラーにしない。
 - 時系列 CSV は置き換えない（`check_price.sh` / `check_spread.sh` / `report_image.sh` が時系列を必要とする）。
-- #137 の予定: 第 1 段は EA を変えずに `check_tick.sh` で列 1 と列 2 の差から途絶を検知する。第 2 段は `IsConnected` などを末尾の列と状態ファイルに足し、`check_trade_ready.sh` で判定する。
+- 第 1 段（EA を変えずに `check_tick.sh` が列 2 の窓内の変化で途絶を検知する）は #137 で実装済み。第 2 段（`IsConnected` などを末尾の列と状態ファイルに足し、`check_trade_ready.sh` で判定する）は #158。
 
 ## MQL4 と MQL5 の差
 
@@ -179,7 +180,7 @@ MQL の行番号は `iconv -f UTF-16LE -t UTF-8 <file> | tr -d '\r' | cat -n` �
 | K1 | `truncate_monitoring.sh` だけ `NF >= 8` のガードと `tr -d '\r'` が無い | 書きかけの行・CR 付きの行も列 1 の比較だけで残る（他の読み手は無視するので現状は害が小さい） | 別 Issue 候補 |
 | K2 | `check_price.sh` / `check_spread.sh` の全件走査は列 1 に `^[0-9]+$` を要求しない（`check_monitoring.sh` / `doctor.sh` は要求する） | 列 1 が数値でない行で `$1 > from` が文字列比較になりうる。実害は未検証 | 別 Issue 候補（低優先） |
 | K3 | `draw_graph.sh` は列 1（UTC）に `3600*9` を固定で足す | グラフの時刻は常に JST。ホストや利用者の TZ に依らない | 別 Issue 候補 |
-| K4 | 列 2（`TimeCurrent`）・列 4（`Ask`）は書かれるが読まれない。`atst_test_make_monitoring_csv` は列 2 を 0 で書く | #137 で列 2 を使うとき、テストの既定値が実態と合わない | #137 で扱う |
+| K4 | 列 2（`TimeCurrent`）・列 4（`Ask`）は書かれるが読まれない。`atst_test_make_monitoring_csv` は列 2 を 0 で書く | #137 で列 2 を使うとき、テストの既定値が実態と合わない | #137 で解消（列 2 は `check_tick.sh` が読む。ヘルパは第 7 引数で列 2 を指定可。列 4 は引き続き読まれない） |
 | K5 | `order_status` の決済の行で、symbol の後のカンマの有無が MQL4（M4:200）と MQL5（M5:217）で違う | 読み手は内容を解釈しないので実害なし | 別 Issue 候補（低優先） |
 | K6 | `check_price.sh` の min/max の初期値が 10000 / 0 の番兵で、min が 10000 のまま、または max が 0 のままなら「データ無し」として終わる | 価格が 10000 以上の銘柄では値動きを判定しない | 別 Issue 候補 |
 | K7 | CSV の `FileOpen` は MQL4 が `FILE_ANSI` / `FILE_UNICODE` 無しで `CP_UTF8`、MQL5 が `FILE_ANSI` で既定のコードページ | 出力のバイト列は実機で確認していない。読み手は 1 バイト文字の行として読む前提 | 別 Issue 候補（調査） |

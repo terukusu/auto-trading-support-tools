@@ -5,7 +5,7 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
 - [最初の 3 手](#最初の-3-手)
 - [安全の原則](#安全の原則)
 - [通知ごとの確認・復旧手順](#通知ごとの確認復旧手順)
-  - [REBOOT](#key-reboot) / [PROCESS_](#key-process) / [TARGET_](#key-target) / [MONITORING_](#key-monitoring) / [MONITORING_AUTO_ATTACH_](#key-monitoring-auto-attach) / [PING_](#key-ping) / [PRICE_](#key-price) / [SPREAD_](#key-spread) / [ORDER](#key-order)
+  - [REBOOT](#key-reboot) / [PROCESS_](#key-process) / [TARGET_](#key-target) / [MONITORING_](#key-monitoring) / [MONITORING_AUTO_ATTACH_](#key-monitoring-auto-attach) / [TICK_](#key-tick) / [PING_](#key-ping) / [PRICE_](#key-price) / [SPREAD_](#key-spread) / [ORDER](#key-order)
   - [RUNNER_STUCK](#key-runner-stuck) / [RUNNER_TIMEOUT_](#key-runner-timeout) / [RUNNER_TARGETS_EMPTY](#key-runner-targets-empty)
   - [IMAGE_REPORT_DEFAULT_CHANGED](#key-image-report-default-changed) / [LINE_QUOTA](#key-line-quota) / [IMAGE_UPLOAD_FAILED](#key-image-upload-failed) / [HEARTBEAT](#key-heartbeat)
 - [MT の固まりの切り分け](#mt-の固まりの切り分け)
@@ -43,6 +43,7 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
 | 監視対象のMetaTraderが見つかりません | `TARGET_<名前>` | [TARGET_](#key-target) |
 | `<MT 名>` のモニタリングデータが … 更新されていません／ありません | `MONITORING_<MT名>` | [MONITORING_](#key-monitoring) |
 | `<MT 名>` の自動配置 (ATST_AUTO_ATTACH_EA=1) が有効ですが … モニタリングデータが出ていません | `MONITORING_AUTO_ATTACH_<MT名>` | [MONITORING_AUTO_ATTACH_](#key-monitoring-auto-attach) |
+| `<MT 名>` の価格データ（ティック）が … 分以上更新されていません | `TICK_<MT名>` | [TICK_](#key-tick) |
 | `<MT 名>` のPingが … 異常値 | `PING_<MT名>` | [PING_](#key-ping) |
 | `<MT 名>` の過去10分の値幅が … 異常値 | `PRICE_<MT名>` | [PRICE_](#key-price) |
 | `<MT 名>` の5分間のスプレッド最高値が … 異常値 | `SPREAD_<MT名>` | [SPREAD_](#key-spread) |
@@ -83,10 +84,10 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
   ```bash
   grep ',1,' ~/.atst/alert_status
   ```
-- MT 名付きのキー（`PROCESS_` / `MONITORING_` / `PING_` / `PRICE_` / `SPREAD_`）の `<MT名>` は、`./mtctl.sh list` の `name=`（フォルダ名）の空白を `_` にしたもの（例: `PROCESS_Land_Prime_MetaTrader_4_Terminal`）。通知文の中の名前は `ATST_TARGETS` に書いた名前。
+- MT 名付きのキー（`PROCESS_` / `MONITORING_` / `TICK_` / `PING_` / `PRICE_` / `SPREAD_`）の `<MT名>` は、`./mtctl.sh list` の `name=`（フォルダ名）の空白を `_` にしたもの（例: `PROCESS_Land_Prime_MetaTrader_4_Terminal`）。通知文の中の名前は `ATST_TARGETS` に書いた名前。
 - しきい値は発生と復帰で別（発生は `..._UPPER` 以上、復帰は `..._LOWER` 以下。間にいる間は状態を変えない）。設定は `~/.atst/config`。`ATST_TARGETS` / `ATST_CHECK_TIMEOUT` / `ATST_ORDER_CHECK_INTERVAL` は config の末尾に置く（書き間違えた行より後は読まれないため）。
-- 継続中の通知（#141）: `PROCESS_*` / `MONITORING_*` / `RUNNER_STUCK` は、発生したまま直らないと、発生の通知から 30 分 / 2 時間 / 12 時間後に `【継続中 30 分】` / `【継続中 2 時間】` / `【継続中 12 時間】` の書き出しで同じ文面が 1 回ずつ届く（1 件の異常につき最大 3 通。送れずに遅れたときは、その時点で達した最も先の段階の 1 通だけが届く。12 時間の後は復帰まで届かない）。間隔は `~/.atst/config` の `ATST_ALERT_REMIND_MINUTES`（既定 `"30 120 720"` 分、`""` で届かない）。値動き・スプレッド・Ping などは継続中の通知が無い。
-- 外形監視（#136）: 発生中のキーのうち `PROCESS_` / `TARGET_` / `MONITORING_` / `RUNNER_`（`RUNNER_TIMEOUT_HEARTBEAT` を除く）/ `LINE_QUOTA` があると、`heartbeat.sh` が外部サービスへ毎分 ping の代わりに `/fail` を送る（[HEARTBEAT](#key-heartbeat)）。
+- 継続中の通知（#141）: `PROCESS_*` / `MONITORING_*` / `TICK_*` / `RUNNER_STUCK` は、発生したまま直らないと、発生の通知から 30 分 / 2 時間 / 12 時間後に `【継続中 30 分】` / `【継続中 2 時間】` / `【継続中 12 時間】` の書き出しで同じ文面が 1 回ずつ届く（1 件の異常につき最大 3 通。送れずに遅れたときは、その時点で達した最も先の段階の 1 通だけが届く。12 時間の後は復帰まで届かない）。間隔は `~/.atst/config` の `ATST_ALERT_REMIND_MINUTES`（既定 `"30 120 720"` 分、`""` で届かない）。値動き・スプレッド・Ping などは継続中の通知が無い。
+- 外形監視（#136）: 発生中のキーのうち `PROCESS_` / `TARGET_` / `MONITORING_` / `TICK_` / `RUNNER_`（`RUNNER_TIMEOUT_HEARTBEAT` を除く）/ `LINE_QUOTA` があると、`heartbeat.sh` が外部サービスへ毎分 ping の代わりに `/fail` を送る（[HEARTBEAT](#key-heartbeat)）。
 - 毎分の監視の stderr（エラー・警告）は `~/.atst/log/check_all.log` に残る（#144）。回の先頭に `===== START <日時> pid=<pid> =====` の行、チェックが 0 以外で終わった回は `check_ping.sh: exit 3` のような行（打ち切りは `exit 124` / `exit 137`）、前の回が終わらず飛ばした回は `another run holds the lock (started ... s ago); skipped` の行が入る。
   ```bash
   tail -n 50 ~/.atst/log/check_all.log
@@ -168,7 +169,7 @@ tail -n 30 ~/.atst/wine_*.log
 - `【発生】監視対象のMetaTraderが見つかりません。監視と自動起動が無効になっています。~/.atst/config の ATST_TARGETS (旧形式の crontab では TARGET) とインストール先のフォルダ名を確認してください: <名前>`
 - `【復帰】監視対象のMetaTraderが見つかりました: <名前>`
 
-**意味**: `check_process.sh` が、`ATST_TARGETS` の名前に前方一致する MT のフォルダ（大文字小文字は区別しない。正規表現ではなく文字どおり）を見つけられないと出す。**この間、その名前の監視（プロセス・監視データ・Ping・値動き・スプレッド）・約定通知・再起動時の自動起動はすべて止まっている**。
+**意味**: `check_process.sh` が、`ATST_TARGETS` の名前に前方一致する MT のフォルダ（大文字小文字は区別しない。正規表現ではなく文字どおり）を見つけられないと出す。**この間、その名前の監視（プロセス・監視データ・ティック・Ping・値動き・スプレッド）・約定通知・再起動時の自動起動はすべて止まっている**。
 
 **確認コマンド**:
 ```bash
@@ -249,6 +250,36 @@ tail -n 20 ~/.atst/wine_<名前を小文字にしたもの>.log
 **それでも直らないとき**: MT の再インストールはせず、`./doctor.sh` の出力を Issue に貼って相談する。その間は手作業で EA を載せれば監視は動く。手で置いたチャートと自動配置のチャートで EA が二重にならないよう注意する（同じ CSV に 2 つの EA が書く）。
 
 **関連**: [docs/monitoring-csv.md](monitoring-csv.md)、[README](../README.md)「監視 EA の自動配置」、#133、#141（継続中の通知）。
+
+<a id="key-tick"></a>
+
+### TICK_<MT名>: 価格データ（ティック）が来ない
+
+**キー名**: `TICK_<MT名>`。
+
+**通知文の例**:
+- `【発生】<MT 名> の価格データ（ティック）が <N> 分以上更新されていません。ブローカーとの接続断・ログアウト・銘柄の配信停止の可能性があります（MetaTrader は動いていて監視データは更新されています）。この間は自動売買が動きません。`（既定は 10 分）
+- `【継続中 30 分】…`（30 分 / 2 時間 / 12 時間後。上と同じ文面）
+- `【復帰】<MT 名> の価格データ（ティック）の更新が再開しました。`
+
+**意味**: `check_tick.sh`（#137）が、監視 EA の CSV の 2 列目（最後のティックのサーバー時刻）が `ATST_TICK_THRESHOLD` 秒（既定 600）の間まったく変わっていないと出す。MT も監視 EA も動いていて CSV は更新されている（`MONITORING_` は出ていない）のに、ブローカーから価格が届いていない。ブローカーとの接続断・ログアウト・口座の無効化・その銘柄の配信停止が考えられる。**この間は自動売買の EA も動かない**。CSV 自体が止まっているときは `MONITORING_` の担当で、こちらは出ない。週末（UTC の金曜 20:00〜月曜 00:00）は判定しない（`ATST_TICK_WEEKEND_SKIP=0` で判定する）。MT や監視 EA の再開直後（窓の中に `ATST_MONITORING_THRESHOLD` 秒以上の空白がある間）も判定しない。祝日・早期クローズ・ブローカーの日次メンテナンス、ティックの少ない銘柄のチャートでも出ることがある。
+
+**確認コマンド**:
+```bash
+./doctor.sh
+tail -n 5 "<data>/MQL4/Files/terminal_monitoring.csv"
+```
+`<data>` は `env -u WINEPREFIX ./mtctl.sh list` の `data=`。CSV の 2 列目が同じ値のまま並んでいればティックが来ていない（1 列目は書いた時刻で進んでいるはず）。VNC で MT の右下の接続表示（「回線不通」「無効な口座」など）とチャートの価格が動いているかを見る。スマホの MT アプリで同じブローカー・同じ銘柄の価格が動いていれば VPS 側（接続・ログイン）、止まっていれば相場・ブローカー側。
+
+**安全な復旧手順**:
+- 読み取り専用の確認（上）を先に済ませる。祝日・早期クローズ・メンテナンスなら、配信の再開で【復帰】が届くのを待ってよい。
+- 接続断・ログアウトなら、VNC で「ファイル」→「取引口座にログイン」でログインし直す。
+- 直らなければ、[安全の原則](#安全の原則)の (a)〜(c) を済ませてから `env -u WINEPREFIX ./mtctl.sh stop "<MT 名>"` → `start "<MT 名>"`。
+- 誤検知が続くときは、監視 EA をティックの多い主要通貨ペアのチャートに載せ直すか、`~/.atst/config` の `ATST_TICK_THRESHOLD` を大きくする。
+
+**それでも直らないとき**: スマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）で建玉を確認し、必要なら手動決済する。ティックが来ない間は EA の決済も動かない。ブローカー側の障害ならブローカーに問い合わせる。
+
+**関連**: [docs/monitoring-csv.md](monitoring-csv.md)（列 2）、[README](../README.md)「毎分の監視 (check_all.sh) の動き」、#137（第 1 段）、#158（第 2 段: 接続・自動売買の許可を EA 側で見る）、#141（継続中の通知）。
 
 <a id="key-ping"></a>
 
@@ -360,7 +391,7 @@ grep 'LINE send failed' ~/.atst/line_error.log | tail -n 5
 - `【継続中 30 分】毎分の監視 (check_all.sh) が、前回の実行が終わらないため <N> 秒以上止まっています`（30 分 / 2 時間 / 12 時間後）
 - `【復帰】毎分の監視 (check_all.sh) が再開しました`
 
-**意味**: `check_all.sh` は 1 回ずつしか動かない（`~/.atst/check_all.lock`）。次の回がロックを取れず、前の回の開始（`~/.atst/check_all.started`）から約 22 分（既定。`ATST_CHECK_TIMEOUT` に応じて変わる）以上たっていると出す。各チェックの打ち切り（`RUNNER_TIMEOUT_`）でも止まらない何かが残っている。**この間は毎分の監視が全部止まっている**。
+**意味**: `check_all.sh` は 1 回ずつしか動かない（`~/.atst/check_all.lock`）。次の回がロックを取れず、前の回の開始（`~/.atst/check_all.started`）から約 22 分（既定の `ATST_CHECK_TIMEOUT=40` で 1335 秒。`ATST_CHECK_TIMEOUT` に応じて変わる）以上たっていると出す。各チェックの打ち切り（`RUNNER_TIMEOUT_`）でも止まらない何かが残っている。**この間は毎分の監視が全部止まっている**。
 
 **確認コマンド**:
 ```bash
@@ -391,11 +422,12 @@ tail -n 50 ~/.atst/log/check_all.log
 
 ### RUNNER_TIMEOUT_<名前>: チェックが時間内に終わらない
 
-**キー名**: 次の 8 個（チェックごと）。
+**キー名**: 次の 9 個（チェックごと）。
 - `RUNNER_TIMEOUT_CHECK_REBOOT`（`check_reboot.sh`）
 - `RUNNER_TIMEOUT_CHECK_ORDER`（`check_order.sh`）
 - `RUNNER_TIMEOUT_CHECK_PROCESS`（`check_process.sh`）
 - `RUNNER_TIMEOUT_CHECK_MONITORING`（`check_monitoring.sh`）
+- `RUNNER_TIMEOUT_CHECK_TICK`（`check_tick.sh`）
 - `RUNNER_TIMEOUT_CHECK_PING`（`check_ping.sh`）
 - `RUNNER_TIMEOUT_CHECK_PRICE`（`check_price.sh`）
 - `RUNNER_TIMEOUT_CHECK_SPREAD`（`check_spread.sh`）
@@ -541,7 +573,7 @@ grep 'upload:imgbb' ~/.atst/line_error.log | tail -n 5
 
 **意味**: `check_all.sh` の最後に `heartbeat.sh` が毎分、外部サービスの URL（`~/.atst/.heartbeat_url`、無ければ config の `ATST_HEARTBEAT_URL`）へ送る。外部サービスからの通知は 2 種類ある。
 - **ping が途絶えた**: VPS の停止・回線断・cron の停止・`check_all.sh` が最後まで届かない、のどれか。**このとき VPS からの LINE は届かない前提**で、**EA も動いていない前提**で動く。
-- **`/fail` が届いた**: VPS は生きていて、監視が異常を検知している。`/fail` の本文は発生中のキー名（空白区切り）だけ。対象は `PROCESS_` / `TARGET_` / `MONITORING_` / `RUNNER_`（`RUNNER_TIMEOUT_HEARTBEAT` を除く）/ `LINE_QUOTA` と、LINE の送信失敗の連続（`LINE_SEND_FAILED`。`~/.atst/line_error.log` の直近 60 分に `ATST_HEARTBEAT_LINE_FAIL_COUNT` 件、既定 3）。LINE が届かない状況でも届く。
+- **`/fail` が届いた**: VPS は生きていて、監視が異常を検知している。`/fail` の本文は発生中のキー名（空白区切り）だけ。対象は `PROCESS_` / `TARGET_` / `MONITORING_` / `TICK_` / `RUNNER_`（`RUNNER_TIMEOUT_HEARTBEAT` を除く）/ `LINE_QUOTA` と、LINE の送信失敗の連続（`LINE_SEND_FAILED`。`~/.atst/line_error.log` の直近 60 分に `ATST_HEARTBEAT_LINE_FAIL_COUNT` 件、既定 3）。LINE が届かない状況でも届く。
 
 **確認コマンド**: まず ssh で入れるか。入れたら:
 ```bash

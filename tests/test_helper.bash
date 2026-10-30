@@ -71,21 +71,23 @@ atst_test_source_common() {
   . "${ATST_TEST_DIR:?}/../common.sh"
 }
 
-# atst_test_make_monitoring_csv <name> <secs_ago> <bid> <spread> <pip> [<ping>]
-# Appends one 8-field line "<now-secs_ago>,0,<bid>,<bid>,<spread>,<ping>,<pip>,USDJPY" to
+# atst_test_make_monitoring_csv <name> <secs_ago> <bid> <spread> <pip> [<ping> [<time_server>]]
+# Appends one 8-field line "<now-secs_ago>,<time_server>,<bid>,<bid>,<spread>,<ping>,<pip>,USDJPY" to
 # MQL4/Files/terminal_monitoring.csv of the MT made by atst_test_make_mt (without a hash).
 # <ping> is in microseconds (the 6th field read by check_ping.sh); the default is 12.
+# <time_server> is field 2 (the server time of the last tick, read by check_tick.sh); the default (also
+# for an empty value) is 0, which check_tick.sh ignores.
 atst_test_make_monitoring_csv() {
-  local name="$1" secs_ago="$2" bid="$3" spread="$4" pip="$5" ping="${6:-12}"
+  local name="$1" secs_ago="$2" bid="$3" spread="$4" pip="$5" ping="${6:-12}" time_server="${7:-0}"
   local dir
 
   [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
-  { [ "$#" -eq 5 ] || [ "$#" -eq 6 ]; } && [ -n "$name" ] || return 1
+  [ "$#" -ge 5 ] && [ "$#" -le 7 ] && [ -n "$name" ] || return 1
   [ -n "${WINEPREFIX:-}" ] || return 1
 
   dir="$WINEPREFIX/drive_c/Program Files/$name/MQL4/Files"
   mkdir -p "$dir" || return 1
-  printf '%s,%s,%s,%s,%s,%s,%s,USDJPY\n' "$(( $(date +%s) - secs_ago ))" 0 "$bid" "$bid" "$spread" "$ping" "$pip" \
+  printf '%s,%s,%s,%s,%s,%s,%s,USDJPY\n' "$(( $(date +%s) - secs_ago ))" "$time_server" "$bid" "$bid" "$spread" "$ping" "$pip" \
     >> "$dir/terminal_monitoring.csv"
 }
 

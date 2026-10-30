@@ -411,7 +411,7 @@ file_url() {
 @test "HB-3: keys outside the allow list never give /fail (AC6)" {
   local k
   config_url "$U"
-  for k in PRICE_A SPREAD_A PING_A IMAGE_REPORT_DEFAULT_CHANGED RUNNER_TIMEOUT_HEARTBEAT XPROCESS_A process_a OTHER_KEY; do
+  for k in PRICE_A SPREAD_A PING_A IMAGE_REPORT_DEFAULT_CHANGED RUNNER_TIMEOUT_HEARTBEAT XPROCESS_A process_a XTICK_A tick_a OTHER_KEY; do
     set_status "$k" 1
   done
   hb_run
@@ -423,7 +423,7 @@ file_url() {
 @test "HB-4: each allow-listed key set to 1 gives one /fail and no ping (AC7, AC12)" {
   local k
   config_url "$U"
-  for k in PROCESS_A TARGET_A MONITORING_A RUNNER_STUCK RUNNER_TIMEOUT_CHECK_PING LINE_X; do
+  for k in PROCESS_A TARGET_A MONITORING_A TICK_A RUNNER_STUCK RUNNER_TIMEOUT_CHECK_PING RUNNER_TIMEOUT_CHECK_TICK LINE_X; do
     echo "case=$k"
     rm -f "$ST" "$LOG"
     set_status "$k" 1
@@ -721,4 +721,13 @@ file_url() {
   [ "$status" -eq 0 ]
   [ "$(fail_lines)" -eq 1 ]
   [ "$(fail_body)" = PROCESS_A ]
+}
+
+@test "HB-24: TICK_ (stopped ticks, #137) set to 0 gives a ping, not /fail" {
+  config_url "$U"
+  set_status TICK_A 0
+  hb_run
+  [ "$status" -eq 0 ]
+  [ "$(ping_lines)" -eq 1 ]
+  [ "$(fail_lines)" -eq 0 ]
 }
