@@ -622,3 +622,49 @@ aa_proc() {
   printf '%s\n' "$output" | grep -q '^NG csv A_MT4 '
   [ "$(printf '%s\n' "$output" | grep -cxF '  auto_attach A_MT4: the ini is passed but no fresh CSV; the StartUp may not work (see ~/.atst/wine_a_mt4.log)')" -eq 1 ]
 }
+
+# doctor_make_csv14 <secs_ago>: one 14-field line (the monitoring EA of #158) in the data folder.
+doctor_make_csv14() {
+  local src dst
+
+  doctor_in_sandbox || return 1
+  atst_test_make_monitoring_csv A_MT4 "$1" 150.000 10 0.01 12 '' '1,1,1,1,0,0.00' || return 1
+  src="$WINEPREFIX/drive_c/Program Files/A_MT4/MQL4/Files/terminal_monitoring.csv"
+  dst="$(doctor_data_dir)/MQL4/Files/terminal_monitoring.csv"
+  cat "$src" >> "$dst" && rm -f "$src"
+}
+
+@test "DR-COLS-1: an 8-field CSV shows cols 8 and one note about the old EA; still OK (#158)" {
+  doctor_run
+  [ "$status" -eq 0 ]
+  [ -n "$(printf '%s\n' "$output" | grep -E '^OK csv A_MT4 last update [0-9]+s ago cols 8$')" ]
+  [ "$(printf '%s\n' "$output" | grep -c '^  the monitoring EA is old (8 fields): check_trade_ready\.sh does not work until the EA is updated (setup_monitoring_ea\.sh) and attached again$')" -eq 1 ]
+  [[ "${lines[${#lines[@]}-1]}" == *" ng=0 "* ]]
+}
+
+@test "DR-COLS-2: a 14-field CSV shows cols 14 and no note (#158)" {
+  rm -f "$(doctor_data_dir)/MQL4/Files/terminal_monitoring.csv"
+  doctor_make_csv14 10
+  doctor_run
+  [ "$status" -eq 0 ]
+  [ -n "$(printf '%s\n' "$output" | grep -E '^OK csv A_MT4 last update [0-9]+s ago cols 14$')" ]
+  [ "$(printf '%s\n' "$output" | grep -c 'monitoring EA is old')" -eq 0 ]
+}
+
+@test "DR-COLS-3: an old 8-field CSV is NG with cols 8 and the note (#158)" {
+  rm -f "$(doctor_data_dir)/MQL4/Files/terminal_monitoring.csv"
+  doctor_make_csv 400
+  doctor_run
+  [ "$status" -eq 1 ]
+  [ -n "$(printf '%s\n' "$output" | grep -E '^NG csv A_MT4 last update [0-9]+s ago \(threshold 180s\) cols 8$')" ]
+  [ "$(printf '%s\n' "$output" | grep -c 'monitoring EA is old (8 fields)')" -eq 1 ]
+}
+
+@test "DR-COLS-4: the number of fields is that of the last data line (14 then 8 gives cols 8) (#158)" {
+  rm -f "$(doctor_data_dir)/MQL4/Files/terminal_monitoring.csv"
+  doctor_make_csv14 20
+  doctor_make_csv 10
+  doctor_run
+  [ "$status" -eq 0 ]
+  [ -n "$(printf '%s\n' "$output" | grep -E '^OK csv A_MT4 last update [0-9]+s ago cols 8$')" ]
+}

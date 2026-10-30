@@ -8,7 +8,7 @@
 #   窓の外側に行が無い (起動直後)、窓の中に ATST_MONITORING_THRESHOLD 秒以上の空白がある (MT / 監視 EA の
 #   再開直後)、列 2 が 0 の行、週末 (列 1 の UTC で金 20:00〜月 00:00。
 #   ATST_TICK_WEEKEND_SKIP=0 で週末も判定)。祝日・早期クローズは抑止しません。
-# - 接続・自動売買の許可・建玉数を EA 側で見る第 2 段は #158。
+# - 接続・自動売買の許可は check_trade_ready.sh (#158)。
 #
 
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
@@ -17,7 +17,7 @@ function do_check() {
   local target_name="$1"
   local target_fullname="$2"
   local alert_key=TICK_${target_fullname// /_}
-  local monitoring_file result last1 changed outside filled now dow hour verdict=""
+  local monitoring_file result last1 changed outside filled now verdict=""
 
   monitoring_file=$(atst_get_monitoring_csv_path "$target_name")
   { [ -n "$monitoring_file" ] && [ -f "$monitoring_file" ]; } || return 0
@@ -49,14 +49,9 @@ function do_check() {
   last1=$((10#$last1))
   now=$(date +%s)
 
-  # The day of the week (0 = Sunday ... 6 = Saturday) and the hour, in UTC, of field 1 (1970-01-01 was a
-  # Thursday). Plain arithmetic, not GNU date: the same on every distribution and whatever the host time zone is.
-  dow=$(( (last1 / 86400 + 4) % 7 ))
-  hour=$(( last1 % 86400 / 3600 ))
-
   if [ $(( now - last1 )) -ge "$mon_threshold" ]; then
     verdict=""   # the csv itself has stopped: MONITORING_ reports it
-  elif [ "$weekend_skip" -eq 1 ] && { [ "$dow" -eq 6 ] || [ "$dow" -eq 0 ] || { [ "$dow" -eq 5 ] && [ "$hour" -ge 20 ]; }; }; then
+  elif [ "$weekend_skip" -eq 1 ] && atst_is_weekend_epoch "$last1"; then
     verdict=""   # the market is closed
   elif [ "$outside" != 1 ]; then
     verdict=""   # the window is not full yet

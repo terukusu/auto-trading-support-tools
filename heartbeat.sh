@@ -7,8 +7,8 @@
 # - 監視自体の健全性に関わる異常が発生中なら <URL>/fail に POST、無ければ <URL> に ping (GET)。
 #   1 回の実行で送るのはどちらか 1 回だけです。
 #   ping が途絶える = cron / VPS / ネットワークの停止、/fail が届く = 監視が異常を検知中 (LINE が死んでいても届く)。
-# - 対象: ~/.atst/alert_status で値が 1 のキーのうち PROCESS_ / TARGET_ / MONITORING_ / TICK_ / RUNNER_ / LINE_
-#   で始まるもの (LINE_QUOTA は check_daily.sh が書く)。ただし RUNNER_TIMEOUT_HEARTBEAT は除く (打ち切られた
+# - 対象: ~/.atst/alert_status で値が 1 のキーのうち PROCESS_ / TARGET_ / MONITORING_ / TICK_ / TRADE_ / RUNNER_
+#   / LINE_ で始まるもの (LINE_QUOTA は check_daily.sh が書く)。ただし RUNNER_TIMEOUT_HEARTBEAT は除く (打ち切られた
 #   相手は外部サービス自身で、ping の途絶として既に見えている)。加えて line_error.log の直近 60 分に LINE の
 #   送信失敗が ATST_HEARTBEAT_LINE_FAIL_COUNT 件 (既定 3) 続いていれば LINE_SEND_FAILED。
 # - 対象外: PRICE_ / SPREAD_ / PING_ (相場・回線品質は LINE の通知で足りる)、IMAGE_REPORT_DEFAULT_CHANGED など
@@ -43,7 +43,7 @@ done
 keys=""
 if [ -n "${ATST_ALERT_STATUS_FILE:-}" ]; then
   keys=$(awk -F, '
-    $2 == "1" && $1 ~ /^(PROCESS_|TARGET_|MONITORING_|TICK_|RUNNER_|LINE_)/ && $1 != "RUNNER_TIMEOUT_HEARTBEAT" {
+    $2 == "1" && $1 ~ /^(PROCESS_|TARGET_|MONITORING_|TICK_|TRADE_|RUNNER_|LINE_)/ && $1 != "RUNNER_TIMEOUT_HEARTBEAT" {
       printf "%s%s", sep, $1; sep = " "
     }' "$ATST_ALERT_STATUS_FILE" 2>/dev/null)
 fi

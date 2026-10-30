@@ -409,3 +409,63 @@ Period=M5" ]
   [ "$status" -eq 1 ]
   [ "$output" = "" ]
 }
+
+# atst_is_weekend_epoch (#158). Fixed epochs (checked once with date -u -d @<e>):
+# 1730491199 = 2024-11-01 Fri 19:59:59 UTC, 1730491200 = Fri 20:00:00, 1730548800 = Sat 12:00:00,
+# 1730678399 = Sun 23:59:59, 1730678400 = Mon 00:00:00, 1730980800 = Thu 12:00:00, 0 = 1970-01-01 Thu 00:00.
+@test "WE-1: Friday 19:59:59 UTC is not the weekend (1), nothing printed" {
+  atst_test_source_common || return 1
+  run atst_is_weekend_epoch 1730491199
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+}
+
+@test "WE-2: Friday 20:00:00 UTC is the weekend (0), nothing printed" {
+  atst_test_source_common || return 1
+  run atst_is_weekend_epoch 1730491200
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "WE-3: Saturday 12:00 and Sunday 23:59:59 UTC are the weekend (0)" {
+  atst_test_source_common || return 1
+  run atst_is_weekend_epoch 1730548800
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  run atst_is_weekend_epoch 1730678399
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "WE-4: Monday 00:00:00 and Thursday 12:00 UTC are not the weekend (1)" {
+  atst_test_source_common || return 1
+  run atst_is_weekend_epoch 1730678400
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+  run atst_is_weekend_epoch 1730980800
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+}
+
+@test "WE-5: empty, not a number, negative, 1.5, 13 digits or no argument return 1 and print nothing" {
+  local v
+  atst_test_source_common || return 1
+  for v in '' abc -1 1.5 1730491200000; do
+    run atst_is_weekend_epoch "$v"
+    [ "$status" -eq 1 ] || { echo "v=$v status=$status"; false; }
+    [ -z "$output" ] || { echo "v=$v output=$output"; false; }
+  done
+  run atst_is_weekend_epoch
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+}
+
+@test "WE-6: a 0-led epoch is decimal (Friday 20:00 -> 0), 0 is Thursday (1)" {
+  atst_test_source_common || return 1
+  run atst_is_weekend_epoch 01730491200
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  run atst_is_weekend_epoch 0
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+}

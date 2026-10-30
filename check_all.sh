@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# 毎分の監視 (再起動・約定・プロセス・監視データ・ティック・Ping・値動き・スプレッド・ハートビート) を順に 1 回ずつ
+# 毎分の監視 (再起動・約定・プロセス・監視データ・ティック・取引可否・Ping・値動き・スプレッド・ハートビート) を順に 1 回ずつ
 # 実行します。監視する MetaTrader の名前は ~/.atst/config の ATST_TARGETS から読みます。
 # crontab には "* * * * * check_all.sh" の 1 行だけを書きます (templates/crontab.txt)。
 #
@@ -58,20 +58,20 @@ fi
 heartbeat_cap=60
 
 # The longest one run can take while the timeouts work:
-# - 9 check runs x (cap + 5 s to KILL): 9 * cap + 45
+# - 10 check runs x (cap + 5 s to KILL): 10 * cap + 50
 # - the heartbeat (60 + 5 s): 65
 # - the wait for the second check_order (ATST_ORDER_CHECK_INTERVAL, at most 50 s): 50
 # - up to 10 notices of our own sent at once when they cannot be spooled (35 s lock wait + 30 s send
 #   each): 650
 # - the two flushes of the spool: the first (10 s for all its key locks + 2 pushes x 30 s) and the
 #   last (10 s + 1 push x 30 s): 110
-# - a margin: 55 (60 before check_tick was added in #137; the total is kept at 975)
-# 45 + 65 + 50 + 650 + 110 + 55 = 975. The alert_status lock (flock -w 10 in atst_set_alert_status)
+# - a margin: 50 (60 before #137, 55 before #158; the total is kept at 975)
+# 50 + 65 + 50 + 650 + 110 + 50 = 975. The alert_status lock (flock -w 10 in atst_set_alert_status)
 # is held for one awk only and is not counted (as before).
 # A run still holding the lock after this is stuck outside the timeouts. A shorter threshold would
 # fire and recover every few runs while every check hangs (the timeouts are reported separately),
 # using up the monthly LINE quota.
-stuck_after=$(( 9 * cap + 975 ))
+stuck_after=$(( 10 * cap + 975 ))
 
 lock_file="$ATST_CONFIG_DIR/check_all.lock"
 started_file="$ATST_CONFIG_DIR/check_all.started"
@@ -147,6 +147,7 @@ cut_order=0
 cut_process=0
 cut_monitoring=0
 cut_tick=0
+cut_trade_ready=0
 cut_ping=0
 cut_price=0
 cut_spread=0
@@ -170,6 +171,7 @@ if [ "$has_targets" -eq 1 ]; then
   run_check "$cap" check_process "${ATST_TARGETS[@]}" || cut_process=1
   run_check "$cap" check_monitoring "${ATST_TARGETS[@]}" || cut_monitoring=1
   run_check "$cap" check_tick "${ATST_TARGETS[@]}" || cut_tick=1
+  run_check "$cap" check_trade_ready "${ATST_TARGETS[@]}" || cut_trade_ready=1
   run_check "$cap" check_ping "${ATST_TARGETS[@]}" || cut_ping=1
   run_check "$cap" check_price "${ATST_TARGETS[@]}" || cut_price=1
   run_check "$cap" check_spread "${ATST_TARGETS[@]}" || cut_spread=1
@@ -182,6 +184,7 @@ if [ "$has_targets" -eq 1 ]; then
   notify_timeout CHECK_PROCESS check_process "$cut_process" "$cap"
   notify_timeout CHECK_MONITORING check_monitoring "$cut_monitoring" "$cap"
   notify_timeout CHECK_TICK check_tick "$cut_tick" "$cap"
+  notify_timeout CHECK_TRADE_READY check_trade_ready "$cut_trade_ready" "$cap"
   notify_timeout CHECK_PING check_ping "$cut_ping" "$cap"
   notify_timeout CHECK_PRICE check_price "$cut_price" "$cap"
   notify_timeout CHECK_SPREAD check_spread "$cut_spread" "$cap"

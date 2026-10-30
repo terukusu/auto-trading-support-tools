@@ -9,7 +9,7 @@
 
 load ../test_helper
 
-CHECKS="check_reboot check_order check_process check_monitoring check_tick check_ping check_price check_spread heartbeat"
+CHECKS="check_reboot check_order check_process check_monitoring check_tick check_trade_ready check_ping check_price check_spread heartbeat"
 
 setup() {
   local n
@@ -98,10 +98,10 @@ runlog() {
 }
 
 # What every run that could not use the log must still do (LOG-04a/b/c, LOG-09): all checks once
-# (check_order twice: 10 lines in calls.log), no push, and the check's stderr where it was (in $output), without a START line.
+# (check_order twice: 11 lines in calls.log), no push, and the check's stderr where it was (in $output), without a START line.
 assert_ran_unlogged() {
   [ "$status" -eq 0 ] || return 1
-  [ "$(wc -l < "$CALLS")" -eq 10 ] || return 1
+  [ "$(wc -l < "$CALLS")" -eq 11 ] || return 1
   [ "$(calls_of check_order.sh)" -eq 2 ] || return 1
   [ "$(atst_test_push_count)" -eq 0 ] || return 1
   [[ "$output" == *PING-STDERR-7f3a* ]] || return 1
@@ -135,6 +135,7 @@ check_order.sh [it's] [a  b] [*]
 check_process.sh [it's] [a  b] [*]
 check_monitoring.sh [it's] [a  b] [*]
 check_tick.sh [it's] [a  b] [*]
+check_trade_ready.sh [it's] [a  b] [*]
 check_ping.sh [it's] [a  b] [*]
 check_price.sh [it's] [a  b] [*]
 check_spread.sh [it's] [a  b] [*]
@@ -203,11 +204,12 @@ heartbeat.sh"
   [ "$status" -eq 0 ]
   [ "$(atst_test_push_count)" -eq 0 ]
   [ -s "$HOME/.atst/uptime" ]
-  [ "$(wc -l < "$CALLS")" -eq 9 ]
+  [ "$(wc -l < "$CALLS")" -eq 10 ]
   [ "$(calls_of check_order.sh)" -eq 2 ]
   [ "$(calls_of check_process.sh)" -eq 1 ]
   [ "$(calls_of check_monitoring.sh)" -eq 1 ]
   [ "$(calls_of check_tick.sh)" -eq 1 ]
+  [ "$(calls_of check_trade_ready.sh)" -eq 1 ]
   [ "$(calls_of check_ping.sh)" -eq 1 ]
   [ "$(calls_of check_price.sh)" -eq 1 ]
   [ "$(calls_of check_spread.sh)" -eq 1 ]
@@ -234,6 +236,7 @@ heartbeat.sh"
   [ "$status" -eq 0 ]
   [ "$el" -le 12 ]
   [ "$(calls_of check_tick.sh)" -eq 1 ]
+  [ "$(calls_of check_trade_ready.sh)" -eq 1 ]
   [ "$(calls_of check_price.sh)" -eq 1 ]
   [ "$(calls_of check_spread.sh)" -eq 1 ]
   [ "$(calls_of heartbeat.sh)" -eq 1 ]
@@ -304,7 +307,7 @@ heartbeat.sh"
 
   wait "$pid"
   rm -f "$ATST_TEST_SANDBOX/bg.pid"
-  [ "$(wc -l < "$CALLS")" -eq 10 ]
+  [ "$(wc -l < "$CALLS")" -eq 11 ]
   [ "$(calls_of check_reboot.sh)" -eq 1 ]
   [ "$(calls_of check_order.sh)" -eq 2 ]
   [ "$(calls_of check_process.sh)" -eq 1 ]
@@ -318,7 +321,7 @@ heartbeat.sh"
   hold_lock "$HOME/.atst/check_all.lock"
   now=$(date +%s)
 
-  # TIMEOUT 2 gives 9 * 2 + 975 = 993 seconds; shorter or unknown elapsed times say nothing.
+  # TIMEOUT 2 gives 10 * 2 + 975 = 995 seconds; shorter or unknown elapsed times say nothing.
   for v in "$(( now - 60 ))" "$(( now - 870 ))" abc "$(( now + 1000 ))" none; do
     if [ "$v" = none ]; then
       rm -f "$HOME/.atst/check_all.started"
@@ -475,12 +478,13 @@ EOF
   [ "$(stat -c %a "$HOME/.atst/check_all.started")" = "$ref" ]
   [ "$(stat -c %a "$HOME/.atst/check_all.lock")" = "$ref" ]
   [ "$(atst_test_push_count)" -eq 0 ]
-  [ "$(wc -l < "$CALLS")" -eq 10 ]
+  [ "$(wc -l < "$CALLS")" -eq 11 ]
   [ "$(calls_of check_order.sh)" -eq 2 ]
   [ "$(calls_of check_reboot.sh)" -eq 1 ]
   [ "$(calls_of check_process.sh)" -eq 1 ]
   [ "$(calls_of check_monitoring.sh)" -eq 1 ]
   [ "$(calls_of check_tick.sh)" -eq 1 ]
+  [ "$(calls_of check_trade_ready.sh)" -eq 1 ]
   [ "$(calls_of check_ping.sh)" -eq 1 ]
   [ "$(calls_of check_price.sh)" -eq 1 ]
   [ "$(calls_of check_spread.sh)" -eq 1 ]
@@ -662,7 +666,7 @@ EOF
   [ "$(runlog | grep -c PING-STDERR-7f3a)" -eq 1 ]
   [[ "$output" != *PING-STDERR-7f3a* ]]
   [ "$(runlog | grep -c '^===== START ')" -eq 1 ]
-  [ "$(wc -l < "$CALLS")" -eq 10 ]
+  [ "$(wc -l < "$CALLS")" -eq 11 ]
 }
 
 @test "LOG-12: an argument exits before the log is touched" {
@@ -700,7 +704,7 @@ EOF
   [ "$(runlog | grep -c PING-STDERR-7f3a)" -eq 1 ]
   [[ "$output" != *PING-STDERR-7f3a* ]]
   [ "$(runlog | grep -c '^===== START ')" -eq 1 ]
-  [ "$(wc -l < "$CALLS")" -eq 10 ]
+  [ "$(wc -l < "$CALLS")" -eq 11 ]
   [ "$(atst_test_push_count)" -eq 0 ]
 }
 
@@ -881,4 +885,73 @@ hb_ping_lines() {
   run bash "$home/check_all.sh"
   [ "$status" -eq 0 ]
   [ "$(atst_test_push_count)" -eq 1 ]
+}
+
+@test "RUN-28: a hung check_trade_ready is cut off as RUNNER_TIMEOUT_CHECK_TRADE_READY, the later checks still run (#158)" {
+  local t0 el
+  atst_test_stub_script "$home" check_trade_ready.sh hang
+  t0=$(date +%s)
+  run timeout 60 bash "$home/check_all.sh"
+  el=$(( $(date +%s) - t0 ))
+  [ "$status" -eq 0 ]
+  [ "$el" -le 12 ]
+  [ "$(calls_of check_ping.sh)" -eq 1 ]
+  [ "$(calls_of check_price.sh)" -eq 1 ]
+  [ "$(calls_of check_spread.sh)" -eq 1 ]
+  [ "$(calls_of heartbeat.sh)" -eq 1 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(status_lines '^RUNNER_TIMEOUT_CHECK_TRADE_READY,1,')" -eq 1 ]
+  grep -qF '【発生】チェックが 2 秒で終わらず打ち切りました: check_trade_ready.sh' "$ATST_TEST_CURL_LOG"
+
+  run timeout 60 bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+
+  atst_test_stub_script "$home" check_trade_ready.sh record
+  run timeout 60 bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 2 ]
+  [ "$(status_lines '^RUNNER_TIMEOUT_CHECK_TRADE_READY,0,')" -eq 1 ]
+  grep -qF '【復帰】チェックが時間内に終わるようになりました: check_trade_ready.sh' "$ATST_TEST_CURL_LOG"
+}
+
+@test "RUN-29: the real check_trade_ready.sh through the runner: an old EA does nothing, the button OFF is reported once (#158)" {
+  local n
+  cp -p "$repo/check_trade_ready.sh" "$home/"
+  atst_test_make_mt A_MT4 MT4
+  atst_test_set_targets A_MT4
+  # Judged on any day the test runs (the weekend gate is covered by tests/check_trade_ready.bats).
+  atst_test_set_config ATST_TRADE_READY_WEEKEND_SKIP 0
+  # (a) 8-field lines of an old EA only
+  for n in 720 660 600 540 480 420 360 300 240 180 120 60 0; do
+    atst_test_make_monitoring_csv A_MT4 "$n" 150.0 10 0.01 12 100
+  done
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 0 ]
+  [ "$(status_lines '^TRADE_')" -eq 0 ]
+  [ "$(runlog | grep -c 'check_trade_ready')" -eq 0 ]
+  # (b) 14-field lines with field 10 = 0 every 60 s
+  rm -f "$WINEPREFIX/drive_c/Program Files/A_MT4/MQL4/Files/terminal_monitoring.csv"
+  for n in 720 660 600 540 480 420 360 300 240 180 120 60 0; do
+    atst_test_make_monitoring_csv A_MT4 "$n" 150.0 10 0.01 12 100 '1,0,1,1,0,0.00'
+  done
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(status_lines '^TRADE_A_MT4,1,')" -eq 1 ]
+  grep -qF '端末の自動売買ボタンが OFF です' "$ATST_TEST_CURL_LOG"
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+}
+
+@test "RUN-30: a missing check_trade_ready.sh is one exit 127 line in the log, not a cut-off (#158)" {
+  rm "$home/check_trade_ready.sh"
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 0 ]
+  [ "$(status_lines '^RUNNER_TIMEOUT_')" -eq 0 ]
+  [ "$(runlog | grep -c 'check_trade_ready.sh: exit 127')" -eq 1 ]
+  [ "$(calls_of check_ping.sh)" -eq 1 ]
 }

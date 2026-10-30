@@ -51,7 +51,7 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 ### 毎分の監視
 
 - `check_all.sh` — crontab の毎分の行はこの 1 行だけ。固定の順で各チェックを 1 回ずつ順次実行し（同時多発を避ける）、その回の通知を 1 通にまとめる。実行順・打ち切り・`RUNNER_*`・ログは `docs/notification-pipeline.md`。
-- `check_*.sh` — 監視（reboot / process / order / ping / price / spread / monitoring / tick / daily）。毎分のものは `check_all.sh` が実行する。`check_tick.sh` の判定と `check_daily.sh` の状態だけのキーは `docs/notification-pipeline.md`。
+- `check_*.sh` — 監視（reboot / process / order / ping / price / spread / monitoring / tick / trade_ready / daily）。毎分のものは `check_all.sh` が実行する。`check_tick.sh`・`check_trade_ready.sh` の判定と `check_daily.sh` の状態だけのキーは `docs/notification-pipeline.md`。
 - `heartbeat.sh` — 外形監視（`check_all.sh` の最後、または旧形式の crontab の行）。URL 未設定なら何もしない。送る内容は `docs/notification-pipeline.md`。
 
 ### 毎分以外のジョブと旧形式
