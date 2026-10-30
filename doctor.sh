@@ -380,11 +380,12 @@ function doctor_check_check_all_log() {
 
 # 12. The StartUp ini of mtctl.sh start (ATST_AUTO_ATTACH_EA=1, #133): whether the ini is there (mode
 # 600 in drive_c/atst of mode 700) with the content of the config, and whether the running MetaTrader
-# got /config:C:\atst\startup_<n>.ini. Whether the EA writes the CSV is item 6 (csv); OK here with csv
+# got the ini argument of atst_startup_ini_arg (MT4: the bare C:\atst\startup_<n>.ini, MT5:
+# /config:C:\atst\startup_<n>.ini). Whether the EA writes the CSV is item 6 (csv); OK here with csv
 # NG adds a note. Read only: the ini is neither made nor fixed, winepath / wine are not run. The
 # symbol / period values, the ini content and the cmdline are not shown.
 function doctor_check_auto_attach() {
-  local t idx rc ini win dir m pid cmd cmd_u reason
+  local t idx rc ini win arg dir m pid cmd cmd_u reason
 
   if ! atst_has_targets; then
     doctor_line -- auto_attach "no targets"
@@ -439,32 +440,39 @@ function doctor_check_auto_attach() {
       continue
     fi
 
+    arg=$(atst_startup_ini_arg "${mt_type[idx]}" "$win")
     pid=$(atst_find_pid "$t")
     reason=""
     if [ -n "$pid" ]; then
       cmd=$(tr '\0' ' ' < "${ATST_PROC_ROOT:-/proc}/$pid/cmdline" 2>/dev/null)
       cmd_u=${cmd^^}
+      # the argument as a whole word after argv[0] (separate element or joined to it)
       case $cmd_u in
-        */CONFIG:*) ;;
-        *) reason="running without /config: (pid=$pid)" ;;
+        *" ${arg^^} "*|*" ${arg^^}") ;;
+        *)
+          case ${mt_type[idx]}:$cmd_u in
+            MT4:*/CONFIG:*) reason="running with /config:, which MT4 ignores (pid=$pid)" ;;
+            MT4:*) reason="running without the ini argument (pid=$pid)" ;;
+            *" /CONFIG:"*) reason="running with another /config: (pid=$pid)" ;;
+            *) reason="running without /config: (pid=$pid)" ;;
+          esac
+          ;;
       esac
-      if [ -z "$reason" ]; then
-        case $cmd_u in
-          *"/CONFIG:${win^^} "*|*"/CONFIG:${win^^}") ;;
-          *) reason="running with another /config: (pid=$pid)" ;;
-        esac
-      fi
       if [ -n "$reason" ]; then
         doctor_line NG auto_attach "$t $reason"
-        doctor_note "auto_attach $t: mtctl.sh stop and start pass /config:$win"
+        doctor_note "auto_attach $t: mtctl.sh stop and start pass $arg"
         continue
       fi
-      doctor_line OK auto_attach "$t ini ok, /config: passed (pid=$pid)"
+      if [ "${mt_type[idx]}" = MT4 ]; then
+        doctor_line OK auto_attach "$t ini ok, ini argument passed (pid=$pid)"
+      else
+        doctor_line OK auto_attach "$t ini ok, /config: passed (pid=$pid)"
+      fi
     else
       doctor_line OK auto_attach "$t ini ok, not running"
     fi
     if [ "${doctor_csv_state[$t]:-}" = ng ]; then
-      doctor_note "auto_attach $t: /config: is passed but no fresh CSV; the StartUp may not work (see ~/.atst/wine_$(printf '%s' "$t" | atst_to_lower).log)"
+      doctor_note "auto_attach $t: the ini is passed but no fresh CSV; the StartUp may not work (see ~/.atst/wine_$(printf '%s' "$t" | atst_to_lower).log)"
     fi
   done
 }

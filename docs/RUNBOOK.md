@@ -220,12 +220,12 @@ env -u WINEPREFIX ./mtctl.sh monitor "<MT 名>"
 **キー名**: `MONITORING_AUTO_ATTACH_<MT名>`（`~/.atst/config` が `ATST_AUTO_ATTACH_EA=1` のときだけ使う。既存の `MONITORING_<MT名>` とは別のキー）。
 
 **通知文の例**:
-- `【発生】<MT 名> の自動配置 (ATST_AUTO_ATTACH_EA=1) が有効ですが、起動から <N> 分たってもモニタリングデータが出ていません。/config の StartUp が効いていない可能性があります。確認: WINEPREFIX の drive_c/atst/startup_<名前>.ini (C:\atst\startup_<名前>.ini)、~/.atst/wine_<名前>.log、doctor.sh の auto_attach`
+- `【発生】<MT 名> の自動配置 (ATST_AUTO_ATTACH_EA=1) が有効ですが、起動から <N> 分たってもモニタリングデータが出ていません。StartUp ini が効いていない可能性があります。確認: WINEPREFIX の drive_c/atst/startup_<名前>.ini (C:\atst\startup_<名前>.ini)、~/.atst/wine_<名前>.log、doctor.sh の auto_attach`
 - `【継続中 30 分】…`（30 分 / 2 時間 / 12 時間後。上と同じ文面）
 - `【復帰】<MT 名> の自動配置 (ATST_AUTO_ATTACH_EA=1) でモニタリングデータが出るようになりました。`
 - `【復帰】<MT 名> の自動配置の確認を終了しました (ATST_AUTO_ATTACH_EA が 1 ではありません)。`（`0` に戻したとき）
 
-**意味**: `mtctl.sh start` が作った StartUp ini（`/config:`）で監視 EA を載せる設定なのに、MT が起動して `ATST_MONITORING_THRESHOLD` 秒たっても、起動後に書かれた CSV の行が無い。ini が読まれていない、通貨ペア・時間足がブローカーに無い、EA が自動売買の許可で動いていない、などが考えられる。止まっている MT や起動直後の MT は判定しない（止まっているときは `PROCESS_` の担当）。`MONITORING_<MT名>` も同時に出ることがあり、その場合はこちらの確認を先に、その後 [MONITORING_](#key-monitoring) を見る。
+**意味**: `mtctl.sh start` が作った StartUp ini（MT4 は ini のパスを素の引数、MT5 は `/config:<パス>` で渡す）で監視 EA を載せる設定なのに、MT が起動して `ATST_MONITORING_THRESHOLD` 秒たっても、起動後に書かれた CSV の行が無い。ini が読まれていない、通貨ペア・時間足がブローカーに無い、EA が自動売買の許可で動いていない、などが考えられる。止まっている MT や起動直後の MT は判定しない（止まっているときは `PROCESS_` の担当）。`MONITORING_<MT名>` も同時に出ることがあり、その場合はこちらの確認を先に、その後 [MONITORING_](#key-monitoring) を見る。
 
 **確認コマンド**:
 ```bash
@@ -233,7 +233,7 @@ env -u WINEPREFIX ./mtctl.sh monitor "<MT 名>"
 ls -l "$WINEPREFIX/drive_c/atst/"
 tail -n 20 ~/.atst/wine_<名前を小文字にしたもの>.log
 ```
-`doctor.sh` の `auto_attach` 行で、通貨ペア・時間足の値、ini の有無・権限（ディレクトリ 700・ファイル 600）、config との一致、動いている MT の `/config:` を見る。wine のログの `auto_attach:` 行は、`/config:` を付けて起動したか、付けずに起動した理由（`skipped (<理由>)`）が分かる。
+`doctor.sh` の `auto_attach` 行で、通貨ペア・時間足の値、ini の有無・権限（ディレクトリ 700・ファイル 600）、config との一致、動いている MT に ini の引数が渡っているか（MT4 は `C:\atst\startup_<名前>.ini`、MT5 は `/config:C:\atst\startup_<名前>.ini`）を見る。MT4 で `running with /config:, which MT4 ignores` なら旧版の起動のままなので `mtctl.sh stop` → `start` する。wine のログの `auto_attach:` 行は、ini を渡して起動したか（MT4 は `auto_attach: C:\atst\startup_<名前>.ini`、MT5 は `auto_attach: /config:C:\atst\startup_<名前>.ini`）、渡さずに起動した理由（`skipped (<理由>)`）が分かる。
 
 **安全な復旧手順**:
 - `doctor.sh` が `NG` の項目を直す（通貨ペア・時間足の値は `~/.atst/config` の `ATST_AUTO_ATTACH_SYMBOL` / `ATST_AUTO_ATTACH_PERIOD`。ブローカーの気配値表示にある名前にする）。

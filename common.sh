@@ -583,6 +583,20 @@ function atst_startup_ini_win_path() {
   printf '%s\n' "$win"
 }
 
+# atst_startup_ini_arg <MT4|MT5> <Windows path of the ini>
+# Prints the terminal.exe argument that passes the StartUp ini: the bare path for MT4
+# (C:\atst\startup_<n>.ini; MT4 build 1492 on Wine 10.0 ignores /config:, checked on the real host,
+# #133) and /config:<path> for MT5 (the MetaQuotes MT5 form, not checked on a real host yet). Prints
+# nothing and returns 1 for another type or an empty path.
+function atst_startup_ini_arg() {
+  [ -n "$2" ] || return 1
+  case $1 in
+    MT4) printf '%s\n' "$2" ;;
+    MT5) printf '%s\n' "/config:$2" ;;
+    *) return 1 ;;
+  esac
+}
+
 # atst_startup_ini_content <MT4|MT5> <symbol> <period>
 # Prints the StartUp ini of mtctl.sh start: 5 lines ending with CRLF (ASCII, no BOM, no time, so the
 # same arguments give the same bytes). Only [StartUp] Symbol / Period / Expert: no [Common] (account),
@@ -621,8 +635,8 @@ function atst_startup_ini_content() {
 #    mtctl stop can only kill our own, and WINEPREFIX lives under our HOME.
 #  - argv[0] (argv[1] when argv[0] is wine/wine64/wine-preloader/wine64-preloader), ignoring case,
 #    is mt_term or its Windows form (atst_to_win_path), optionally inside ", either alone or followed
-#    by a blank / tab and anything (Wine may show the arguments joined to argv[0], e.g. the /config: of
-#    mtctl.sh start, #133); what follows the blank is ignored. "...\MT AB\terminal.exe" or
+#    by a blank / tab and anything (Wine may show the arguments joined to argv[0], e.g. the StartUp ini
+#    argument of mtctl.sh start, #133); what follows the blank is ignored. "...\MT AB\terminal.exe" or
 #    "...\terminal.exe.bak" (with or without a tail) is not "...\MT A\terminal.exe". In theory an
 #    exe under a folder named "...\terminal.exe <blank>..." would match; no such folder is expected.
 #  - for the Windows form only, its prefix (environ WINEPREFIX, else environ HOME/.wine, else our

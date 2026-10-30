@@ -76,7 +76,7 @@ mc_wine_lines() {
   grep '^wine ' "$ATST_TEST_SANDBOX/calls.log" 2>/dev/null | cut -d' ' -f3-
 }
 
-# The arguments of wine start without /config: (the order mtctl.sh has always used).
+# The arguments of wine start without the StartUp ini (the order mtctl.sh has always used).
 mc_base_args() {
   printf '[start] [/b] [/d] [%s] [/unix] [%s]' "C:\\Program Files\\$1" "$WINEPREFIX/drive_c/Program Files/$1/terminal.exe"
 }
@@ -85,7 +85,7 @@ mc_stderr_of_start() {
   run bash -c 'bash "$0" "$@" 2>&1 1>/dev/null' "$BATS_TEST_DIRNAME/../mtctl.sh" "$@"
 }
 
-@test "MC-8: start with ATST_AUTO_ATTACH_EA=1 writes the ini (600 in a 700 dir) and passes /config:C:\\atst\\..." {
+@test "MC-8: start with ATST_AUTO_ATTACH_EA=1 writes the ini (600 in a 700 dir) and passes the bare C:\\atst\\... to MT4" {
   local atstdir="$WINEPREFIX/drive_c/atst" ini="$WINEPREFIX/drive_c/atst/startup_a_mt4.ini"
   mc_stub_wine
   mc_enable
@@ -97,11 +97,14 @@ mc_stderr_of_start() {
   [ "$(stat -c %a "$ini")" = 600 ]
   [ -z "$(ls "$HOME"/.atst/startup_* 2>/dev/null)" ]
   [ "$(mc_wine_lines | wc -l)" -eq 1 ]
-  [ "$(mc_wine_lines)" = "$(mc_base_args A_MT4) [/config:C:\\atst\\startup_a_mt4.ini]" ]
-  [ "$(mc_wine_lines | grep -o '\[/config:' | wc -l)" -eq 1 ]
+  [ "$(mc_wine_lines)" = "$(mc_base_args A_MT4) [C:\\atst\\startup_a_mt4.ini]" ]
+  [ "$(mc_wine_lines | grep -o '\[C:\\atst\\' | wc -l)" -eq 1 ]
+  # MT4 ignores /config: (real host, #133): it is not passed
+  [ "$(grep -c '/config:' "$ATST_TEST_SANDBOX/calls.log")" -eq 0 ]
   [ "$(grep -c '^auto_attach: ' "$HOME/.atst/wine_a_mt4.log")" -eq 1 ]
   [ "$(grep -n '^auto_attach: ' "$HOME/.atst/wine_a_mt4.log" | cut -d: -f1)" -gt "$(grep -n '^===== START' "$HOME/.atst/wine_a_mt4.log" | cut -d: -f1)" ]
-  grep -qxF 'auto_attach: /config:C:\atst\startup_a_mt4.ini' "$HOME/.atst/wine_a_mt4.log"
+  grep -qxF 'auto_attach: C:\atst\startup_a_mt4.ini' "$HOME/.atst/wine_a_mt4.log"
+  [ "$(grep -c '/config:' "$HOME/.atst/wine_a_mt4.log")" -eq 0 ]
   # MC-15: nothing goes through Z:
   [ "$(grep -c 'Z:' "$ATST_TEST_SANDBOX/calls.log")" -eq 0 ]
   [ "$(grep -c '^auto_attach: .*Z:' "$HOME/.atst/wine_a_mt4.log")" -eq 0 ]
@@ -194,9 +197,10 @@ Expert=TerminalMonitoring" ]
   [ "$(tr -d '\r' < "$WINEPREFIX/drive_c/atst/startup_b_mt5.ini" | sed -n 5p)" = 'Expert=Advisors\TerminalMonitoring' ]
   [ "$(mc_wine_lines)" = "$(mc_base_args B_MT5) [/config:C:\\atst\\startup_b_mt5.ini]" ]
   [ "$(grep -c 'Z:' "$ATST_TEST_SANDBOX/calls.log")" -eq 0 ]
+  grep -qxF 'auto_attach: /config:C:\atst\startup_b_mt5.ini' "$HOME/.atst/wine_b_mt5.log"
 }
 
-@test "MC-13: a wrong or empty symbol / period starts without /config:, one stderr line without the value, -q silent" {
+@test "MC-13: a wrong or empty symbol / period starts without the ini, one stderr line without the value, -q silent" {
   local c log="$HOME/.atst/wine_a_mt4.log"
   mc_stub_wine
   for c in bad empty noperiod; do
@@ -230,7 +234,7 @@ Expert=TerminalMonitoring" ]
   done
 }
 
-@test "MC-14: an ini that cannot be written starts without /config:, leaves no temporary file and keeps the file in the way" {
+@test "MC-14: an ini that cannot be written starts without the ini, leaves no temporary file and keeps the file in the way" {
   local atstdir="$WINEPREFIX/drive_c/atst" log="$HOME/.atst/wine_a_mt4.log"
   mc_stub_wine
   mc_enable
@@ -272,10 +276,10 @@ Expert=TerminalMonitoring" ]
   run bash "$BATS_TEST_DIRNAME/../mtctl.sh" start A_MT4
   [ "$status" -eq 0 ]
   [ "$output" = "executing: $WINEPREFIX/drive_c/Program Files/A_MT4/terminal.exe" ]
-  [ "$(mc_wine_lines)" = "$(mc_base_args A_MT4) [/config:C:\\atst\\startup_a_mt4.ini]" ]
+  [ "$(mc_wine_lines)" = "$(mc_base_args A_MT4) [C:\\atst\\startup_a_mt4.ini]" ]
 }
 
-@test "MC-14c: a blank in WINEPREFIX does not reach /config:" {
+@test "MC-14c: a blank in WINEPREFIX does not reach the ini argument" {
   WINEPREFIX="$ATST_TEST_SANDBOX/pre fix"
   export WINEPREFIX
   atst_test_make_mt A_MT4 MT4
@@ -285,6 +289,6 @@ Expert=TerminalMonitoring" ]
   [ "$status" -eq 0 ]
   [ "$output" = "" ]
   [ "$(stat -c %a "$WINEPREFIX/drive_c/atst/startup_a_mt4.ini")" = 600 ]
-  [ "$(mc_wine_lines)" = "$(mc_base_args A_MT4) [/config:C:\\atst\\startup_a_mt4.ini]" ]
+  [ "$(mc_wine_lines)" = "$(mc_base_args A_MT4) [C:\\atst\\startup_a_mt4.ini]" ]
   [ "$(grep -c 'Z:' "$ATST_TEST_SANDBOX/calls.log")" -eq 0 ]
 }

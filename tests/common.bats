@@ -393,3 +393,19 @@ Period=M5" ]
   [ "$output" = 'C:\atst\startup_a_mt4.ini' ]
   [[ $output != *Z:* ]]
 }
+
+@test "IN-10: atst_startup_ini_arg is the bare path for MT4 and /config:<path> for MT5 (real host, #133)" {
+  atst_test_source_common || return 1
+  run atst_startup_ini_arg MT4 'C:\atst\startup_a_mt4.ini'
+  [ "$status" -eq 0 ]
+  [ "$output" = 'C:\atst\startup_a_mt4.ini' ]
+  run atst_startup_ini_arg MT5 'C:\atst\startup_b_mt5.ini'
+  [ "$status" -eq 0 ]
+  [ "$output" = '/config:C:\atst\startup_b_mt5.ini' ]
+  run atst_startup_ini_arg MT6 'C:\atst\x.ini'
+  [ "$status" -eq 1 ]
+  [ "$output" = "" ]
+  run atst_startup_ini_arg MT4 ''
+  [ "$status" -eq 1 ]
+  [ "$output" = "" ]
+}

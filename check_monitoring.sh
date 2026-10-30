@@ -39,7 +39,7 @@ function do_check_auto_attach() {
   ini_win=$(atst_startup_ini_win_path "$target_name")
   [ -n "$ini_win" ] || ini_win='C:\atst\startup_<name>.ini'
   log_name=$(echo $target_name | atst_to_lower)
-  fire_msg="【発生】$target_name の自動配置 (ATST_AUTO_ATTACH_EA=1) が有効ですが、起動から $((et / 60)) 分たってもモニタリングデータが出ていません。/config の StartUp が効いていない可能性があります。確認: WINEPREFIX の drive_c/atst/${ini_win##*\\} ($ini_win)、~/.atst/wine_$log_name.log、doctor.sh の auto_attach"
+  fire_msg="【発生】$target_name の自動配置 (ATST_AUTO_ATTACH_EA=1) が有効ですが、起動から $((et / 60)) 分たってもモニタリングデータが出ていません。StartUp ini が効いていない可能性があります。確認: WINEPREFIX の drive_c/atst/${ini_win##*\\} ($ini_win)、~/.atst/wine_$log_name.log、doctor.sh の auto_attach"
 
   atst_update_alert "$auto_key" "$verdict" "$fire_msg" \
     "【復帰】$target_name の自動配置 (ATST_AUTO_ATTACH_EA=1) でモニタリングデータが出るようになりました。"

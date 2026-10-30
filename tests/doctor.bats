@@ -481,13 +481,13 @@ aa_proc() {
   [[ $output != *'.atst/startup_'* ]]
 }
 
-@test "DR-AA-3: enabled, ini ok and /config:C:\\atst\\... in the cmdline is OK; nothing secret, home as ~" {
+@test "DR-AA-3: enabled, ini ok and the bare C:\\atst\\... in the MT4 cmdline is OK; nothing secret, home as ~" {
   aa_enable
   aa_make_ini
-  aa_proc 'C:\Program Files\A_MT4\terminal.exe' '/config:C:\atst\startup_a_mt4.ini'
+  aa_proc 'C:\Program Files\A_MT4\terminal.exe' 'C:\atst\startup_a_mt4.ini'
   doctor_run
   [ "$status" -eq 0 ]
-  [ "$(ini_line)" = "OK auto_attach A_MT4 ini ok, /config: passed (pid=123)" ]
+  [ "$(ini_line)" = "OK auto_attach A_MT4 ini ok, ini argument passed (pid=123)" ]
   [ "$(printf '%s\n' "$output" | grep -vcE '^((OK|NG|--) |  )')" -eq 0 ]
   [[ $output != *"$HOME"* ]]
   [[ $output != *EURUSD* ]]
@@ -496,32 +496,69 @@ aa_proc() {
   [ "$(printf '%s\n' "$output" | grep -c 'no fresh CSV')" -eq 0 ]
 }
 
-@test "DR-AA-3b: /config: joined to argv[0] (one cmdline element) is OK and the process is found" {
+@test "DR-AA-3b: the ini joined to argv[0] (one cmdline element) is OK and the process is found" {
   aa_enable
   aa_make_ini
-  aa_proc 'C:\Program Files\A_MT4\terminal.exe /config:C:\atst\startup_a_mt4.ini'
+  aa_proc 'C:\Program Files\A_MT4\terminal.exe C:\atst\startup_a_mt4.ini'
   doctor_run
   [ "$status" -eq 0 ]
-  [ "$(ini_line)" = "OK auto_attach A_MT4 ini ok, /config: passed (pid=123)" ]
+  [ "$(ini_line)" = "OK auto_attach A_MT4 ini ok, ini argument passed (pid=123)" ]
   printf '%s\n' "$output" | grep -q '^OK process A_MT4 pid=123$'
 }
 
-@test "DR-AA-3c: another /config: (an old Z: path) is NG without showing it" {
+@test "DR-AA-3c: MT4 running with /config: (ignored by MT4; the old start or an old Z: path) is NG without showing it" {
+  local a
   aa_enable
   aa_make_ini
-  aa_proc 'C:\Program Files\A_MT4\terminal.exe' '/config:Z:\home\u\.atst\startup_a_mt4.ini'
+  for a in '/config:C:\atst\startup_a_mt4.ini' '/config:Z:\home\u\.atst\startup_a_mt4.ini'; do
+    aa_proc 'C:\Program Files\A_MT4\terminal.exe' "$a"
+    doctor_run
+    [ "$status" -eq 1 ]
+    [ "$(ini_line)" = "NG auto_attach A_MT4 running with /config:, which MT4 ignores (pid=123)" ]
+    printf '%s\n' "$output" | grep -qxF '  auto_attach A_MT4: mtctl.sh stop and start pass C:\atst\startup_a_mt4.ini'
+    [[ $output != *Z:* ]]
+  done
+  # another bare ini is not ours
+  aa_proc 'C:\Program Files\A_MT4\terminal.exe' 'C:\atst\startup_a_mt4x.ini'
   doctor_run
   [ "$status" -eq 1 ]
-  [ "$(ini_line)" = "NG auto_attach A_MT4 running with another /config: (pid=123)" ]
+  [ "$(ini_line)" = "NG auto_attach A_MT4 running without the ini argument (pid=123)" ]
+}
+
+@test "DR-AA-3d: MT5 needs /config:C:\\atst\\...; the bare path or another /config: is NG" {
+  local hash5=B1B2C3D4E5F60718293A4B5C6D7E8F90
+  atst_test_make_mt B_MT5 MT5 "$hash5"
+  atst_test_set_targets B_MT5
+  aa_enable
+  mkdir -p "$WINEPREFIX/drive_c/atst" && chmod 700 "$WINEPREFIX/drive_c/atst"
+  atst_test_source_common
+  atst_startup_ini_content MT5 EURUSD M5 > "$WINEPREFIX/drive_c/atst/startup_b_mt5.ini"
+  chmod 600 "$WINEPREFIX/drive_c/atst/startup_b_mt5.ini"
+  rm -rf "${ATST_PROC_ROOT:?}/123"
+  atst_test_make_proc 125 - "$(printf 'HOME=%s\nWINEPREFIX=%s' "$HOME" "$WINEPREFIX")" \
+    'C:\Program Files\B_MT5\terminal.exe' '/config:C:\atst\startup_b_mt5.ini'
+  doctor_run
+  [ "$(ini_line)" = "OK auto_attach B_MT5 ini ok, /config: passed (pid=125)" ]
+  rm -rf "${ATST_PROC_ROOT:?}/125"
+  atst_test_make_proc 125 - "$(printf 'HOME=%s\nWINEPREFIX=%s' "$HOME" "$WINEPREFIX")" \
+    'C:\Program Files\B_MT5\terminal.exe' 'C:\atst\startup_b_mt5.ini'
+  doctor_run
+  [ "$(ini_line)" = "NG auto_attach B_MT5 running without /config: (pid=125)" ]
+  printf '%s\n' "$output" | grep -qxF '  auto_attach B_MT5: mtctl.sh stop and start pass /config:C:\atst\startup_b_mt5.ini'
+  rm -rf "${ATST_PROC_ROOT:?}/125"
+  atst_test_make_proc 125 - "$(printf 'HOME=%s\nWINEPREFIX=%s' "$HOME" "$WINEPREFIX")" \
+    'C:\Program Files\B_MT5\terminal.exe' '/config:Z:\home\u\.atst\startup_b_mt5.ini'
+  doctor_run
+  [ "$(ini_line)" = "NG auto_attach B_MT5 running with another /config: (pid=125)" ]
   [[ $output != *Z:* ]]
 }
 
-@test "DR-AA-4a: enabled, ini ok, a running MetaTrader without /config: is NG" {
+@test "DR-AA-4a: enabled, ini ok, a running MT4 without the ini argument is NG" {
   aa_enable
   aa_make_ini
   doctor_run
   [ "$status" -eq 1 ]
-  [ "$(ini_line)" = "NG auto_attach A_MT4 running without /config: (pid=123)" ]
+  [ "$(ini_line)" = "NG auto_attach A_MT4 running without the ini argument (pid=123)" ]
 }
 
 @test "DR-AA-4b: an ini of mode 644 is NG and doctor does not chmod it" {
@@ -568,7 +605,7 @@ aa_proc() {
   aa_enable
   aa_make_ini
   chmod 755 "$WINEPREFIX/drive_c/atst"
-  aa_proc 'C:\Program Files\A_MT4\terminal.exe' '/config:C:\atst\startup_a_mt4.ini'
+  aa_proc 'C:\Program Files\A_MT4\terminal.exe' 'C:\atst\startup_a_mt4.ini'
   doctor_run
   [ "$status" -eq 1 ]
   [ "$(ini_line)" = "NG auto_attach A_MT4 dir mode 755 (must be 700): $WINEPREFIX/drive_c/atst" ]
@@ -577,11 +614,11 @@ aa_proc() {
 @test "DR-AA-5: auto_attach OK with csv NG adds a note" {
   aa_enable
   aa_make_ini
-  aa_proc 'C:\Program Files\A_MT4\terminal.exe' '/config:C:\atst\startup_a_mt4.ini'
+  aa_proc 'C:\Program Files\A_MT4\terminal.exe' 'C:\atst\startup_a_mt4.ini'
   : > "$(doctor_data_dir)/MQL4/Files/terminal_monitoring.csv"
   doctor_make_csv 400
   doctor_run
-  [ "$(ini_line)" = "OK auto_attach A_MT4 ini ok, /config: passed (pid=123)" ]
+  [ "$(ini_line)" = "OK auto_attach A_MT4 ini ok, ini argument passed (pid=123)" ]
   printf '%s\n' "$output" | grep -q '^NG csv A_MT4 '
-  [ "$(printf '%s\n' "$output" | grep -cxF '  auto_attach A_MT4: /config: is passed but no fresh CSV; the StartUp may not work (see ~/.atst/wine_a_mt4.log)')" -eq 1 ]
+  [ "$(printf '%s\n' "$output" | grep -cxF '  auto_attach A_MT4: the ini is passed but no fresh CSV; the StartUp may not work (see ~/.atst/wine_a_mt4.log)')" -eq 1 ]
 }

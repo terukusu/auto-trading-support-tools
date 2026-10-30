@@ -56,7 +56,8 @@ ATST_THRESHOLD_PRICE_UPPER=100
 ATST_THRESHOLD_PRICE_LOWER=50
 
 # 1 にすると、mtctl.sh start が WINEPREFIX の drive_c/atst/startup_<名前>.ini (Windows から見て C:\atst\startup_<名前>.ini) を作り、
-# MetaTrader を /config: 付きで起動して、監視 EA (TerminalMonitoring) を下の通貨ペア・時間足の新しいチャートに起動時に載せます
+# その ini を付けて MetaTrader を起動し (MT4 は ini のパスを素の引数、MT5 は /config:<パス>)、監視 EA (TerminalMonitoring) を
+# 下の通貨ペア・時間足の新しいチャートに起動時に載せます
 # (チャートへの手作業の配置が要らなくなります)。<名前> は mtctl.sh start に渡す名前 (ATST_TARGETS の名前) を小文字にしたものです。
 # 0 (既定) なら今までどおり手で配置します。この行が無い古い config も 0 と同じです。戻すときは 0 にして mtctl.sh stop / start し直します。
 # ini には口座番号・パスワードを書きません。実機での確認状況は README の「監視 EA の自動配置」を見てください。

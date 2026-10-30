@@ -32,9 +32,11 @@ function pm () {
 # start_mt_startup_ini <MT name>
 # ATST_AUTO_ATTACH_EA=1 (#133): writes the StartUp ini of <MT name> (atst_startup_ini_path, mode 600 in
 # drive_c/atst of mode 700, replaced through a temporary file in the same directory) and sets
-# start_ini_arg to "/config:C:\atst\startup_<n>.ini" (atst_to_win_path; winepath is not used, so no Z:).
-# On any failure start_ini_arg stays empty and start_ini_reason says why, without the symbol / period
-# values or the home path; MetaTrader is then started without /config: (fail-open, never skipped).
+# start_ini_arg to the argument of atst_startup_ini_arg: the bare C:\atst\startup_<n>.ini for MT4 (MT4
+# ignores /config:, checked on the real host) and /config:C:\atst\startup_<n>.ini for MT5
+# (atst_to_win_path; winepath is not used, so no Z:). On any failure start_ini_arg stays empty and
+# start_ini_reason says why, without the symbol / period values or the home path; MetaTrader is then
+# started without the ini (fail-open, never skipped).
 function start_mt_startup_ini() {
   local name="$1"
   local idx type ini prefix_l win dir rc
@@ -83,7 +85,8 @@ function start_mt_startup_ini() {
   fi
 
   if [ -z "$start_ini_reason" ]; then
-    start_ini_arg="/config:$win"
+    start_ini_arg=$(atst_startup_ini_arg "$type" "$win")
+    [ -n "$start_ini_arg" ] || start_ini_reason="unknown MetaTrader type"
   fi
 }
 
@@ -113,7 +116,8 @@ function start_mt() {
 
     echo -e "\n===== START `date +'%Y-%m-%d %H:%M:%S'` =====" >> "$wine_log"
 
-    # ATST_AUTO_ATTACH_EA=1: one more argument, /config:<StartUp ini> (#133). Never skips the start.
+    # ATST_AUTO_ATTACH_EA=1: one more argument, the StartUp ini (MT4: the bare C:\ path, MT5:
+    # /config:<path>, #133). Never skips the start.
     extra_args=()
     if atst_auto_attach_enabled; then
       start_mt_startup_ini "$target_name"

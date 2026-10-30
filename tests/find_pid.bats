@@ -179,8 +179,29 @@ win_term() {
   [ "$output" = "" ]
 }
 
-# #133: mtctl.sh start may pass /config:<ini> after terminal.exe. Wine may show it as a separate argv
-# element or joined to argv[0] with a blank; both must match, nothing else may start to match.
+# #133: mtctl.sh start passes the StartUp ini after terminal.exe (MT4: the bare C:\atst\startup_<n>.ini,
+# MT5: /config:<ini>). Wine may show it as a separate argv element or joined to argv[0] with a blank;
+# both must match, nothing else may start to match.
+
+@test "F15m4: MT4 with the bare ini path (terminal.exe C:\\atst\\startup_x.ini) matches, separate or joined" {
+  atst_test_make_mt A_MT4 MT4
+  atst_test_source_common
+  atst_test_make_proc 123 - "$(own_env)" "$(win_term A_MT4)" 'C:\atst\startup_x.ini'
+  run atst_find_pid A_MT4
+  [ "$status" -eq 0 ]
+  [ "$output" = "123" ]
+  rm -rf "${ATST_PROC_ROOT:?}/123"
+  atst_test_make_proc 124 - "$(own_env)" "$(win_term A_MT4) C:\\atst\\startup_x.ini"
+  run atst_find_pid A_MT4
+  [ "$status" -eq 0 ]
+  [ "$output" = "124" ]
+  rm -rf "${ATST_PROC_ROOT:?}/124"
+  # the ini path glued to the exe (no blank) is not terminal.exe
+  atst_test_make_proc 125 - "$(own_env)" "$(win_term A_MT4)C:\\atst\\startup_x.ini"
+  run atst_find_pid A_MT4
+  [ "$status" -eq 0 ]
+  [ "$output" = "" ]
+}
 
 @test "F15: a Windows argv[0] followed by a separate /config: element matches" {
   atst_test_make_mt A_MT4 MT4
