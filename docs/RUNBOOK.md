@@ -20,6 +20,11 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
    ./doctor.sh
    ```
    `doctor.sh` は読み取り専用で、何も変えない。ネットワークも LINE も使わないので、夜中に何度実行しても LINE の送信枠（無料プランは月 200 通）を使わない。`NG` の行がそのまま次に見る場所になる。出力はホームを `~`、トークン・キー・URL を末尾 4 文字で表示するので、Issue に貼ってよい（`check_all.log` の末尾の行だけは貼る前に目で見る。[秘匿値の扱い](#秘匿値の扱い)）。
+   画面を見たいだけなら、VNC を開かずに `./snap.sh` で VNC のデスクトップ（:1）を 1 枚撮れる。保存先のパスが 1 行だけ出るので、手元から次の 1 行で取る（`<vps>` は ssh の接続名）。
+   ```bash
+   scp "<vps>:$(ssh <vps> '~/auto-trading-support-tools-master/snap.sh')" .
+   ```
+   `snap.sh` は VNC の画面を撮るだけで MT には触らない。LINE にも送らない（`--line` を付けたときだけ送る。[秘匿値の扱い](#秘匿値の扱い)）。
 2. MT の状態を、cron と同じ WINEPREFIX で確かめる。
    ```bash
    env -u WINEPREFIX ./mtctl.sh status "<MT 名>"
@@ -634,4 +639,6 @@ diff <(echo "$a") <(echo "$b")
   - ハートビートの URL: 外部サービス側で新しい URL を発行し、`./setup_heartbeat.sh` で入れ直す（`~/.atst/.heartbeat_url` が config の `ATST_HEARTBEAT_URL` より優先される。config に古い URL が残っていれば消す）。
 - 貼ってよいもの: `./doctor.sh` の出力（ホームは `~`、トークン・キー・URL は末尾 4 文字、LINE ID は出さない）。ただし `check_all.log` の末尾の行は各チェックの出力そのままなので、貼る前に目で見る。
 - 貼らないもの: `~/.atst/line_error.log` の `response:` / `message:` の行（通知の本文を含む。見出し行だけなら可）、`order_status.failed` と監視 CSV の中身（口座の情報を含みうる）、`~/.atst/.line_token` / `.line_id` / `.imgbb_key` / `.heartbeat_url`（`cat` しない）。
+- `./snap.sh` で撮った画像（`~/.atst/snap/*.jpg`）には口座番号・残高が写る。Issue・チャット・PR に貼らない。ファイルは 600、ディレクトリは 700 で作られ、新しい 10 枚（config の `ATST_SNAP_KEEP`）だけ残して古いものから消える。不要になったら `~/.atst/snap/` の中身を自分で消し、手元に `scp` した分も消す。
+- `./snap.sh --line` は画像を ImgBB に置いて LINE に送る。URL を知っていれば誰でも見られる公開 URL で、`ATST_IMGBB_EXPIRATION` 秒（既定 86400 秒 = 1 日）残る。口座が写るので、LINE に送る必要があるときだけ使い、普段は付けない。
 - これらの秘匿ファイルの権限は 600（`./doctor.sh` が検査し、違えば `NG`）。
