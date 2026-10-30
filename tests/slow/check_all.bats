@@ -6,6 +6,8 @@
 # checks are stubs recording their arguments (atst_test_stub_script), unless a test puts the real one
 # back. Also covers the test_helper functions made for it.
 # LOG-xx (#144): the stderr of the runner and its checks goes to ~/.atst/log/check_all.log.
+# self_heal.sh (#140) is not in CHECKS: the real one runs last and, without ~/.atst/self_heal.enabled,
+# exits at once without a call or a line (RUN-31..34 cover it).
 
 load ../test_helper
 
@@ -321,7 +323,8 @@ heartbeat.sh"
   hold_lock "$HOME/.atst/check_all.lock"
   now=$(date +%s)
 
-  # TIMEOUT 2 gives 10 * 2 + 975 = 995 seconds; shorter or unknown elapsed times say nothing.
+  # TIMEOUT 2 gives 10 * 2 + 975 + 155 = 1150 seconds (+ 155: self_heal, #140); shorter or unknown
+  # elapsed times say nothing.
   for v in "$(( now - 60 ))" "$(( now - 870 ))" abc "$(( now + 1000 ))" none; do
     if [ "$v" = none ]; then
       rm -f "$HOME/.atst/check_all.started"
@@ -334,7 +337,7 @@ heartbeat.sh"
   [ "$(atst_test_push_count)" -eq 0 ]
   [ ! -e "$CALLS" ]
 
-  echo "$(( now - 1000 ))" > "$HOME/.atst/check_all.started"
+  echo "$(( now - 1200 ))" > "$HOME/.atst/check_all.started"
   for v in 1 2 3; do
     run bash "$home/check_all.sh"
     [ "$status" -eq 0 ]
@@ -954,4 +957,66 @@ hb_ping_lines() {
   [ "$(status_lines '^RUNNER_TIMEOUT_')" -eq 0 ]
   [ "$(runlog | grep -c 'check_trade_ready.sh: exit 127')" -eq 1 ]
   [ "$(calls_of check_ping.sh)" -eq 1 ]
+}
+
+@test "RUN-31: self_heal runs last with the names, after the heartbeat; not without targets (#140 AC14)" {
+  atst_test_stub_script "$home" self_heal.sh record
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$CALLS")" -eq 12 ]
+  [ "$(calls | tail -2)" = "heartbeat.sh
+self_heal.sh [A]" ]
+
+  rm -f "$CALLS"
+  unset_targets
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(calls_of self_heal.sh)" -eq 0 ]
+}
+
+@test "RUN-32: the real self_heal.sh without self_heal.enabled calls no mtctl.sh, even with PROCESS_A at 1 (#140 AC5)" {
+  atst_test_stub_script "$home" mtctl.sh record
+  mkdir -p "$HOME/.atst"
+  echo "PROCESS_A,1,$(date +%s)" > "$ST"
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(calls_of mtctl.sh)" -eq 0 ]
+  [ ! -e "$HOME/.atst/self_heal.log" ]
+  [ "$(wc -l < "$CALLS")" -eq 11 ]
+  [ "$(atst_test_push_count)" -eq 0 ]
+}
+
+@test "RUN-33: a hung self_heal is cut off as RUNNER_TIMEOUT_SELF_HEAL after every other check ran (#140 AC14)" {
+  atst_test_stub_script "$home" self_heal.sh hang
+  sed -i 's/^self_heal_cap=150$/self_heal_cap=2/' "$home/check_all.sh"
+  [ "$(grep -c '^self_heal_cap=2$' "$home/check_all.sh")" -eq 1 ]
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(status_lines '^RUNNER_TIMEOUT_SELF_HEAL,1,')" -eq 1 ]
+  [ "$(wc -l < "$CALLS")" -eq 12 ]
+  [ "$(calls_of check_order.sh)" -eq 2 ]
+  [ "$(calls_of heartbeat.sh)" -eq 1 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  grep -qF '【発生】チェックが 2 秒で終わらず打ち切りました: self_heal.sh' "$ATST_TEST_CURL_LOG"
+}
+
+@test "RUN-34: enabled, MetaTrader stopped: one run sends the 【発生】 first and the 【自己修復】 after it (#140 AC14)" {
+  local first second
+  atst_test_make_mt A_MT4 MT4
+  cp "$repo/check_process.sh" "$home/"
+  atst_test_stub_script "$home" mtctl.sh record
+  mkdir -p "$HOME/.atst"
+  touch "$HOME/.atst/self_heal.enabled"
+  chmod 600 "$HOME/.atst/self_heal.enabled"
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 2 ]
+  first=$(grep -n '【発生】MetaTraderプロセスが動作していません' "$ATST_TEST_CURL_LOG" | cut -d: -f1)
+  second=$(grep -n '【自己修復】A_MT4' "$ATST_TEST_CURL_LOG" | cut -d: -f1)
+  [ -n "$first" ]
+  [ -n "$second" ]
+  [ "$first" -lt "$second" ]
+  [ "$(grep -c '^mtctl.sh [0-9]* \[-q\] \[start\] \[A\]$' "$CALLS")" -eq 1 ]
+  [ "$(wc -l < "$HOME/.atst/self_heal.log")" -eq 2 ]
+  grep -q '^PROCESS_A_MT4,1,' "$ST"
 }

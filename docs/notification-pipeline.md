@@ -69,12 +69,13 @@ config の読み込み（`ATST_NOTIFY_SPOOL` の退避・復元、各項目の�
 
 ## check_all.sh の回の流れ
 
-- crontab の毎分の行は `check_all.sh` の 1 行だけ。固定の順で check_reboot → check_order → check_process / monitoring / tick / trade_ready / ping / price / spread → check_order（`ATST_ORDER_CHECK_INTERVAL` 秒後の 2 回目）→ heartbeat を 1 回ずつ実行する（順次実行で同時多発を避ける）。
+- crontab の毎分の行は `check_all.sh` の 1 行だけ。固定の順で check_reboot → check_order → check_process / monitoring / tick / trade_ready / ping / price / spread → check_order（`ATST_ORDER_CHECK_INTERVAL` 秒後の 2 回目）→ heartbeat → self_heal（監視対象があるときだけ）を 1 回ずつ実行する（順次実行で同時多発を避ける）。
 - MT 名は `ATST_TARGETS` から配列のまま渡す（eval 無し）。
-- 各チェックは `timeout`（`ATST_CHECK_TIMEOUT` 秒、heartbeat は 60 秒）で打ち切り、打ち切りは `RUNNER_TIMEOUT_*` で LINE に通知する。1 つが失敗しても残りは実行する。
-- その回の通知は `atst_spool_begin`（flock 取得・`check_all.started` の後）〜 F1 `atst_spool_flush 2`（1 回目のチェック群と打ち切り通知の後、2 回目の check_order の前。最大 2 push）〜 2 回目の check_order・heartbeat 〜 F2 `atst_spool_flush 1`（最大 1 push）〜 `atst_spool_end` の順で 1 通にまとめて送る（通常は 1 push、後から出た打ち切りがあれば +1。約定通知は即時のまま）。
+- 各チェックは `timeout`（`ATST_CHECK_TIMEOUT` 秒、heartbeat は 60 秒、self_heal は 150 秒）で打ち切り、打ち切りは `RUNNER_TIMEOUT_*` で LINE に通知する。1 つが失敗しても残りは実行する。
+- その回の通知は `atst_spool_begin`（flock 取得・`check_all.started` の後）〜 F1 `atst_spool_flush 2`（1 回目のチェック群と打ち切り通知の後、2 回目の check_order の前。最大 2 push）〜 2 回目の check_order・heartbeat・self_heal 〜 F2 `atst_spool_flush 1`（最大 1 push）〜 `atst_spool_end` の順で 1 通にまとめて送る（通常は 1 push、後から出た打ち切りか自己修復の通知があれば +1。約定通知は即時のまま）。
 - `unset ATST_NOTIFY_SPOOL` を common.sh の source 直後に行い、継承値を使わない。このため `atst_spool_begin` より前の `RUNNER_STUCK` 発生（ロックを取れなかった側の回）は即時に個別送信になり、復帰（`atst_spool_begin` の直後）・`RUNNER_TARGETS_EMPTY`・`RUNNER_TIMEOUT_*` はスプールに入る。
-- `flock -n` で多重起動しない。前の回が終わらず `stuck_after = 10 * cap + 975` 秒（cap は `ATST_CHECK_TIMEOUT`。既定値で 1375 秒、約 23 分）以上止まっていれば `RUNNER_STUCK` を通知する。開始時刻は `~/.atst/check_all.started`。
+- `flock -n` で多重起動しない。前の回が終わらず `stuck_after = 10 * cap + 975 + 155` 秒（cap は `ATST_CHECK_TIMEOUT`。155 は self_heal の 150 + KILL までの 5 秒。既定値で 1530 秒、約 26 分）以上止まっていれば `RUNNER_STUCK` を通知する。開始時刻は `~/.atst/check_all.started`。
+- self_heal（`self_heal.sh`、#140）は opt-in の自己修復。`~/.atst/self_heal.enabled`（自分の所有・600 の通常ファイル）が無ければ alert_status も読まずに終わる。有効なら、F1 または前の回で【発生】が届いた（alert_status が 1 の）`PROCESS_<MT>` / `MONITORING_<MT>` だけを見て `mtctl.sh start` / `restart` を 1 回に 1 台まで呼び、`atst_notify_text` で【自己修復】を F2 に入れる（前に【発生】、後に【自己修復】）。alert_status には書かず（`SELF_HEAL_` キーは無い）、回数・クールダウン・停止通知済みは `~/.atst/self_heal.log` の行（`<epoch>,<MT>,<キー>,<op>,<begin|ok|fail|halt>`）で持つ。上限（24 時間に 3 回、固定）に達したら halt 行を先に書き、書けたときだけ【自己修復停止】を 1 通送る。`mtctl.sh` は wine を `setsid` で新しいセッションに起動するので、self_heal の打ち切り（プロセスグループへの TERM / KILL）で起動した MT は止まらない。
 - `ATST_TARGETS` が未設定・空・読み込み不能なら `RUNNER_TARGETS_EMPTY` を通知し、MT 名を要するチェックは実行しない。
 - 自分と子の stderr は common.sh の source 前に `command exec 2>>` で `~/.atst/log/check_all.log`（700/600）に追記し、回の先頭に START 行、子の非 0 終了とロック待ちで飛ばした回を 1 行ずつ書く。開けなければそのまま続行する（tee 等の中継は置かない）。
 

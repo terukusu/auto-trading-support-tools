@@ -192,22 +192,22 @@ ATST_TARGETS=('Land Prime')
 
 * 1 つのチェックが失敗しても、残りのチェックは実行します。
 * 1 つのチェックは `ATST_CHECK_TIMEOUT` 秒(1〜300、既定 40。`~/.atst/config` の末尾に `ATST_CHECK_TIMEOUT=60` のように書いて変更できます。範囲外の値は既定値になります)で打ち切り、「チェックが ... 秒で終わらず打ち切りました」と LINE に通知します(時間内に終わるようになると復帰を通知します)。
-* 前の回がまだ終わっていないときは、その分は何もしないで終わります(重なって動きません)。前の回が約 23 分(既定の `ATST_CHECK_TIMEOUT=40` で 1375 秒。`ATST_CHECK_TIMEOUT` に応じて変わります)以上終わらないと、「毎分の監視 (check_all.sh) が ... 止まっています」(RUNNER_STUCK)と LINE に通知します。
+* 前の回がまだ終わっていないときは、その分は何もしないで終わります(重なって動きません)。前の回が約 26 分(既定の `ATST_CHECK_TIMEOUT=40` で 1530 秒。`ATST_CHECK_TIMEOUT` に応じて変わります)以上終わらないと、「毎分の監視 (check_all.sh) が ... 止まっています」(RUNNER_STUCK)と LINE に通知します。
 * MetaTrader のプロセス停止(PROCESS)・監視データの停止(MONITORING)・ティック途絶(TICK)・取引できない状態(TRADE)・毎分の監視の停止(RUNNER_STUCK)が続いているときは、【発生】の通知から 30 分 / 2 時間 / 12 時間後に「【継続中 30 分】MetaTraderプロセスが動作していません: ...」のように 1 回ずつ再通知します(1 件の異常につき最大 3 通。その回の他の通知と同じ 1 通に入ります。12 時間の後は復帰するまで送りません)。値動き・スプレッド・Ping などの異常は再通知しません。
     * 間隔は `~/.atst/config` の `ATST_ALERT_REMIND_MINUTES="30 120 720"`(空白区切りの分、昇順、1〜3 個)で変えられます。`""` にすると再通知しません。行が無いとき・値が正しくないときは `30 120 720` で動きます(値が正しくないときは、対象のキーで異常が続いている間、毎分 `check_all.log` に対象キーごとに 1 行残ります。異常が無いときは何も残りません)。
 * ティック途絶(`check_tick.sh`): 監視 EA の CSV の列 2(最後のティックの時刻)が `ATST_TICK_THRESHOLD` 秒(既定 600)変わらないと「価格データ（ティック）が ... 分以上更新されていません」と通知します(ブローカーとの接続断・ログアウト・銘柄の配信停止など。MetaTrader も監視 EA も動いているのに取引できない状態)。CSV 自体が止まっているときは監視データの停止(MONITORING)だけを通知します。UTC の金曜 20:00〜月曜 00:00 と、MetaTrader・監視 EA の再開直後(CSV が `ATST_MONITORING_THRESHOLD` 秒以上止まった後、`ATST_TICK_THRESHOLD` 秒分の行がたまるまで)は判定しません(週末は `ATST_TICK_WEEKEND_SKIP=0` で判定します)。祝日・早期クローズでは誤検知することがあります。`ATST_MONITORING_THRESHOLD` を `ATST_TICK_THRESHOLD` 以上にすると再開直後に誤検知することがあるので、前者を小さくしてください。監視 EA はティックの多い主要通貨ペアのチャートに載せてください。
 * 取引できない状態(`check_trade_ready.sh`、#158): 監視 EA の CSV の列 9〜12(ブローカーへの接続・端末の自動売買ボタン・口座の取引許可・口座の EA 取引許可)が `ATST_TRADE_READY_THRESHOLD` 秒(既定 300)の間ずっと不良なら「… が 5 分以上取引できない状態です: 端末の自動売買ボタンが OFF です。…」のように理由を付けて通知し(キー `TRADE_<MT名>`)、すべて良好に戻ると【復帰】を送ります。MetaTrader も監視 EA も動いて CSV も更新されているのに自動売買が動かない状態を拾います。取引 EA 自身の「自動売買を許可」(EA のプロパティ)は見えません。判定しないのは、CSV の停止(MONITORING が通知)・UTC の金曜 20:00〜月曜 00:00(`ATST_TRADE_READY_WEEKEND_SKIP=0` で判定します)・MetaTrader や監視 EA の再開直後(`ATST_MONITORING_THRESHOLD` 秒以上の空白の後、`ATST_TRADE_READY_THRESHOLD` 秒分の行がたまるまで)・古い監視 EA(8 列の CSV)のときです。接続断ではティック途絶(TICK)と両方が届くことがあります。自動売買ボタンを意図して長期間 OFF にしている間も通知は届きます(無効にする設定はありません)。
     * 列 9〜14 は #158 で増えた列です。リポジトリの監視 EA を更新したら、`setup_monitoring_ea.sh` で `Experts` にコピーし、チャートに載せ直してください(`mtctl.sh stop` → `start` で自動配置が効いていれば載り直ります。そうでなければ VNC でチャートから外して付け直します)。載せ直すまでは `check_trade_ready.sh` は何もしません。`doctor.sh` の `csv` の行の `cols 14` で確かめられます。
 * その回の通知(発生・復帰・再起動の検出・打ち切り)は、1 通にまとめて LINE に届きます(【ホスト名】は先頭に 1 つ、通知の間は空行です)。
-    * 1 回目のチェック群が終わった時点で 1 通送ります。2 回目の約定のチェックやハートビートで打ち切りが出たときだけ、回の最後にもう 1 通届きます。
+    * 1 回目のチェック群が終わった時点で 1 通送ります。2 回目の約定のチェックやハートビートで打ち切りが出たとき、自己修復が動いたときだけ、回の最後にもう 1 通届きます。
     * 通知は、従来より最大で 1 回目のチェック群の実行時間分(通常は数秒〜数十秒、打ち切りが重なると数分)遅れます。
     * 約定の通知と、「毎分の監視が止まっています」(RUNNER_STUCK)の通知は、まとめずにその場で個別に届きます。
     * まとめた通知が LINE の 1 メッセージの上限(5000 字)を超えるときは、通知の区切りで分けて送ります。
 * 約定のチェックは 1 回目の開始から `ATST_ORDER_CHECK_INTERVAL` 秒(0〜50、既定 30。こちらも `~/.atst/config` の末尾に書きます)後にもう一度実行するので、従来どおり毎分 2 回です。
-* ハートビート(`heartbeat.sh`)は `check_all.sh` の最後に送ります。外部サービス側の猶予(grace)は **3 分以上**を推奨します。
+* ハートビート(`heartbeat.sh`)は `check_all.sh` の最後に送ります。外部サービス側の猶予(grace)は **3 分以上**を推奨します(自己修復を有効にしている間は、再起動した回が最大 155 秒長くなり、その間の回が飛ばされて ping の間隔が空くことがあるので **5 分以上**)。
     * URL は `setup_heartbeat.sh` で設定します(`~/.atst/.heartbeat_url` に 600 で保存し、テストの ping を 1 回送ります。何も入力せずに Enter で削除)。`~/.atst/config` の `ATST_HEARTBEAT_URL` に書いた従来の設定もそのまま使えます(`.heartbeat_url` があればそちらが優先)。未設定なら何も送りません。
     * 正常なら `<URL>` に ping、監視が異常を検知している間は毎分 `<URL>/fail` に送ります(本文は発生中のキー名だけ。建玉・口座・通知の文面・ホスト名は入れません)。「ping が途絶える」は cron / VPS / ネットワークの停止、「`/fail` が届く」は監視が異常を検知中、と区別できます。
-    * `/fail` になるもの: MT4/5 の停止(PROCESS)、監視対象が見つからない(TARGET)、監視 EA の CSV の停止(MONITORING)、ティック途絶(TICK)、取引できない状態(TRADE)、毎分の監視自体の異常(RUNNER_STUCK / RUNNER_TARGETS_EMPTY / 打ち切り。ハートビート自身の打ち切りは除く)、LINE の送信失敗の連続(`~/.atst/line_error.log` の直近 60 分に `ATST_HEARTBEAT_LINE_FAIL_COUNT` 件。既定 3。LINE が直っても最大 60 分は `/fail` が続くことがあります)、LINE の今月の送信数が上限の 8 割以上(毎朝の `check_daily.sh` が記録し、8 割未満を観測するまで続きます)。
+    * `/fail` になるもの: MT4/5 の停止(PROCESS)、監視対象が見つからない(TARGET)、監視 EA の CSV の停止(MONITORING)、ティック途絶(TICK)、取引できない状態(TRADE)、毎分の監視自体の異常(RUNNER_STUCK / RUNNER_TARGETS_EMPTY / 打ち切り。自己修復の打ち切り RUNNER_TIMEOUT_SELF_HEAL も含む。ハートビート自身の打ち切りは除く)、LINE の送信失敗の連続(`~/.atst/line_error.log` の直近 60 分に `ATST_HEARTBEAT_LINE_FAIL_COUNT` 件。既定 3。LINE が直っても最大 60 分は `/fail` が続くことがあります)、LINE の今月の送信数が上限の 8 割以上(毎朝の `check_daily.sh` が記録し、8 割未満を観測するまで続きます)。
     * `/fail` にならないもの: 値動き・スプレッド・Ping(PRICE / SPREAD / PING)の異常。これらは LINE の通知だけです。
     * `/fail` を受け付けないサービスでは、異常の間は ping も送られないので「ping の途絶」として通知されます。
     * 外形監視が未設定のときは、毎朝の稼働OK(`check_daily.sh`)の最後に「外形監視: 未設定(推奨。setup_heartbeat.sh で設定)」の 1 行が付きます(この行のためだけには送りません)。
@@ -219,6 +219,27 @@ ATST_TARGETS=('Land Prime')
     * 手で `check_all.sh` を実行したときも、stderr は端末に出ずにこのログに入ります (stdout は従来どおり)。
     * 「通知が来ない」「止まっています」「打ち切りました」が続くときは、まず `tail ~/.atst/log/check_all.log` を見てください。
     * ログを作れない・書けないときは従来どおり stderr は捨てられ、監視は止まりません。
+
+### 自己修復 (opt-in、既定 OFF)
+
+MetaTrader のプロセスが落ちた・固まって監視データが止まったときに、`check_all.sh` の回の最後で `mtctl.sh start` / `mtctl.sh restart` を自動で実行する機能です(`self_heal.sh`、#140)。**既定は OFF** で、次のファイルを置くまで一切動きません(本番の実弾口座では、下の注意を読んでから手で有効にしてください)。
+
+```
+touch ~/.atst/self_heal.enabled && chmod 600 ~/.atst/self_heal.enabled   # 有効にする
+rm ~/.atst/self_heal.enabled                                              # 無効にする
+```
+
+* ファイルが自分の所有・mode 600 の通常ファイルのときだけ有効です。所有者・mode が違う、シンボリックリンクのときは OFF のまま `check_all.log` に 1 行残ります。cron やスクリプトから作る経路はありません。
+* 動く条件(どちらも【発生】が LINE に届いた後だけ。LINE が送れない間は【発生】が記録されないので動きません):
+    * MetaTrader のプロセス停止(`PROCESS_<名前>`)が発生中でプロセスが居ない → `mtctl.sh start`。
+    * 監視データの停止(`MONITORING_<名前>`)が発生から `ATST_MONITORING_THRESHOLD` 秒以上続き、プロセスは居て起動から閾値の 2 倍以上たっていて、監視 EA の自動配置(`ATST_AUTO_ATTACH_EA=1`)が有効で StartUp の不良(`MONITORING_AUTO_ATTACH_<名前>`)が無い → `mtctl.sh restart`(自動配置が無効だと再起動しても EA が載らず直らないため)。
+    * ティック途絶(TICK)・取引できない状態(TRADE)などは対象外です。ブローカー側の問題や自動売買ボタンの OFF は、MetaTrader を再起動しても直らないためです。
+* 回数: 1 回の実行で動かすのは 1 つの MetaTrader だけ。同じ MetaTrader は前回から 30 分は動かさず、直近 24 時間に 3 回試したら止めて「【自己修復停止】<名前>: 24 時間に 3 回再起動しても直らないため、自己修復を止めています（人の確認が必要です）」を 1 通だけ送ります(一番古い試行が 24 時間を過ぎると黙って再開します)。固定値で、設定では変えられません。
+* 待つとき: `mtctl.sh` が同じ MetaTrader を起動・再起動している最中、最後の起動から `ATST_MONITORING_THRESHOLD` 秒(既定 180)以内、OS の起動から同じ秒数以内は動きません(`@reboot` の起動と重ならないように)。理由は `check_all.log` に 1 行残ります。
+* 動いたときは必ず LINE に 1 通届きます: 「【自己修復】<名前>: MT プロセス停止のため MetaTrader を起動しました (直近 24 時間で 1/3 回目)」「…監視データ停止のため MetaTrader を再起動しました …」、失敗したときは「…再起動に失敗しました（プロセスを止められません。pid=…）…」など。
+* 記録は `~/.atst/self_heal.log`(600)に `<epoch>,<名前>,<キー>,<start|restart>,<begin|ok|fail|halt>` の 1 行ずつです。`mtctl.sh` を呼ぶ前に `begin` を書くので、打ち切られた試行も 1 回に数えます。この行を書けないときは動きません。当該 MetaTrader の行を消すと、上限やクールダウンを待たずに再開します。
+* **メンテナンスで MetaTrader を手で止めるときは、先に `~/.atst/self_heal.enabled` を消してください**(消さないと、プロセス停止の【発生】の後に起動し直されます)。
+* 実弾口座で有効にする前に: 建玉はブローカー側に残り、再起動では決済されません。ただし再起動中の数十秒〜数分は EA が動きません。固まった MetaTrader は止まっているのと同じなので再起動で損失は増えない、という前提の機能です。
 
 
 ### デスクトップ画像の通知の移行
@@ -263,9 +284,10 @@ ATST_IMAGE_REPORT_DESKTOP=1
 
 mtctl.sh は 複数の MT4/5 の一覧・起動・終了・状態確認ができるスクリプトです。使い方は↓こん感じ。
 ```
-Usage: mtctl.sh [-qsh] <list|start|status|stop|monitor> <MetaTrader Name1> [<MetaTrader Name2> ...]
+Usage: mtctl.sh [-qsh] <list|start|restart|status|stop|monitor> <MetaTrader Name1> [<MetaTrader Name2> ...]
 	list: list MetaTrader installed
-	start: start MetaTrader
+	start: start MetaTrader (waits first for the X display, up to ATST_X_WAIT seconds, default 120, 0: no wait)
+	restart: stop (TERM, up to 15 s; then KILL, up to 5 s) and start MetaTrader. exit 1: could not stop, 2: busy
 	status: print status of specified MetaTrader
 	stop: stop MetaTrader
 	monitor: preview monitoring data file.
@@ -276,6 +298,11 @@ Usage: mtctl.sh [-qsh] <list|start|status|stop|monitor> <MetaTrader Name1> [<Met
 ```
 
 mtctl.sh のメッセージ(`list` の 1 行目、`status` の各行、`stop` / `start` で対象が見つからないときの行)には、判定に使った WINEPREFIX が ` (WINEPREFIX=...)` の形で付きます。`-q` のときはこれまでどおり何も出しません。
+
+* `start` は最初の MetaTrader を起動する前に、X(VNC の画面、`DISPLAY` の番号の `/tmp/.X11-unix/X<番号>`)が現れるのを最大 `ATST_X_WAIT` 秒(既定 120、`0` で待たない)待ちます。`@reboot` の起動が vncserver より先に走ったときのためです。現れなくてもそのまま起動し(stderr に 1 行)、終了コードは 0 のままです。結果は `~/.atst/wine_<名前>.log` の `===== START` の次の行に `x_wait: ready (<秒> s)` / `x_wait: timeout (<秒> s)` / `x_wait: skipped (<理由>)` で残ります。`ATST_X_WAIT` / `ATST_X11_DIR`(ソケットの置き場所。既定 `/tmp/.X11-unix`)は環境変数か `~/.atst/config` で指定します。
+* `restart` は `stop` と同じプロセスに TERM を送り、最大 15 秒待って残っていれば KILL、さらに最大 5 秒待ってから `start` と同じ手順で起動します。止められなかったときは起動せず終了コード 1、起動していなければそのまま起動します。
+* `start` / `restart` は MetaTrader ごとのロック(`~/.atst/mtctl_<名前>.lock`、600。1 行目は最後に起動した時刻)を取り、同じ MetaTrader の起動・再起動が重ならないようにします。ほかの `mtctl.sh` が使用中なら stderr に `[busy]` の 1 行を出して何もしません(`start` の終了コードは 0、`restart` は 2)。ロックファイルを作れないときはロック無しで起動します。
+* MetaTrader は新しいセッション(`setsid`)で起動するので、起動した側のシェルや `check_all.sh` の打ち切りで巻き添えに止まりません。
 
 `~/.atst/config` が `ATST_AUTO_ATTACH_EA=1` のとき、`start` は StartUp ini を付けて起動します。MT4 は ini のパスを素の引数 (`terminal.exe C:\atst\startup_<名前>.ini`)、MT5 は `/config:C:\atst\startup_<名前>.ini` で渡します (下の「監視 EA の自動配置」)。通貨ペア・時間足の値が空・不正なときや ini を書けないときは、stderr に 1 行出して ini を付けずに起動します (起動は止めません)。
 

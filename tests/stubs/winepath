@@ -3,6 +3,13 @@
 # Converts the last argument (a unix path) to a Windows path:
 #   $WINEPREFIX/drive_c/<rest> -> C:\<rest>, anything else -> Z:<path>
 
+# ATST_TEST_WINEPATH_CHILD=<file>: leaves a background child (like the wineserver winepath starts) and
+# writes its pid to <file>; the child inherits every fd winepath was given.
+if [ -n "${ATST_TEST_WINEPATH_CHILD:-}" ]; then
+  sleep 30 >/dev/null 2>&1 &
+  echo "$!" > "$ATST_TEST_WINEPATH_CHILD"
+fi
+
 [ "$#" -gt 0 ] || exit 0
 path="${!#}"
 prefix="${WINEPREFIX:-}"

@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # 毎分の監視 (再起動・約定・プロセス・監視データ・ティック・取引可否・Ping・値動き・スプレッド・ハートビート) を順に 1 回ずつ
-# 実行します。監視する MetaTrader の名前は ~/.atst/config の ATST_TARGETS から読みます。
+# 実行し、最後に自己修復 (opt-in。~/.atst/self_heal.enabled があるときだけ動く、#140) を 1 回実行します。監視する MetaTrader の名前は ~/.atst/config の ATST_TARGETS から読みます。
 # crontab には "* * * * * check_all.sh" の 1 行だけを書きます (templates/crontab.txt)。
 #
 # - 1 つのチェックが失敗しても残りは実行します。
@@ -9,7 +9,7 @@
 # - 前の回が終わっていなければ何もせずに終わります (積み重ならない)。止まったままなら LINE に通知します。
 # - 約定のチェックは 1 回目の開始から ATST_ORDER_CHECK_INTERVAL 秒後にもう一度実行します (毎分 2 回)。
 # - その回の通知 (発生・復帰・再起動の検出・打ち切り) は 1 通にまとめて LINE に送ります
-#   (1 回目のチェック群の後に 1 回、後から出た打ち切りの通知は回の最後にもう 1 回)。約定通知は従来どおり即時です。
+#   (1 回目のチェック群の後に 1 回、後から出た打ち切りと自己修復の通知は回の最後にもう 1 回)。約定通知は従来どおり即時です。
 # - 自分と各チェックの stderr は ~/.atst/log/check_all.log に追記します (回の先頭に START 行。書けなければ従来どおり)。
 #
 
@@ -56,6 +56,8 @@ if [ -n "${ATST_ORDER_CHECK_INTERVAL+x}" ]; then
   fi
 fi
 heartbeat_cap=60
+# self_heal.sh (#140): mtctl.sh restart waits up to 15 s (TERM) + 5 s (KILL) and up to 120 s for X; fixed.
+self_heal_cap=150
 
 # The longest one run can take while the timeouts work:
 # - 10 check runs x (cap + 5 s to KILL): 10 * cap + 50
@@ -68,10 +70,12 @@ heartbeat_cap=60
 # - a margin: 50 (60 before #137, 55 before #158; the total is kept at 975)
 # 50 + 65 + 50 + 650 + 110 + 50 = 975. The alert_status lock (flock -w 10 in atst_set_alert_status)
 # is held for one awk only and is not counted (as before).
+# - self_heal.sh (opt-in, #140; long only when it starts / restarts a MetaTrader): self_heal_cap + 5 s
+#   to KILL = 155, added to the 975 above (10 * cap + 975 + 155: 1530 s with the default cap of 40).
 # A run still holding the lock after this is stuck outside the timeouts. A shorter threshold would
 # fire and recover every few runs while every check hangs (the timeouts are reported separately),
 # using up the monthly LINE quota.
-stuck_after=$(( 10 * cap + 975 ))
+stuck_after=$(( 10 * cap + 975 + 155 ))
 
 lock_file="$ATST_CONFIG_DIR/check_all.lock"
 started_file="$ATST_CONFIG_DIR/check_all.started"
@@ -152,6 +156,7 @@ cut_ping=0
 cut_price=0
 cut_spread=0
 cut_heartbeat=0
+cut_self_heal=0
 
 run_check "$cap" check_reboot || cut_reboot=1
 
@@ -209,7 +214,17 @@ fi
 run_check "$heartbeat_cap" heartbeat || cut_heartbeat=1
 notify_timeout HEARTBEAT heartbeat "$cut_heartbeat" "$heartbeat_cap"
 
-# What came after the first flush (a cut-off second check_order or heartbeat); empty in a usual run.
+# The opt-in self-heal (self_heal.sh, #140): last, so a restart (up to 155 s) delays neither the second
+# check_order nor the heartbeat. It acts only on a 【発生】 already delivered (alert_status is 1, sent by
+# the first flush or an earlier run), and its own message goes out with the last flush below. Without
+# ~/.atst/self_heal.enabled it exits at once and does nothing.
+if [ "$has_targets" -eq 1 ]; then
+  run_check "$self_heal_cap" self_heal "${ATST_TARGETS[@]}" || cut_self_heal=1
+  notify_timeout SELF_HEAL self_heal "$cut_self_heal" "$self_heal_cap"
+fi
+
+# What came after the first flush (a cut-off second check_order or heartbeat, the self-heal's message);
+# empty in a usual run.
 atst_spool_flush 1
 atst_spool_end
 

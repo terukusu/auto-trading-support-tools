@@ -176,6 +176,22 @@ function atst_startup_ini_path() {
   printf '%s\n' "$prefix_l/drive_c/atst/startup_$n.ini"
 }
 
+# atst_mt_lock_path <MT name>
+# Prints "$ATST_CONFIG_DIR/mtctl_<n>.lock", the lock of one MetaTrader taken by mtctl.sh start / restart
+# (and probed by the opt-in self-heal, #140): <n> is the folder name (mt_name of atst_find_mt_index, so
+# "A" and "A_MT4" give the same lock) in lower case with each byte other than a-z 0-9 _ turned into _.
+# Its first line is the epoch of the last start by mtctl.sh. Prints nothing and returns 1 when the name
+# is empty or matches no MetaTrader, or ATST_CONFIG_DIR is empty. Creates nothing.
+function atst_mt_lock_path() {
+  local idx n
+
+  [ -n "$1" ] && [ -n "${ATST_CONFIG_DIR:-}" ] || return 1
+  idx=$(atst_find_mt_index "$1")
+  [ -n "$idx" ] || return 1
+  n=$(printf '%s' "${mt_name[idx]}" | atst_to_lower | LC_ALL=C tr -c 'a-z0-9_' '_')
+  printf '%s\n' "$ATST_CONFIG_DIR/mtctl_$n.lock"
+}
+
 # atst_startup_ini_win_path <MT name>
 # Prints the Windows form of atst_startup_ini_path (C:\atst\startup_<n>.ini) by atst_to_win_path: pure
 # string work, winepath is not run. Prints nothing and returns 1 when there is none.

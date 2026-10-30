@@ -6,7 +6,7 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
 - [安全の原則](#安全の原則)
 - [通知ごとの確認・復旧手順](#通知ごとの確認復旧手順)
   - [REBOOT](#key-reboot) / [PROCESS_](#key-process) / [TARGET_](#key-target) / [MONITORING_](#key-monitoring) / [MONITORING_AUTO_ATTACH_](#key-monitoring-auto-attach) / [TICK_](#key-tick) / [TRADE_](#key-trade) / [PING_](#key-ping) / [PRICE_](#key-price) / [SPREAD_](#key-spread) / [ORDER](#key-order)
-  - [RUNNER_STUCK](#key-runner-stuck) / [RUNNER_TIMEOUT_](#key-runner-timeout) / [RUNNER_TARGETS_EMPTY](#key-runner-targets-empty)
+  - [RUNNER_STUCK](#key-runner-stuck) / [RUNNER_TIMEOUT_](#key-runner-timeout) / [RUNNER_TARGETS_EMPTY](#key-runner-targets-empty) / [自己修復](#key-self-heal)
   - [IMAGE_REPORT_DEFAULT_CHANGED](#key-image-report-default-changed) / [LINE_QUOTA](#key-line-quota) / [IMAGE_UPLOAD_FAILED](#key-image-upload-failed) / [HEARTBEAT](#key-heartbeat)
 - [MT の固まりの切り分け](#mt-の固まりの切り分け)
 - [VNC の既知の罠](#vnc-の既知の罠)
@@ -52,6 +52,7 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
 | 毎分の監視 (check_all.sh) が、前回の実行が終わらないため … 止まっています | `RUNNER_STUCK` | [RUNNER_STUCK](#key-runner-stuck) |
 | チェックが … 秒で終わらず打ち切りました | `RUNNER_TIMEOUT_<名前>` | [RUNNER_TIMEOUT_](#key-runner-timeout) |
 | 監視対象が設定されていません | `RUNNER_TARGETS_EMPTY` | [RUNNER_TARGETS_EMPTY](#key-runner-targets-empty) |
+| `【自己修復】<MT 名>: …`／`【自己修復停止】<MT 名>: …`（書き出しそのもの） | （キー無し） | [自己修復](#key-self-heal) |
 | 【お知らせ】デスクトップ画像の通知は既定 OFF になりました | `IMAGE_REPORT_DEFAULT_CHANGED` | [IMAGE_REPORT_DEFAULT_CHANGED](#key-image-report-default-changed) |
 | 【注意】LINE の今月の送信数が上限の8割を超えました | `LINE_QUOTA` | [LINE_QUOTA](#key-line-quota) |
 | 本文の末尾に (画像アップロード失敗: N枚) | （キー無し） | [IMAGE_UPLOAD_FAILED](#key-image-upload-failed) |
@@ -70,6 +71,7 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
 - **`./mtctl.sh start` は起動済みかを確かめない（二重起動を防がない）**。必ず先に `status` で `stopped` を確かめる。
 - `kill` するのは、pid を `./mtctl.sh status` や `ps -o pid,cmd -p <pid>` で確かめたものだけ。`pkill` / `killall` / `wineserver -k` は使わない（他の MT も巻き込む）。
 - `check_all.sh` や `check_*.sh` を手で実行しない（LINE に送り、状態を書き換える）。状態の確認は `./doctor.sh` で足りる。
+- 自己修復（opt-in）を有効にしている（`~/.atst/self_heal.enabled` がある）ときは、MT を手で止める前に `rm ~/.atst/self_heal.enabled` で無効にする（消さないと `PROCESS_` の【発生】の後に起動し直される）。作業が終わったら、使い続けるなら `touch ~/.atst/self_heal.enabled && chmod 600 ~/.atst/self_heal.enabled` で戻す（[自己修復](#key-self-heal)）。
 - `~/.atst/alert_status` を手で消さない・編集しない（同じ通知がもう一度届き、送信枠を使う）。例外は README「毎分の監視 (check_all.sh) の動き」にある、監視対象から外した MT のキーの行を消す場合だけ。
 - atst の更新は、リリース zip か `scripts/init_atst.sh` で全体を入れ替える。`*.sh` だけを手でコピーしない（`common.sh` が `lib/` を読むので、`lib/` が欠けると監視が正しく動かない）。
 - 手順の練習や検証は、使い捨ての VPS か MT 非稼働・建玉なしの検証機で行い、稼働中の本番 VPS では試さない（CLAUDE.md「実行・検証」と同じ）。
@@ -142,7 +144,7 @@ env -u WINEPREFIX ./mtctl.sh status "<MT 名>"
 ls -l ~/.atst/wine_*.log
 tail -n 30 ~/.atst/wine_*.log
 ```
-`doctor.sh` の `process` 行（`NG process <名前> not running`）と `WINEPREFIX` 行（`NG` なら `config=` と `cron=` がずれている）を見る。`wine_*.log` は `mtctl.sh start` が Wine の出力を追記するログ（起動ごとに `===== START <日時> =====` の行）。
+`doctor.sh` の `process` 行（`NG process <名前> not running`）と `WINEPREFIX` 行（`NG` なら `config=` と `cron=` がずれている）を見る。`wine_*.log` は `mtctl.sh start` が Wine の出力を追記するログ（起動ごとに `===== START <日時> =====` の行、その次に X の待ちの結果 `x_wait: …` の行）。自己修復（opt-in）が有効なら、`【発生】` の後の回で自動で起動して `【自己修復】` が届く（[自己修復](#key-self-heal)）。
 
 **安全な復旧手順**:
 1. `status` が `stopped` であることを確かめる（`start` は二重起動を防がない）。名前の打ち間違いでも `stopped` と出るので、`./doctor.sh` の `target` 行が `OK`（または `./mtctl.sh list` の `name=` に前方一致）であることも確かめる。`doctor.sh` の `WINEPREFIX` 行が `NG` なら起動せず、先に `~/.atst/config` の `WINEPREFIX` を直す（MT が別の prefix で動いている可能性がある）。
@@ -426,7 +428,7 @@ grep 'LINE send failed' ~/.atst/line_error.log | tail -n 5
 - `【継続中 30 分】毎分の監視 (check_all.sh) が、前回の実行が終わらないため <N> 秒以上止まっています`（30 分 / 2 時間 / 12 時間後）
 - `【復帰】毎分の監視 (check_all.sh) が再開しました`
 
-**意味**: `check_all.sh` は 1 回ずつしか動かない（`~/.atst/check_all.lock`）。次の回がロックを取れず、前の回の開始（`~/.atst/check_all.started`）から約 23 分（既定の `ATST_CHECK_TIMEOUT=40` で 1375 秒。`ATST_CHECK_TIMEOUT` に応じて変わる）以上たっていると出す。各チェックの打ち切り（`RUNNER_TIMEOUT_`）でも止まらない何かが残っている。**この間は毎分の監視が全部止まっている**。
+**意味**: `check_all.sh` は 1 回ずつしか動かない（`~/.atst/check_all.lock`）。次の回がロックを取れず、前の回の開始（`~/.atst/check_all.started`）から約 26 分（既定の `ATST_CHECK_TIMEOUT=40` で 1530 秒。`ATST_CHECK_TIMEOUT` に応じて変わる）以上たっていると出す。各チェックの打ち切り（`RUNNER_TIMEOUT_`）でも止まらない何かが残っている。**この間は毎分の監視が全部止まっている**。
 
 **確認コマンド**:
 ```bash
@@ -457,7 +459,7 @@ tail -n 50 ~/.atst/log/check_all.log
 
 ### RUNNER_TIMEOUT_<名前>: チェックが時間内に終わらない
 
-**キー名**: 次の 10 個（チェックごと）。
+**キー名**: 次の 11 個（チェックごと）。
 - `RUNNER_TIMEOUT_CHECK_REBOOT`（`check_reboot.sh`）
 - `RUNNER_TIMEOUT_CHECK_ORDER`（`check_order.sh`）
 - `RUNNER_TIMEOUT_CHECK_PROCESS`（`check_process.sh`）
@@ -468,6 +470,7 @@ tail -n 50 ~/.atst/log/check_all.log
 - `RUNNER_TIMEOUT_CHECK_PRICE`（`check_price.sh`）
 - `RUNNER_TIMEOUT_CHECK_SPREAD`（`check_spread.sh`）
 - `RUNNER_TIMEOUT_HEARTBEAT`（`heartbeat.sh`。上限は 60 秒）
+- `RUNNER_TIMEOUT_SELF_HEAL`（`self_heal.sh`。上限は 150 秒。自己修復が有効で MT を起動・再起動している回だけ長くなる。打ち切られても、起動した MT は別のセッションで動いているので巻き添えで止まらない）
 
 **通知文の例**:
 - `【発生】チェックが 40 秒で終わらず打ち切りました: check_ping.sh`
@@ -524,6 +527,42 @@ tail -n 50 ~/.atst/log/check_all.log
 **それでも直らないとき**: 監視も約定通知も止まっているので、スマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）で建玉を見る。
 
 **関連**: [README](../README.md)「監視するMT4/5の指定 (ATST_TARGETS)」。
+
+<a id="key-self-heal"></a>
+
+### 自己修復（キー無し）: 自己修復が MT を起動・再起動した／止まった
+
+**キー名**: 無し（`alert_status` に書かない。`SELF_HEAL_` というキーは作らない）。状態は `~/.atst/self_heal.log` の行だけ。打ち切りは `RUNNER_TIMEOUT_SELF_HEAL`（[RUNNER_TIMEOUT_](#key-runner-timeout)）。
+
+**通知文の例**:
+- `【自己修復】<MT 名>: MT プロセス停止のため MetaTrader を起動しました (直近 24 時間で 1/3 回目)`
+- `【自己修復】<MT 名>: 監視データ停止のため MetaTrader を再起動しました (直近 24 時間で 2/3 回目)`
+- `【自己修復】<MT 名>: 再起動に失敗しました（プロセスを止められません。pid=<pid>）(直近 24 時間で 1/3 回目)`
+- `【自己修復】<MT 名>: ほかの起動・再起動の最中だったため何もしませんでした (直近 24 時間で 1/3 回目)`
+- `【自己修復停止】<MT 名>: 24 時間に 3 回再起動しても直らないため、自己修復を止めています（人の確認が必要です）`
+
+`<MT 名>` はフォルダ名の大文字（`mtctl.sh list` の `name=`）。
+
+**意味**: `~/.atst/self_heal.enabled`（自分の所有・600）があるときだけ、`check_all.sh` の回の最後に `self_heal.sh` が、【発生】が届いた `PROCESS_`（プロセスが居ない → `mtctl.sh start`）か、閾値以上続いた `MONITORING_`（プロセスは居るのに CSV が止まった固まり → `mtctl.sh restart`。`ATST_AUTO_ATTACH_EA=1` で StartUp が効いているときだけ）を見て、1 回に 1 台だけ動かす。同じ MT は 30 分あけ、24 時間に 3 回で止めて【自己修復停止】を 1 通だけ送る（再開の通知は無い）。`TICK_` / `TRADE_` などは対象外（ブローカー側の問題や自動売買ボタンの OFF は再起動で直らないため）。既定は OFF。動かなかった理由は `check_all.log` に 1 行残る。
+
+**確認コマンド**:
+```bash
+ls -l ~/.atst/self_heal.enabled
+cat ~/.atst/self_heal.log
+grep -v '^=====' ~/.atst/log/check_all.log | tail -n 20
+env -u WINEPREFIX ./mtctl.sh status "<MT 名>"
+grep -n 'x_wait' ~/.atst/wine_*.log | tail -n 3
+```
+`self_heal.log` は `<epoch>,<MT>,<キー>,<start|restart>,<begin|ok|fail|halt>`。`begin` だけで結果の行が無いものは、打ち切られた試行。
+
+**安全な復旧手順**:
+- `【自己修復】… 起動しました／再起動しました`: 1〜2 分で `PROCESS_` / `MONITORING_` の `【復帰】` が届くのを待つ。届いたら VNC で口座の接続・「自動売買」ボタン・チャートの EA を確かめる。
+- 失敗・`【自己修復停止】`: 自動では直らない状態。先に `rm ~/.atst/self_heal.enabled` で無効にしてから、[PROCESS_](#key-process) / [MT の固まりの切り分け](#mt-の固まりの切り分け) の手順で人が直す。直したら、当該 MT の行を `self_heal.log` から消すと上限・クールダウンを待たずに再開できる（消さなければ一番古い試行が 24 時間を過ぎたときに再開）。使い続けるなら `self_heal.enabled` を戻す。
+- メンテナンスで MT を止めるときは、先に `rm ~/.atst/self_heal.enabled`（[安全の原則](#安全の原則)）。
+
+**それでも直らないとき**: `self_heal.enabled` を消したまま、スマホの MT アプリで建玉を見て、`./doctor.sh` の出力・`self_heal.log`・`wine_*.log` の末尾（目で確かめてから）を Issue に貼って相談する。
+
+**関連**: [README](../README.md)「自己修復 (opt-in、既定 OFF)」、[docs/CODING_GUIDELINES.md](CODING_GUIDELINES.md) P1 の例外、#140。
 
 <a id="key-image-report-default-changed"></a>
 
@@ -668,6 +707,7 @@ diff <(echo "$a") <(echo "$b")
    env -u WINEPREFIX ./mtctl.sh stop "<MT 名>"
    env -u WINEPREFIX ./mtctl.sh status "<MT 名>"
    ```
+   自己修復（opt-in）が有効なら、止める前に `rm ~/.atst/self_heal.enabled` で無効にする（[自己修復](#key-self-heal)）。`./mtctl.sh restart "<MT 名>"` は TERM → 最大 15 秒待ち → KILL → 最大 5 秒待ち → 起動、を 1 回で行う（止められなければ起動せず終了コード 1）。
    `./mtctl.sh stop` は TERM を送るだけなので、`status` が `stopped` になるまで数秒おきに確かめる。残るときは、`status` の pid が止める MT のものであることを確かめ直してから `kill -KILL <pid>`。
 4. `stopped` を確かめてから起動する。
    ```bash
