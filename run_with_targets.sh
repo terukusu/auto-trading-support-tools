@@ -3,7 +3,7 @@
 # MetaTrader の名前を要する毎分以外のジョブを、~/.atst/config の ATST_TARGETS を付けて起動します。
 #   run_with_targets.sh <mtctl.sh|truncate_monitoring.sh|report_image.sh> [引数...]
 # 例: "@reboot run_with_targets.sh mtctl.sh start" は "mtctl.sh start <ATST_TARGETS の名前...>" を実行します。
-# 旧形式の crontab の wrapper.sh "$TARGET" <スクリプト> に当たります。名前は配列のまま渡します。
+# 名前は配列のまま渡します。
 #
 
 print_usage_exit() {

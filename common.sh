@@ -313,8 +313,8 @@ function atst_update_alert() {
     fi
   fi
 
-  # An old-style crontab line and check_all.sh (#95) can see the same transition at the same time and
-  # would both send it. Serialise decide-send-record per key and decide again inside the lock, so the
+  # A check started by hand (or check_daily.sh) and check_all.sh can see the same transition at the
+  # same time and would both send it. Serialise decide-send-record per key and decide again inside the lock, so the
   # later run reads the state the first one recorded. Only a due transition or a due reminder takes the lock: the usual
   # "nothing to send" path stays as cheap as before, and other keys are never held up.
   local lock
@@ -371,7 +371,7 @@ function atst_update_alert() {
 # The spool is $ATST_CONFIG_DIR/check_all.spool/run.<epoch>.<runner pid>/, one file per notice named
 # <6-digit sequence>.<random>: line 1 = key (empty for a text-only notice), line 2 = verdict (1/0,
 # "1:remind=<1-3>" for a reminder of that stage (#141), empty for a text-only notice), the rest = the text. Only check_all.sh sets ATST_NOTIFY_SPOOL; any
-# other run (a check started directly or by wrapper.sh, send_to_line.sh) sends at once as before.
+# other run (a check started directly, send_to_line.sh) sends at once as before.
 # atst_send_to_line always sends at once (check_order.sh needs its result to clear .pending).
 
 # atst_spool_dir
@@ -516,8 +516,8 @@ function atst_spool_end() {
 # - The last notice of a key wins; earlier ones of the same key are dropped.
 # - Takes the per-key locks of atst_update_alert (in spool order, each lock file once), waiting 10
 #   seconds in all for every lock of this flush. A key whose lock is not free is left for the next run
-#   (not sent, not recorded). Decides again inside the lock: a transition another run (an old-style
-#   crontab line) has sent and recorded meanwhile is not sent again. A reminder (#141) is sent only
+#   (not sent, not recorded). Decides again inside the lock: a transition another run (a check
+#   started by hand) has sent and recorded meanwhile is not sent again. A reminder (#141) is sent only
 #   while the key is still 1, its stage is not recorded yet and still reached; only its stage is recorded.
 # - Joins the texts with an empty line under one "【host】" heading, up to 4900 characters per message
 #   and never splitting a notice (a notice longer than that alone is cut like atst_send_to_line), and
@@ -737,26 +737,6 @@ function atst_is_weekend_epoch() {
   dow=$(( (e / 86400 + 4) % 7 ))   # 0 = Sunday ... 6 = Saturday
   hour=$(( e % 86400 / 3600 ))
   [ "$dow" -eq 6 ] || [ "$dow" -eq 0 ] || { [ "$dow" -eq 5 ] && [ "$hour" -ge 20 ]; }
-}
-
-# The old-style crontab (TARGET and wrapper.sh "$TARGET" check_*.sh, #143)
-# It keeps working until the deadline below and after it too: the deadline only changes what doctor.sh
-# and check_daily.sh say (doctor.sh NG, a warning line in the morning report). Nothing that monitors or
-# notifies looks at it. Removing wrapper.sh is a separate issue after the deadline. Defined here, after
-# ~/.atst/config is read, so neither the config nor the environment can move it. Not readonly: some tests
-# source common.sh twice.
-ATST_LEGACY_CRONTAB_DEADLINE=2027-05-31
-
-# atst_legacy_crontab_expired <YYYY-MM-DD>
-# Returns 0 when the date is after the deadline (ATST_LEGACY_CRONTAB_DEADLINE), 1 on or before it and for
-# anything that is not YYYY-MM-DD (the safe side: before the deadline). Plain arithmetic, no external
-# command. Prints nothing and changes no variable.
-function atst_legacy_crontab_expired() {
-  local d="${1-}" deadline="$ATST_LEGACY_CRONTAB_DEADLINE"
-
-  [[ "$d" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || return 1
-  [[ "$deadline" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || return 1
-  [ "$((10#${d//-/}))" -gt "$((10#${deadline//-/}))" ]
 }
 
 # atst_crontab_form_of <crontab text>

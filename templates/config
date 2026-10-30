@@ -141,6 +141,5 @@ ATST_ORDER_CHECK_INTERVAL=30
 # 未設定・空のときは LINE に通知します (MetaTrader ごとの監視と約定通知、再起動時の自動起動は止まります)。
 # 引用符や括弧の閉じ忘れなどで書き間違えると、この行は読み込まれず、LINE に
 # 「監視対象が設定されていません」が届きます。そのときはこの行を見直してください。
-# 旧形式の crontab (TARGET="(...)" と wrapper.sh の行) はこの値を使いません。
 # 旧形式の crontab の TARGET="('Land Prime')" の ('...') の部分は、そのまま ATST_TARGETS=('Land Prime') と書けます。
 ATST_TARGETS=('Land Prime')

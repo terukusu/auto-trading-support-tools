@@ -273,36 +273,6 @@ atst_test_stub_script() {
   chmod 755 "$real/$name"
 }
 
-# atst_test_stub_date <dir> <YYYY-MM-DD>
-# Writes <dir>/date (mode 755): "date +%Y-%m-%d" (exactly that one argument) prints <YYYY-MM-DD>, any
-# other call runs /bin/date with the same arguments (date +%s, date -d ..., other formats are real).
-# <dir> must be an existing directory in the sandbox; otherwise nothing is written and it returns 1.
-atst_test_stub_date() {
-  local dir="$1" day="$2"
-  local sandbox real
-
-  [ -n "${ATST_TEST_SANDBOX:-}" ] && [ "$HOME" = "$ATST_TEST_SANDBOX/home" ] || return 1
-  [ "$#" -eq 2 ] || return 1
-  [[ "$day" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || return 1
-  [ -d "$dir" ] || return 1
-  sandbox=$(cd "$ATST_TEST_SANDBOX" && pwd -P) || return 1
-  real=$(cd "$dir" && pwd -P) || return 1
-  case "$real" in
-    "$sandbox"|"$sandbox"/*) ;;
-    *) return 1 ;;
-  esac
-
-  {
-    printf '#!/bin/bash\n'
-    printf 'if [ "$#" -eq 1 ] && [ "$1" = "+%%Y-%%m-%%d" ]; then\n'
-    printf '  echo %s\n' "$day"
-    printf '  exit 0\n'
-    printf 'fi\n'
-    printf 'exec /bin/date "$@"\n'
-  } > "$real/date" || return 1
-  chmod 755 "$real/date"
-}
-
 # atst_test_make_dummy_zip <zip_path> <top> [<install_body>]
 # Writes <zip_path> (in the sandbox) holding <top>/install_required_for_mt.sh (mode 755) and
 # <top>/README.md, shaped like a GitHub archive zip. The default install_required_for_mt.sh touches

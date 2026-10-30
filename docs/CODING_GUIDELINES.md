@@ -82,7 +82,6 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 ## P7. eval の安全性（block〜warn）
 
 - `eval` は入力が**信頼できる文字列**（管理者が書いたもの等）に限る。外部・ネットワーク由来を `eval` するのは block。
-  - 許容例: `wrapper.sh` の `eval "target_mt=$1"`（crontab 管理者が書いた配列リテラル）。入力元が**信頼できる管理者の記述**である前提で、旧形式の crontab（`wrapper.sh "$TARGET" ...`）を動かし続けるためだけに残している。新しい経路（`check_all.sh` / `run_with_targets.sh`）は `~/.atst/config` の `ATST_TARGETS` 配列をそのまま渡し、eval を使わない。新規コードで `wrapper.sh` を使わない。期限 `ATST_LEGACY_CRONTAB_DEADLINE`（common.sh）まで。期限後に撤去する（#143）。
   - ファイルシステム由来の値（フォルダ名など）は `eval` しない。`common.sh` の MT 一覧は `atst_load_mt_list` が配列へ直接代入する（#93）。
 
 ## P8. apt / 鍵 / リポジトリ（block）
@@ -119,7 +118,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
   - 例外: `mt_home` / `mt_data` / `mt_name` / `mt_type` / `mt_term` は `atst_load_mt_list` が設定するグローバル配列で、`ATST_*` 命名の意図的な例外（これら以外の新規共通変数は `ATST_*` にする）。
 - 1 スクリプト 1 責務。cron から叩く監視は `check_*.sh`、セットアップは `setup_*.sh` の命名に合わせる。
 - テンプレート化すべき設定ファイルは `templates/` に置き、`%%PLACEHOLDER%%` 置換の既存流儀に合わせる。
-- usage を持つスクリプトは引数不足時に usage を出して非 0 終了する（`wrapper.sh` の `print_usage_exit` 参照）。
+- usage を持つスクリプトは引数不足時に usage を出して非 0 終了する（`run_with_targets.sh` の `print_usage_exit` 参照）。
 
 ## P13. install の fail-fast と最終検証（block）
 

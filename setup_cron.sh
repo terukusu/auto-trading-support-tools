@@ -89,7 +89,7 @@ if [ "$has_legacy" -eq 1 ]; then
   echo '       README の「既存の crontab からの移行」を参照して、旧形式の行を新しい行に置き換えてください。'
   echo '       上書き (Y) を選ぶと crontab 全体が新しいテンプレートに置き換わり、独自に追加した行も消えます。'
   echo '       このスクリプトは旧形式の行を自動では削除しません。'
-  echo "       旧形式は ${ATST_LEGACY_CRONTAB_DEADLINE} まで動きます (期限後も監視は止まりませんが、毎朝の報告に注意が付き doctor.sh が NG になります)。"
+  echo '       wrapper.sh は撤去したため、旧形式の行は動きません (毎朝の報告に注意が付き、doctor.sh が NG になります)。'
   echo '       Y を選ぶと、元の crontab を ~/.atst/crontab.bak.<日時> に退避してから置き換え、TARGET の値を ~/.atst/config の末尾に ATST_TARGETS として追記します (追記できる形のときだけ)。'
   # Show the old TARGET value as the line to put in the config (shown only; never evaluated, and
   # neither the config nor the crontab is changed here).

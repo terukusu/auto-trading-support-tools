@@ -295,9 +295,9 @@ function doctor_check_monitoring() {
 }
 
 # 7. The form of the crontab (atst_crontab_form; comment lines do not count). Its content is not shown.
-# The old-style form is OK until ATST_LEGACY_CRONTAB_DEADLINE and NG after it (#143).
+# The old-style form (wrapper.sh, removed in #176) is NG.
 function doctor_check_cron() {
-  local form today
+  local form
 
   form=$(atst_crontab_form)
   case "$form" in
@@ -311,12 +311,7 @@ function doctor_check_cron() {
       doctor_line OK "crontab -l" "new format (check_all.sh)"
       ;;
     legacy)
-      today=$(date +%Y-%m-%d)
-      if atst_legacy_crontab_expired "$today"; then
-        doctor_line NG "crontab -l" "旧形式 (wrapper.sh). 猶予期限 ${ATST_LEGACY_CRONTAB_DEADLINE} を過ぎています。setup_cron.sh で移行してください"
-      else
-        doctor_line OK "crontab -l" "旧形式 (wrapper.sh). ${ATST_LEGACY_CRONTAB_DEADLINE} までに setup_cron.sh で移行してください (README「既存の crontab からの移行」)"
-      fi
+      doctor_line NG "crontab -l" "旧形式 (wrapper.sh). wrapper.sh は撤去したため旧形式の行は動きません。setup_cron.sh で移行してください (README「既存の crontab からの移行」)"
       ;;
     *)
       doctor_line NG "crontab -l" "no atst line (check_all.sh)"

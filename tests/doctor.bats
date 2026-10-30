@@ -13,8 +13,6 @@ setup() {
   PATH="$ATST_TEST_SANDBOX/bin:$PATH"
   export PATH
   doctor_make_ok_state
-  # A fixed day before the deadline of the old-style crontab (#143), whatever the real date is.
-  atst_test_stub_date "$ATST_TEST_SANDBOX/bin" 2026-11-01
   hash -r
 }
 
@@ -183,7 +181,7 @@ doctor_ng_count() {
   [ -n "$(printf '%s\n' "$output" | grep '^-- mt A_MT4 ')" ]
 }
 
-@test "DR-10: crontab forms: mixed / empty / comment only are NG, old only is OK (AC-9)" {
+@test "DR-10: crontab forms: mixed / empty / comment only / old only are NG (AC-9)" {
   printf '* * * * * check_all.sh\n* * * * * wrapper.sh "$TARGET" check_process.sh\n' > "$ATST_TEST_SANDBOX/crontab.txt"
   doctor_run
   [ "$status" -eq 1 ]
@@ -201,10 +199,11 @@ doctor_ng_count() {
 
   printf '* * * * * wrapper.sh "$TARGET" check_process.sh\n' > "$ATST_TEST_SANDBOX/crontab.txt"
   doctor_run
-  [ "$status" -eq 0 ]
-  line=$(printf '%s\n' "$output" | grep '^OK crontab -l ')
+  [ "$status" -eq 1 ]
+  line=$(printf '%s\n' "$output" | grep '^NG crontab -l ')
   [ -n "$line" ]
   [[ "$line" == *旧形式* ]]
+  [[ "$line" == *setup_cron.sh* ]]
 }
 
 @test "DR-11: a CSV older than the threshold is NG (AC-10)" {
