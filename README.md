@@ -67,6 +67,10 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 * 可能ならば swap 領域の作成
 * vncserver + wm2
     * 要するに最小構成のGUI
+    * VNC のパスワードはインストール時に英数字 8 文字を乱数で作り、最後の結果表示に `[ OK ] VNC password: ...` として 1 回だけ出します(途中で止まったときも、終了時に未表示なら 1 回出します)。控えてください(インストールの出力を `| tee` などでファイルに保存するとパスワードもそこに残ります)
+    * 控え忘れたときは VPS 上で `vncpasswd` を実行して設定し直し、MetaTrader が動いていない時に `sudo systemctl restart vncserver@:1` します
+    * 既に `~/.vnc/passwd` がある環境(再実行を含む)ではパスワードを変えません
+    * 自分で決めたい場合は環境変数 `VNC_PASSWORD`(空白なしの 6〜8 文字。全角などは使わず ASCII の英数字・記号にしてください。VNC は先頭 8 バイトしか使いません)で渡せます。値は表示しません(シェルの履歴に残るので注意)。条件に合わない値なら何も変えずに止まります
 * wine
     * Linux 上で Windows 用アプリを動かすソフト
     * WineHQ の stable 版を 10 系に固定してインストール(`/etc/apt/preferences.d/winehq-stable-pin`)
@@ -112,6 +116,9 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
 ### おまけ
 * 不正アクセス防止のところは GCP がよしなにやってくれてるので気にしなくてOK
     * 他の格安VPSの場合はちゃんとしないと驚くほど攻撃を受けるので注意。 [設定例](../../wiki/setup_iptables)
+    * テンプレートは `templates/ip_rules_v4.txt` / `ip_rules_v6.txt`。sshd のポートは `%%SSH_PORT%%` になっているので、`sudo sshd -T | grep -i '^port '` で確かめたポートで `./setup_iptables.sh --port <ポート> > rules.v4`(IPv6 は `--v6` を付けて `> rules.v6`)を実行し、置き換えた結果をファイルに保存します。このスクリプトは表示するだけで、ルールを適用しません
+    * HTTP/HTTPS の行はコメントアウトしてあります。公開サイトを同居させるときだけ行頭の `#` を外します
+    * 適用は `sudo iptables-restore --test < rules.v4` で確かめてから(sshd と ICMP の行は hashlimit を使うので、対応していないカーネルではここで失敗します。その場合は適用しないでください)、今の ssh 接続を開いたまま行い、別の端末から新しい ssh 接続ができることを確かめてから `iptables-persistent` で永続化します(新しいイメージでは先に `sudo apt-get update` しないとパッケージが見つからないことがあります。手順の詳細は Wiki)
 * [スマートフォンで口座を操作する](../../wiki/setup_mobile_mt)
     * 緊急時の手動決済などのための備え
 * [スマートフォンで自動売買サーバーを操作する](../../wiki/setup_mobile_ssh)
