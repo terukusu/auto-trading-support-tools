@@ -33,7 +33,7 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 
 - `common.sh` — 全スクリプトが source する共通ライブラリ。`atst_*` 関数と設定ロード。source 時に `atst_load_mt_list` で MT 一覧を検出し、グローバル配列 `mt_home/mt_data/mt_name/mt_type/mt_term` へ直接読み込む（フォルダ名をシェルコードとして評価しない。再呼び出しで再読込できる。`mt_data` は MQL4/MQL5 の Files・Experts がある MT のデータフォルダ。決め方は `docs/monitoring-csv.md`）。crontab の形の判定（旧形式の検出）もここ。
 - MT プロセスの特定（`atst_find_pid`）は `/proc`（`ATST_PROC_ROOT` で差し替え可）を自ユーザー分だけ走査し、`winepath`・`ps` を使わない（argv[0]（wine loader なら argv[1]）が terminal.exe のパスそのもの、またはパス + 空白 + 後続（Wine が StartUp ini の引数などを連結して見せる形。後続は無視）なら一致）。
-- `lib/` — common.sh が source する内部ファイル（呼び出し側は common.sh だけを source する。単独で source しない）。`atst_config.sh`（~/.atst/config の生成・読み込み、KEY=VALUE 形式のパーサ `atst_config_parse`、`atst_load_heartbeat_url`、WINEDLLOVERRIDES）、`atst_line.sh`（文字列ヘルパ・ImgBB・LINE 送信・line_error.log・`atst_line_send_failing`）、`atst_mt.sh`（MT 検出・pid・StartUp ini・MT ごとのロックのパス `atst_mt_lock_path`・MQL / 監視 CSV のパス・走査）。
+- `lib/` — common.sh が source する内部ファイル（呼び出し側は common.sh だけを source する。単独で source しない）。`atst_config.sh`（~/.atst/config の生成・読み込み、KEY=VALUE 形式のパーサ `atst_config_parse`、`atst_load_heartbeat_url`、WINEDLLOVERRIDES）、`atst_line.sh`（文字列ヘルパ・ImgBB・LINE 送信・line_error.log・`atst_line_send_failing`）、`atst_mt.sh`（MT 検出・pid・StartUp ini・MT ごとのロックのパス `atst_mt_lock_path`・MQL / 監視 CSV のパス・走査）、`atst_notify.sh`（alert_status・再通知・スプール・キー単位のロック。契約は `docs/notification-pipeline.md`）。
 
 設定は `~/.atst/config`（`templates/config` から初回生成）を読んで `ATST_*` 変数で参照し（全行が KEY=VALUE 形式なら `atst_config_parse` が source せずに代入、それ以外は従来どおり source）、LINE トークン等の秘匿値は `~/.atst/` の別ファイル（リポジトリ外）に置く。契約は `docs/config.md`。
 

@@ -27,7 +27,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 
 ## 4. 共通処理は common.sh に寄せる
 
-全スクリプトは `common.sh` を source し、`atst_*` 関数・`ATST_*` 変数を使う。ロジックの重複を見つけたら `common.sh` の関数化を検討する（ただし 3 回ルール: 2 回目までは重複を許容し、3 回目で抽象化）。`common.sh` は内部で `lib/atst_config.sh` / `atst_line.sh` / `atst_mt.sh` を source する。呼び出し側は `common.sh` だけを source し、`lib/*.sh` を直接 source しない。
+全スクリプトは `common.sh` を source し、`atst_*` 関数・`ATST_*` 変数を使う。ロジックの重複を見つけたら `common.sh` の関数化を検討する（ただし 3 回ルール: 2 回目までは重複を許容し、3 回目で抽象化）。`common.sh` は内部で `lib/atst_config.sh` / `atst_line.sh` / `atst_mt.sh` / `atst_notify.sh` を source する。呼び出し側は `common.sh` だけを source し、`lib/*.sh` を直接 source しない。
 
 ---
 

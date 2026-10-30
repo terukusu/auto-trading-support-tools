@@ -1,6 +1,6 @@
 # 通知パイプラインの契約（atst）
 
-監視（`check_*.sh`）の判定結果が LINE 通知と `~/.atst/alert_status` に届くまでの契約をまとめる。状態・再通知・スプール・ロックは `common.sh`、LINE 送信と `line_error.log` は `lib/atst_line.sh`、回の流れは `check_all.sh`、外形監視は `heartbeat.sh` にあり、**通知の送り方・記録の仕方・順序・しきい値を変える PR はこの文書を同じ PR で更新する**。通知キーごとの運用者向けの確認・復旧手順は [docs/RUNBOOK.md](RUNBOOK.md)。
+監視（`check_*.sh`）の判定結果が LINE 通知と `~/.atst/alert_status` に届くまでの契約をまとめる。状態・再通知・スプール・ロックは `lib/atst_notify.sh`（common.sh が source する）、LINE 送信と `line_error.log` は `lib/atst_line.sh`、回の流れは `check_all.sh`、外形監視は `heartbeat.sh` にあり、**通知の送り方・記録の仕方・順序・しきい値を変える PR はこの文書を同じ PR で更新する**。通知キーごとの運用者向けの確認・復旧手順は [docs/RUNBOOK.md](RUNBOOK.md)。
 
 config の読み込み（`ATST_NOTIFY_SPOOL` の退避・復元、各項目の既定値）は [docs/config.md](config.md)、テストでの LINE push の数え方は [docs/testing.md](testing.md) にある。
 
