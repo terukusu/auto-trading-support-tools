@@ -54,6 +54,7 @@ MetaTraderのクラッシュやサーバーの予期せぬ再起動を検知し�
     * ポジションの変化(新規、決済)の検知
     * 価格、スプレッド、Pingの異常値検知
     * ティック(価格データ)の途絶の検知(ブローカーとの接続断・ログアウト・銘柄の配信停止など。週末は判定しない)
+    * 取引できない状態の検知(ブローカーとの接続断・端末の自動売買ボタン OFF・閲覧専用のログイン・口座の EA 取引の禁止。週末は判定しない)
 
 
 * [通知内容のサンプルはこちら](../../wiki/notification_sample)
@@ -161,9 +162,9 @@ PATH="%%ATST_HOME%%:/bin:/usr/bin:/usr/local/bin" ← %%ATST_HOME%% の部分は
 ATST_TARGETS=('Land Prime')
 ```
 
-こんな感じで設定しておけば、再起動時とMT4/5プロセスが落ちたときや、ポジションの新規や決済、値動きやスプレッド、Pingに異常が有った時や、ティックが途絶えた時にLINEへ通知してくれます。  
+こんな感じで設定しておけば、再起動時とMT4/5プロセスが落ちたときや、ポジションの新規や決済、値動きやスプレッド、Pingに異常が有った時や、ティックが途絶えた時、取引できない状態が続いた時にLINEへ通知してくれます。  
 
-* `check_all.sh` は毎分の監視(再起動・約定・プロセス・監視データ・ティック・Ping・値動き・スプレッド・ハートビート)を 1 回ずつ順番に実行します。crontab の毎分の行はこの 1 行だけです。
+* `check_all.sh` は毎分の監視(再起動・約定・プロセス・監視データ・ティック・取引可否・Ping・値動き・スプレッド・ハートビート)を 1 回ずつ順番に実行します。crontab の毎分の行はこの 1 行だけです。
 * `run_with_targets.sh` は、`@reboot` のMT4/5の自動起動、監視データの整理、定期レポート (値動き・スプレッドの要約と画像) のジョブに、`ATST_TARGETS` の名前を付けて実行します。
 * `report_image.sh` は毎朝、MT ごとの値動き・スプレッドの文字要約を送ります。ImgBB の API キー (`setup_imgbb.sh`) があればグラフ画像を付け、`~/.atst/config` に `ATST_IMAGE_REPORT_DESKTOP=1` を書くとデスクトップ画像も付けます (既定は送りません。口座番号・残高が写るため)。画像は ImgBB に置かれ、24 時間で消えます (`ATST_IMGBB_EXPIRATION` で変更できます)。
 
@@ -191,10 +192,12 @@ ATST_TARGETS=('Land Prime')
 
 * 1 つのチェックが失敗しても、残りのチェックは実行します。
 * 1 つのチェックは `ATST_CHECK_TIMEOUT` 秒(1〜300、既定 40。`~/.atst/config` の末尾に `ATST_CHECK_TIMEOUT=60` のように書いて変更できます。範囲外の値は既定値になります)で打ち切り、「チェックが ... 秒で終わらず打ち切りました」と LINE に通知します(時間内に終わるようになると復帰を通知します)。
-* 前の回がまだ終わっていないときは、その分は何もしないで終わります(重なって動きません)。前の回が約 22 分(既定の `ATST_CHECK_TIMEOUT=40` で 1335 秒。`ATST_CHECK_TIMEOUT` に応じて変わります)以上終わらないと、「毎分の監視 (check_all.sh) が ... 止まっています」(RUNNER_STUCK)と LINE に通知します。
-* MetaTrader のプロセス停止(PROCESS)・監視データの停止(MONITORING)・ティック途絶(TICK)・毎分の監視の停止(RUNNER_STUCK)が続いているときは、【発生】の通知から 30 分 / 2 時間 / 12 時間後に「【継続中 30 分】MetaTraderプロセスが動作していません: ...」のように 1 回ずつ再通知します(1 件の異常につき最大 3 通。その回の他の通知と同じ 1 通に入ります。12 時間の後は復帰するまで送りません)。値動き・スプレッド・Ping などの異常は再通知しません。
+* 前の回がまだ終わっていないときは、その分は何もしないで終わります(重なって動きません)。前の回が約 23 分(既定の `ATST_CHECK_TIMEOUT=40` で 1375 秒。`ATST_CHECK_TIMEOUT` に応じて変わります)以上終わらないと、「毎分の監視 (check_all.sh) が ... 止まっています」(RUNNER_STUCK)と LINE に通知します。
+* MetaTrader のプロセス停止(PROCESS)・監視データの停止(MONITORING)・ティック途絶(TICK)・取引できない状態(TRADE)・毎分の監視の停止(RUNNER_STUCK)が続いているときは、【発生】の通知から 30 分 / 2 時間 / 12 時間後に「【継続中 30 分】MetaTraderプロセスが動作していません: ...」のように 1 回ずつ再通知します(1 件の異常につき最大 3 通。その回の他の通知と同じ 1 通に入ります。12 時間の後は復帰するまで送りません)。値動き・スプレッド・Ping などの異常は再通知しません。
     * 間隔は `~/.atst/config` の `ATST_ALERT_REMIND_MINUTES="30 120 720"`(空白区切りの分、昇順、1〜3 個)で変えられます。`""` にすると再通知しません。行が無いとき・値が正しくないときは `30 120 720` で動きます(値が正しくないときは、対象のキーで異常が続いている間、毎分 `check_all.log` に対象キーごとに 1 行残ります。異常が無いときは何も残りません)。
 * ティック途絶(`check_tick.sh`): 監視 EA の CSV の列 2(最後のティックの時刻)が `ATST_TICK_THRESHOLD` 秒(既定 600)変わらないと「価格データ（ティック）が ... 分以上更新されていません」と通知します(ブローカーとの接続断・ログアウト・銘柄の配信停止など。MetaTrader も監視 EA も動いているのに取引できない状態)。CSV 自体が止まっているときは監視データの停止(MONITORING)だけを通知します。UTC の金曜 20:00〜月曜 00:00 と、MetaTrader・監視 EA の再開直後(CSV が `ATST_MONITORING_THRESHOLD` 秒以上止まった後、`ATST_TICK_THRESHOLD` 秒分の行がたまるまで)は判定しません(週末は `ATST_TICK_WEEKEND_SKIP=0` で判定します)。祝日・早期クローズでは誤検知することがあります。`ATST_MONITORING_THRESHOLD` を `ATST_TICK_THRESHOLD` 以上にすると再開直後に誤検知することがあるので、前者を小さくしてください。監視 EA はティックの多い主要通貨ペアのチャートに載せてください。
+* 取引できない状態(`check_trade_ready.sh`、#158): 監視 EA の CSV の列 9〜12(ブローカーへの接続・端末の自動売買ボタン・口座の取引許可・口座の EA 取引許可)が `ATST_TRADE_READY_THRESHOLD` 秒(既定 300)の間ずっと不良なら「… が 5 分以上取引できない状態です: 端末の自動売買ボタンが OFF です。…」のように理由を付けて通知し(キー `TRADE_<MT名>`)、すべて良好に戻ると【復帰】を送ります。MetaTrader も監視 EA も動いて CSV も更新されているのに自動売買が動かない状態を拾います。取引 EA 自身の「自動売買を許可」(EA のプロパティ)は見えません。判定しないのは、CSV の停止(MONITORING が通知)・UTC の金曜 20:00〜月曜 00:00(`ATST_TRADE_READY_WEEKEND_SKIP=0` で判定します)・MetaTrader や監視 EA の再開直後(`ATST_MONITORING_THRESHOLD` 秒以上の空白の後、`ATST_TRADE_READY_THRESHOLD` 秒分の行がたまるまで)・古い監視 EA(8 列の CSV)のときです。接続断ではティック途絶(TICK)と両方が届くことがあります。自動売買ボタンを意図して長期間 OFF にしている間も通知は届きます(無効にする設定はありません)。
+    * 列 9〜14 は #158 で増えた列です。リポジトリの監視 EA を更新したら、`setup_monitoring_ea.sh` で `Experts` にコピーし、チャートに載せ直してください(`mtctl.sh stop` → `start` で自動配置が効いていれば載り直ります。そうでなければ VNC でチャートから外して付け直します)。載せ直すまでは `check_trade_ready.sh` は何もしません。`doctor.sh` の `csv` の行の `cols 14` で確かめられます。
 * その回の通知(発生・復帰・再起動の検出・打ち切り)は、1 通にまとめて LINE に届きます(【ホスト名】は先頭に 1 つ、通知の間は空行です)。
     * 1 回目のチェック群が終わった時点で 1 通送ります。2 回目の約定のチェックやハートビートで打ち切りが出たときだけ、回の最後にもう 1 通届きます。
     * 通知は、従来より最大で 1 回目のチェック群の実行時間分(通常は数秒〜数十秒、打ち切りが重なると数分)遅れます。
@@ -204,7 +207,7 @@ ATST_TARGETS=('Land Prime')
 * ハートビート(`heartbeat.sh`)は `check_all.sh` の最後に送ります。外部サービス側の猶予(grace)は **3 分以上**を推奨します。
     * URL は `setup_heartbeat.sh` で設定します(`~/.atst/.heartbeat_url` に 600 で保存し、テストの ping を 1 回送ります。何も入力せずに Enter で削除)。`~/.atst/config` の `ATST_HEARTBEAT_URL` に書いた従来の設定もそのまま使えます(`.heartbeat_url` があればそちらが優先)。未設定なら何も送りません。
     * 正常なら `<URL>` に ping、監視が異常を検知している間は毎分 `<URL>/fail` に送ります(本文は発生中のキー名だけ。建玉・口座・通知の文面・ホスト名は入れません)。「ping が途絶える」は cron / VPS / ネットワークの停止、「`/fail` が届く」は監視が異常を検知中、と区別できます。
-    * `/fail` になるもの: MT4/5 の停止(PROCESS)、監視対象が見つからない(TARGET)、監視 EA の CSV の停止(MONITORING)、ティック途絶(TICK)、毎分の監視自体の異常(RUNNER_STUCK / RUNNER_TARGETS_EMPTY / 打ち切り。ハートビート自身の打ち切りは除く)、LINE の送信失敗の連続(`~/.atst/line_error.log` の直近 60 分に `ATST_HEARTBEAT_LINE_FAIL_COUNT` 件。既定 3。LINE が直っても最大 60 分は `/fail` が続くことがあります)、LINE の今月の送信数が上限の 8 割以上(毎朝の `check_daily.sh` が記録し、8 割未満を観測するまで続きます)。
+    * `/fail` になるもの: MT4/5 の停止(PROCESS)、監視対象が見つからない(TARGET)、監視 EA の CSV の停止(MONITORING)、ティック途絶(TICK)、取引できない状態(TRADE)、毎分の監視自体の異常(RUNNER_STUCK / RUNNER_TARGETS_EMPTY / 打ち切り。ハートビート自身の打ち切りは除く)、LINE の送信失敗の連続(`~/.atst/line_error.log` の直近 60 分に `ATST_HEARTBEAT_LINE_FAIL_COUNT` 件。既定 3。LINE が直っても最大 60 分は `/fail` が続くことがあります)、LINE の今月の送信数が上限の 8 割以上(毎朝の `check_daily.sh` が記録し、8 割未満を観測するまで続きます)。
     * `/fail` にならないもの: 値動き・スプレッド・Ping(PRICE / SPREAD / PING)の異常。これらは LINE の通知だけです。
     * `/fail` を受け付けないサービスでは、異常の間は ping も送られないので「ping の途絶」として通知されます。
     * 外形監視が未設定のときは、毎朝の稼働OK(`check_daily.sh`)の最後に「外形監視: 未設定(推奨。setup_heartbeat.sh で設定)」の 1 行が付きます(この行のためだけには送りません)。
@@ -312,7 +315,7 @@ mtctl.sh のメッセージ(`list` の 1 行目、`status` の各行、`stop` / 
    - `config`: `~/.atst/config` が KEY=VALUE 形式 (`OK config KEY=VALUE 形式 ...`) か旧形式 (`OK config 旧形式 ... N 行目 (KEY) ...`) か。旧形式も NG にはしません。値は表示しません。
 4. `target` / `mt`: `ATST_TARGETS` の各名前が検出した MT4/5 に前方一致するか (未設定・空は NG)。どの名前にも選ばれない MT4/5 は `--` (監視対象外) で表示します。前方一致で複数に当たるときは、check_*.sh と同じく最初の 1 つだけが監視対象です。
 5. `process`: 対象の MT4/5 が起動しているか。
-6. `ea` / `csv`: 監視 EA (`TerminalMonitoring.ex4` / `.ex5`) が置かれているか、`terminal_monitoring.csv` の最終行が `ATST_MONITORING_THRESHOLD` 秒より新しいか (check_monitoring.sh と同じ基準)。CSV の各列の意味は [docs/monitoring-csv.md](docs/monitoring-csv.md) を参照してください。
+6. `ea` / `csv`: 監視 EA (`TerminalMonitoring.ex4` / `.ex5`) が置かれているか、`terminal_monitoring.csv` の最終行が `ATST_MONITORING_THRESHOLD` 秒より新しいか (check_monitoring.sh と同じ基準)。`csv` の行の末尾の `cols N` は最終行の列数で、14 未満なら古い監視 EA のままなので、「the monitoring EA is old (N fields) …」の補足行を出します (判定は変えません。監視 EA を更新して載せ直すと 14 になり、`check_trade_ready.sh` が働きます)。CSV の各列の意味は [docs/monitoring-csv.md](docs/monitoring-csv.md) を参照してください。
 7. `crontab -l`: 新形式 (`check_all.sh`) なら OK、旧形式 (`wrapper.sh`) のみなら OK で「旧形式」と添えます。両方ある (混在)・どちらも無いときは NG。
 8. `line_error.log`: `~/.atst/line_error.log` の LINE 送信失敗の見出し行 (末尾 5 件)。表示のみです。
 9. `.line_token` / `.line_id` / `.imgbb_key`: 存在と権限 (600 でなければ NG)。`.imgbb_key` は任意です (定期レポートにグラフ・デスクトップの画像を付けるのに必要。無ければ文字要約だけを送ります)。

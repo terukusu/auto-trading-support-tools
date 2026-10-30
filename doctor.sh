@@ -232,7 +232,7 @@ function doctor_check_process() {
 # 6. The monitoring EA of each target and the age of its last CSV line (same rule as
 # check_monitoring.sh: NG when the age reaches ATST_MONITORING_THRESHOLD).
 function doctor_check_monitoring() {
-  local t idx mql ea csv t_last elapsed th
+  local t idx mql ea csv t_last cols elapsed th
 
   if ! atst_has_targets; then
     doctor_line -- ea "no targets"
@@ -272,7 +272,9 @@ function doctor_check_monitoring() {
       doctor_csv_state["$t"]=ng
       continue
     fi
-    t_last=$(tail -n 20 "$csv" | tr -d '\r' | awk -F, 'NF >= 8 && $1 ~ /^[0-9]+$/ {t = $1} END {print t}')
+    # The field 1 and the number of fields of the last data line (14 since #158; 8 from an old EA).
+    read -r t_last cols < <(tail -n 20 "$csv" | tr -d '\r' \
+      | awk -F, 'NF >= 8 && $1 ~ /^[0-9]+$/ {t = $1; n = NF} END {print t, n}')
     if [ -z "$t_last" ]; then
       doctor_line NG csv "$t no data line: $csv"
       doctor_csv_state["$t"]=ng
@@ -280,11 +282,14 @@ function doctor_check_monitoring() {
     fi
     elapsed=$(( $(date +%s) - t_last ))
     if [ "$elapsed" -ge "$th" ]; then
-      doctor_line NG csv "$t last update ${elapsed}s ago (threshold ${th}s)"
+      doctor_line NG csv "$t last update ${elapsed}s ago (threshold ${th}s) cols ${cols}"
       doctor_csv_state["$t"]=ng
     else
-      doctor_line OK csv "$t last update ${elapsed}s ago"
+      doctor_line OK csv "$t last update ${elapsed}s ago cols ${cols}"
       doctor_csv_state["$t"]=ok
+    fi
+    if [ "$cols" -lt 14 ]; then
+      doctor_note "the monitoring EA is old (${cols} fields): check_trade_ready.sh does not work until the EA is updated (setup_monitoring_ea.sh) and attached again"
     fi
   done
 }

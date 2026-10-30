@@ -673,3 +673,38 @@ make_slow_curl() {
   [ "$status" -eq 1 ]
   [ -z "$output" ]
 }
+
+@test "RM-28: TRADE_* (not tradable, #158) is reminded like PROCESS_*" {
+  local e
+  e=$(ago 31)
+  printf 'TRADE_A,1,%s\n' "$e" > "$ST"
+  run atst_update_alert TRADE_A 1 '【発生】fire-t' '【復帰】rec-t'
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(sent '【継続中 30 分】fire-t')" -eq 1 ]
+  [ "$(grep -c "^TRADE_A,1,$e,1$" "$ST")" -eq 1 ]
+  no_bearer
+}
+
+@test "RM-29: XTRADE_A, trade_a and RUNNER_TIMEOUT_CHECK_TRADE_READY are not reminded; TRADE_* by its exact prefix (#158)" {
+  local k line
+  for k in XTRADE_A trade_a RUNNER_TIMEOUT_CHECK_TRADE_READY; do
+    line="$k,1,$(ago 1500)"
+    printf '%s\n' "$line" > "$ST"
+    run atst_update_alert "$k" 1 '【発生】x' r
+    [ "$status" -eq 0 ] || { echo "$k: status=$status"; false; }
+    [ "$(atst_test_push_count)" -eq 0 ] || { echo "$k: pushed"; false; }
+    [ "$(cat "$ST")" = "$line" ] || { echo "$k: line changed"; false; }
+  done
+  for k in TRADE_A TRADE_A_B; do
+    run atst_alert_remind_is_target "$k"
+    [ "$status" -eq 0 ] || { echo "$k: status=$status"; false; }
+    [ -z "$output" ]
+  done
+  for k in XTRADE_A trade_a RUNNER_TIMEOUT_CHECK_TRADE_READY ''; do
+    run atst_alert_remind_is_target "$k"
+    [ "$status" -eq 1 ] || { echo "$k: status=$status"; false; }
+    [ -z "$output" ]
+  done
+}

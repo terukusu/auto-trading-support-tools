@@ -555,13 +555,55 @@ drop_threshold() {
   [[ "$(tail -n 1 "$C")" =~ ^[0-9]+,0, ]]
 }
 
-@test "TH-08: 4 or 8 arguments return 1 and add no line" {
+@test "TH-08: 4 or 9 arguments return 1 and add no line" {
   local n0
   atst_test_make_monitoring_csv A_MT4 0 1.5 2 0.01
   n0=$(wc -l < "$C")
   run atst_test_make_monitoring_csv A_MT4 0 1.5 2
   [ "$status" -eq 1 ]
-  run atst_test_make_monitoring_csv A_MT4 0 1.5 2 0.01 12 1 x
+  run atst_test_make_monitoring_csv A_MT4 0 1.5 2 0.01 12 1 x y
   [ "$status" -eq 1 ]
   [ "$(wc -l < "$C")" -eq "$n0" ]
+}
+
+@test "TH-09: the 8th argument appends fields 9 and on (14 fields); an empty one gives 8 fields (#158)" {
+  atst_test_make_monitoring_csv A_MT4 0 1.5 2 0.01 12 '' '1,1,1,1,0,0.00'
+  [[ "$(tail -n 1 "$C")" =~ ^[0-9]+,0,1\.5,1\.5,2,12,0\.01,USDJPY,1,1,1,1,0,0\.00$ ]]
+  [ "$(tail -n 1 "$C" | awk -F, '{print NF}')" -eq 14 ]
+  atst_test_make_monitoring_csv A_MT4 0 1.5 2 0.01 12 '' ''
+  [[ "$(tail -n 1 "$C")" =~ ^[0-9]+,0,1\.5,1\.5,2,12,0\.01,USDJPY$ ]]
+}
+
+# span14 <from_ago> <to_ago> <time_server> [<fields 9..14>]: span with the 14-field lines of the new EA (#158).
+span14() {
+  local n
+  n=$(date +%s)
+  awk -v a=$(( n - $1 )) -v b=$(( n - $2 )) -v v="$3" -v x="${4:-1,1,1,1,0,0.00}" 'BEGIN {
+    for (t = a; t < b; t += 60) printf "%.0f,%s,150.0,150.0,10,12,0.01,USDJPY,%s\n", t, v, x
+    printf "%.0f,%s,150.0,150.0,10,12,0.01,USDJPY,%s\n", b, v, x
+  }' >> "$C"
+}
+
+@test "TK-28: 14-field lines (#158) are judged as before; mixed 8- and 14-field lines too" {
+  # (a) field 2 unchanged in 14-field lines: fired
+  mkdir -p "$(dirname "$C")"
+  span14 700 0 100
+  tick_run
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(grep -cF "$FIRE600" "$ATST_TEST_CURL_LOG")" -eq 1 ]
+  # (b) field 2 changes in 14-field lines: nothing
+  reset
+  mkdir -p "$(dirname "$C")"
+  span14 700 200 100; span14 100 0 101
+  tick_run
+  [ "$(atst_test_push_count)" -eq 0 ]
+  no_tick
+  # (c) 8-field lines before, 14-field lines after, field 2 unchanged: fired
+  reset
+  span 900 400 100
+  span14 340 0 100
+  tick_run
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(state 1)" -eq 1 ]
 }

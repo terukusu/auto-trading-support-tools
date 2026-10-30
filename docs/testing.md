@@ -37,7 +37,7 @@ bats の自動テスト（`tests/`）、共通フィクスチャ `tests/test_hel
 - `atst_test_teardown_sandbox` — sandbox を削除する。
 - `atst_test_make_mt <name> <MT4|MT5> [<appdata-hash>]` — 偽の MT インストールと AppData データフォルダ・`origin.txt` を作る。
 - `atst_test_source_common` — sandbox 内でのみ `common.sh` を source する。
-- `atst_test_make_monitoring_csv <name> <secs_ago> <bid> <spread> <pip> [<ping> [<time_server>]]` — MT4 の `MQL4/Files/terminal_monitoring.csv` に 8 列の行を 1 行追記する。`<ping>` は 6 列目（マイクロ秒、既定 12）、`<time_server>` は列 2（最後のティックのサーバー時刻。既定・空は 0 で、`check_tick.sh` は無視する）。列の意味は [docs/monitoring-csv.md](monitoring-csv.md)。
+- `atst_test_make_monitoring_csv <name> <secs_ago> <bid> <spread> <pip> [<ping> [<time_server> [<extra>]]]` — MT4 の `MQL4/Files/terminal_monitoring.csv` に 8 列の行を 1 行追記する。`<ping>` は 6 列目（マイクロ秒、既定 12）、`<time_server>` は列 2（最後のティックのサーバー時刻。既定・空は 0 で、`check_tick.sh` は無視する）。`<extra>`（#158）が空でなければ `USDJPY` の後に `,<extra>` を足す（例 `1,1,1,1,0,0.00` で 14 列。検証しない）。引数が 5〜8 個でなければ 1 を返して行を足さない。列の意味は [docs/monitoring-csv.md](monitoring-csv.md)。
 - `atst_test_push_count` — `$ATST_TEST_CURL_LOG` に記録された LINE push の件数。ログが無ければ 0。
 - `atst_test_make_order_status <name> <line>...` — MT4 の `MQL4/Files/order_status` に行を追記する。
 - `atst_test_make_proc <pid> <uid> <environ> [<argv>...]` — `$ATST_PROC_ROOT/<pid>/` に偽の `cmdline` / `status` / `environ` を作る。`<uid>` は数値か `-`（= 自分の EUID）、`<environ>` は改行区切りの `KEY=VAL`、`-` なら environ を作らず、空文字なら空ファイル。sandbox 内でのみ動き、`ATST_PROC_ROOT` が sandbox 配下でなければ失敗する。

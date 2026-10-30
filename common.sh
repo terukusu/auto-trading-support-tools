@@ -158,11 +158,12 @@ function atst_set_alert_stage() {
 }
 
 # atst_alert_remind_is_target <key>
-# Returns 0 for the keys that are reminded (a stopped MT, stopped monitoring data, stopped ticks, a stuck
-# runner: they do not recover by themselves), 1 otherwise. Fixed here, not in the config.
+# Returns 0 for the keys that are reminded (a stopped MT, stopped monitoring data, stopped ticks, a
+# MetaTrader that is not tradable, a stuck runner: they do not recover by themselves), 1 otherwise. Fixed
+# here, not in the config.
 function atst_alert_remind_is_target() {
   case "$1" in
-    PROCESS_*|MONITORING_*|TICK_*|RUNNER_STUCK) return 0 ;;
+    PROCESS_*|MONITORING_*|TICK_*|TRADE_*|RUNNER_STUCK) return 0 ;;
   esac
   return 1
 }
@@ -721,6 +722,21 @@ function atst_spool_flush() {
     rm -f -- "${files[@]}"
     exit "$rc"
   )
+}
+
+# atst_is_weekend_epoch <epoch>
+# Returns 0 when the epoch (seconds, UTC) is in the weekend of the FX market: Friday 20:00:00 to Monday
+# 00:00:00 (exclusive), UTC. Returns 1 otherwise, and for anything but 1 to 12 digits (empty, not a number,
+# negative, too long). Holidays are not known. Plain arithmetic, not GNU date: the same on every
+# distribution and whatever the host time zone is (1970-01-01 was a Thursday). Prints nothing.
+function atst_is_weekend_epoch() {
+  local e dow hour
+
+  [[ "${1-}" =~ ^[0-9]{1,12}$ ]] || return 1
+  e=$((10#$1))
+  dow=$(( (e / 86400 + 4) % 7 ))   # 0 = Sunday ... 6 = Saturday
+  hour=$(( e % 86400 / 3600 ))
+  [ "$dow" -eq 6 ] || [ "$dow" -eq 0 ] || { [ "$dow" -eq 5 ] && [ "$hour" -ge 20 ]; }
 }
 
 # atst_has_targets
