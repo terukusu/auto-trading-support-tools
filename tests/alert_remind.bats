@@ -708,3 +708,38 @@ make_slow_curl() {
     [ -z "$output" ]
   done
 }
+
+@test "RM-30: MARGIN_* (a low margin level, #177) is reminded like PROCESS_*" {
+  local e
+  e=$(ago 31)
+  printf 'MARGIN_A,1,%s\n' "$e" > "$ST"
+  run atst_update_alert MARGIN_A 1 '【発生】fire-m' '【復帰】rec-m'
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(sent '【継続中 30 分】fire-m')" -eq 1 ]
+  [ "$(grep -c "^MARGIN_A,1,$e,1$" "$ST")" -eq 1 ]
+  no_bearer
+}
+
+@test "RM-31: XMARGIN_A, margin_a and RUNNER_TIMEOUT_CHECK_MARGIN are not reminded; MARGIN_* by its exact prefix (#177)" {
+  local k line
+  for k in XMARGIN_A margin_a RUNNER_TIMEOUT_CHECK_MARGIN; do
+    line="$k,1,$(ago 1500)"
+    printf '%s\n' "$line" > "$ST"
+    run atst_update_alert "$k" 1 '【発生】x' r
+    [ "$status" -eq 0 ] || { echo "$k: status=$status"; false; }
+    [ "$(atst_test_push_count)" -eq 0 ] || { echo "$k: pushed"; false; }
+    [ "$(cat "$ST")" = "$line" ] || { echo "$k: line changed"; false; }
+  done
+  for k in MARGIN_A MARGIN_A_B; do
+    run atst_alert_remind_is_target "$k"
+    [ "$status" -eq 0 ] || { echo "$k: status=$status"; false; }
+    [ -z "$output" ]
+  done
+  for k in XMARGIN_A margin_a RUNNER_TIMEOUT_CHECK_MARGIN ''; do
+    run atst_alert_remind_is_target "$k"
+    [ "$status" -eq 1 ] || { echo "$k: status=$status"; false; }
+    [ -z "$output" ]
+  done
+}

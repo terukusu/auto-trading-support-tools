@@ -10,15 +10,17 @@ function do_check() {
 
   target_pid=$(atst_find_pid "$target_name")
 
-  local verdict=""
+  local verdict="" note=""
   if [ -z "$target_pid" ]; then
     verdict=1
+    # the positions of the last monitoring data, for the fire message only
+    note=$(atst_positions_note "$target_name")
   elif [ -n "$target_pid" ]; then
     verdict=0
   fi
 
   atst_update_alert "$alert_key" "$verdict" \
-    "【発生】MetaTraderプロセスが動作していません: $target_name" \
+    "【発生】MetaTraderプロセスが動作していません: $target_name${note:+ $note}" \
     "【復帰】MetaTraderプロセスが再開しました: $target_name"
 }
 

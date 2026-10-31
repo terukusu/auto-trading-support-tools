@@ -150,11 +150,12 @@ function atst_set_alert_stage() {
 
 # atst_alert_remind_is_target <key>
 # Returns 0 for the keys that are reminded (a stopped MT, stopped monitoring data, stopped ticks, a
-# MetaTrader that is not tradable, a stuck runner: they do not recover by themselves), 1 otherwise. Fixed
-# here, not in the config.
+# MetaTrader that is not tradable, a stuck runner: they do not recover by themselves; a low margin level:
+# left alone it ends in a loss, and it seldom recovers unless someone acts), 1 otherwise. Fixed here, not
+# in the config.
 function atst_alert_remind_is_target() {
   case "$1" in
-    PROCESS_*|MONITORING_*|TICK_*|TRADE_*|RUNNER_STUCK) return 0 ;;
+    PROCESS_*|MONITORING_*|TICK_*|TRADE_*|MARGIN_*|RUNNER_STUCK) return 0 ;;
   esac
   return 1
 }

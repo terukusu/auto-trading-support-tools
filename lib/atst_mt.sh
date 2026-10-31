@@ -369,6 +369,52 @@ function atst_get_monitoring_csv_path() {
   echo "$target_mt_home/Files/terminal_monitoring.csv"
 }
 
+# atst_monitoring_last_row <csv_path>
+# Prints "<field 1> <field 13> <field 14>" of the last complete line among the last 20 lines of the
+# monitoring csv, as read (not normalized). A complete line has 14 fields or more, field 1 and field 13
+# digits and field 14 "digits.digits"; the 8-field lines of an old EA, a line cut after field 13 while
+# the EA writes it (field 14 empty, K12) and blank lines are skipped. CRs are removed. The values must
+# also fit (field 1 up to 12 digits, field 13 up to 9, field 14 up to 15 digits on each side of the dot)
+# so that callers can do arithmetic with them. Returns 1 and prints nothing (not even on stderr) when the
+# argument is empty, the file is missing or no such line is found.
+function atst_monitoring_last_row() {
+  local csv="$1"
+  local row t n m
+
+  [ -n "$csv" ] && [ -f "$csv" ] || return 1
+
+  # mawk 1.3.3 has no {n} in regular expressions, so the lengths are checked in bash below.
+  row=$(tail -n 20 "$csv" 2>/dev/null | tr -d '\r' | awk -F, '
+    NF >= 14 && $1 ~ /^[0-9]+$/ && $13 ~ /^[0-9]+$/ && $14 ~ /^[0-9]+\.[0-9]+$/ { r = $1 " " $13 " " $14 }
+    END { if (r != "") print r }')
+  read -r t n m <<< "$row"
+  [[ "$t" =~ ^[0-9]{1,12}$ ]] && [[ "$n" =~ ^[0-9]{1,9}$ ]] && [[ "$m" =~ ^[0-9]{1,15}\.[0-9]{1,15}$ ]] \
+    || return 1
+  printf '%s %s %s\n' "$t" "$n" "$m"
+}
+
+# atst_positions_note <name>
+# Prints "建玉 N 件（M 分前の監視データ。MT4 は待機注文を含みます）" when the last complete line of the
+# monitoring csv of the MetaTrader <name> (atst_monitoring_last_row) has 1 or more in field 13 (the
+# positions; MQL4 OrdersTotal() counts pending orders too). M is the minutes since field 1, rounded down
+# (0 for a line in the future). Prints nothing when the MetaTrader, the csv or a complete line is missing
+# or field 13 is 0. Nothing else from the csv (path, prices, symbol, field 14) is printed. Always returns 0.
+function atst_positions_note() {
+  local csv row t n m
+
+  [ -n "$1" ] || return 0
+  csv=$(atst_get_monitoring_csv_path "$1")
+  [ -n "$csv" ] || return 0
+  row=$(atst_monitoring_last_row "$csv") || return 0
+  read -r t n _ <<< "$row"
+  n=$((10#$n))
+  [ "$n" -ge 1 ] || return 0
+  m=$(( ( $(date +%s) - 10#$t ) / 60 ))
+  [ "$m" -ge 0 ] || m=0
+  echo "建玉 $n 件（$m 分前の監視データ。MT4 は待機注文を含みます）"
+  return 0
+}
+
 function atst_get_mql_folder_path() {
   local target_name="$1"
 

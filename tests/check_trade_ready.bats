@@ -413,7 +413,7 @@ drop_threshold() {
   [ "$output" = "$BADT" ]
 }
 
-@test "TR-18 (T10): no path, token, price, symbol or fields 13/14 in the notices" {
+@test "TR-18 (T10): no path, token, price, symbol or field 14; field 13 only as 建玉 N 件 (#177)" {
   span 700 0 0,1,1,1 A_MT4 7,123.45
   tr_run
   [ "$(atst_test_push_count)" -eq 1 ]
@@ -423,13 +423,14 @@ drop_threshold() {
   tr_run
   [ "$(atst_test_push_count)" -eq 2 ]
   grep -qF "$REC" "$ATST_TEST_CURL_LOG"
-  ! grep -qF "$ATST_TEST_SANDBOX" "$ATST_TEST_CURL_LOG"
-  ! grep -q Bearer "$ATST_TEST_CURL_LOG"
-  ! grep -qF 150.0 "$ATST_TEST_CURL_LOG"
-  ! grep -qF 123.45 "$ATST_TEST_CURL_LOG"
-  ! grep -qF ',7,' "$ATST_TEST_CURL_LOG"
-  ! grep -qF USDJPY "$ATST_TEST_CURL_LOG"
-  ! grep -qF terminal_monitoring "$ATST_TEST_CURL_LOG"
+  grep -qF '建玉 7 件' "$ATST_TEST_CURL_LOG"
+  [ "$(grep -cF "$ATST_TEST_SANDBOX" "$ATST_TEST_CURL_LOG")" -eq 0 ]
+  [ "$(grep -c Bearer "$ATST_TEST_CURL_LOG")" -eq 0 ]
+  [ "$(grep -cF 150.0 "$ATST_TEST_CURL_LOG")" -eq 0 ]
+  [ "$(grep -cF 123.45 "$ATST_TEST_CURL_LOG")" -eq 0 ]
+  [ "$(grep -cF ',7,' "$ATST_TEST_CURL_LOG")" -eq 0 ]
+  [ "$(grep -cF USDJPY "$ATST_TEST_CURL_LOG")" -eq 0 ]
+  [ "$(grep -cF terminal_monitoring "$ATST_TEST_CURL_LOG")" -eq 0 ]
 }
 
 @test "TR-19 (T11): the key is the folder name with spaces as _" {

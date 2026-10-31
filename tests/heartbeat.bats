@@ -411,9 +411,18 @@ file_url() {
 @test "HB-3: keys outside the allow list never give /fail (AC6)" {
   local k
   config_url "$U"
-  for k in PRICE_A SPREAD_A PING_A IMAGE_REPORT_DEFAULT_CHANGED RUNNER_TIMEOUT_HEARTBEAT XPROCESS_A process_a XTICK_A tick_a XTRADE_A trade_a OTHER_KEY; do
+  for k in PRICE_A SPREAD_A PING_A MARGIN_A IMAGE_REPORT_DEFAULT_CHANGED RUNNER_TIMEOUT_HEARTBEAT XPROCESS_A process_a XTICK_A tick_a XTRADE_A trade_a OTHER_KEY; do
     set_status "$k" 1
   done
+  hb_run
+  [ "$status" -eq 0 ]
+  [ "$(ping_lines)" -eq 1 ]
+  [ "$(fail_lines)" -eq 0 ]
+}
+
+@test "HB-3b: MARGIN_A alone (a low margin level, #177) gives a ping, not /fail" {
+  config_url "$U"
+  set_status MARGIN_A 1
   hb_run
   [ "$status" -eq 0 ]
   [ "$(ping_lines)" -eq 1 ]
@@ -423,7 +432,7 @@ file_url() {
 @test "HB-4: each allow-listed key set to 1 gives one /fail and no ping (AC7, AC12)" {
   local k
   config_url "$U"
-  for k in PROCESS_A TARGET_A MONITORING_A TICK_A RUNNER_STUCK RUNNER_TIMEOUT_CHECK_PING RUNNER_TIMEOUT_CHECK_TICK TRADE_A RUNNER_TIMEOUT_CHECK_TRADE_READY LINE_X; do
+  for k in PROCESS_A TARGET_A MONITORING_A TICK_A RUNNER_STUCK RUNNER_TIMEOUT_CHECK_PING RUNNER_TIMEOUT_CHECK_TICK TRADE_A RUNNER_TIMEOUT_CHECK_TRADE_READY RUNNER_TIMEOUT_CHECK_MARGIN LINE_X; do
     echo "case=$k"
     rm -f "$ST" "$LOG"
     set_status "$k" 1

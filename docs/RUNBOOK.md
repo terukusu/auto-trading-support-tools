@@ -5,7 +5,7 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
 - [最初の 3 手](#最初の-3-手)
 - [安全の原則](#安全の原則)
 - [通知ごとの確認・復旧手順](#通知ごとの確認復旧手順)
-  - [REBOOT](#key-reboot) / [PROCESS_](#key-process) / [TARGET_](#key-target) / [MONITORING_](#key-monitoring) / [MONITORING_AUTO_ATTACH_](#key-monitoring-auto-attach) / [TICK_](#key-tick) / [TRADE_](#key-trade) / [PING_](#key-ping) / [PRICE_](#key-price) / [SPREAD_](#key-spread) / [ORDER](#key-order)
+  - [REBOOT](#key-reboot) / [PROCESS_](#key-process) / [TARGET_](#key-target) / [MONITORING_](#key-monitoring) / [MONITORING_AUTO_ATTACH_](#key-monitoring-auto-attach) / [TICK_](#key-tick) / [TRADE_](#key-trade) / [MARGIN_](#key-margin) / [PING_](#key-ping) / [PRICE_](#key-price) / [SPREAD_](#key-spread) / [ORDER](#key-order)
   - [RUNNER_STUCK](#key-runner-stuck) / [RUNNER_TIMEOUT_](#key-runner-timeout) / [RUNNER_TARGETS_EMPTY](#key-runner-targets-empty) / [自己修復](#key-self-heal)
   - [IMAGE_REPORT_DEFAULT_CHANGED](#key-image-report-default-changed) / [crontab が旧形式](#crontab-legacy) / [LINE_QUOTA](#key-line-quota) / [IMAGE_UPLOAD_FAILED](#key-image-upload-failed) / [HEARTBEAT](#key-heartbeat)
 - [MT の固まりの切り分け](#mt-の固まりの切り分け)
@@ -45,6 +45,7 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
 | `<MT 名>` の自動配置 (ATST_AUTO_ATTACH_EA=1) が有効ですが … モニタリングデータが出ていません | `MONITORING_AUTO_ATTACH_<MT名>` | [MONITORING_AUTO_ATTACH_](#key-monitoring-auto-attach) |
 | `<MT 名>` の価格データ（ティック）が … 分以上更新されていません | `TICK_<MT名>` | [TICK_](#key-tick) |
 | `<MT 名>` が … 分以上取引できない状態です | `TRADE_<MT名>` | [TRADE_](#key-trade) |
+| `<MT 名>` の証拠金維持率が … % を下回りました | `MARGIN_<MT名>` | [MARGIN_](#key-margin) |
 | `<MT 名>` のPingが … 異常値 | `PING_<MT名>` | [PING_](#key-ping) |
 | `<MT 名>` の過去10分の値幅が … 異常値 | `PRICE_<MT名>` | [PRICE_](#key-price) |
 | `<MT 名>` の5分間のスプレッド最高値が … 異常値 | `SPREAD_<MT名>` | [SPREAD_](#key-spread) |
@@ -88,10 +89,11 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
   ```bash
   grep ',1,' ~/.atst/alert_status
   ```
-- MT 名付きのキー（`PROCESS_` / `MONITORING_` / `TICK_` / `TRADE_` / `PING_` / `PRICE_` / `SPREAD_`）の `<MT名>` は、`./mtctl.sh list` の `name=`（フォルダ名）の空白を `_` にしたもの（例: `PROCESS_Land_Prime_MetaTrader_4_Terminal`）。通知文の中の名前は `ATST_TARGETS` に書いた名前。
+- MT 名付きのキー（`PROCESS_` / `MONITORING_` / `TICK_` / `TRADE_` / `MARGIN_` / `PING_` / `PRICE_` / `SPREAD_`）の `<MT名>` は、`./mtctl.sh list` の `name=`（フォルダ名）の空白を `_` にしたもの（例: `PROCESS_Land_Prime_MetaTrader_4_Terminal`）。通知文の中の名前は `ATST_TARGETS` に書いた名前。
 - しきい値は発生と復帰で別（発生は `..._UPPER` 以上、復帰は `..._LOWER` 以下。間にいる間は状態を変えない）。設定は `~/.atst/config`。`ATST_TARGETS` / `ATST_CHECK_TIMEOUT` / `ATST_ORDER_CHECK_INTERVAL` は config の末尾に置く（書き間違えた行より後は読まれないため）。
-- 継続中の通知（#141）: `PROCESS_*` / `MONITORING_*` / `TICK_*` / `TRADE_*` / `RUNNER_STUCK` は、発生したまま直らないと、発生の通知から 30 分 / 2 時間 / 12 時間後に `【継続中 30 分】` / `【継続中 2 時間】` / `【継続中 12 時間】` の書き出しで同じ文面が 1 回ずつ届く（1 件の異常につき最大 3 通。送れずに遅れたときは、その時点で達した最も先の段階の 1 通だけが届く。12 時間の後は復帰まで届かない）。間隔は `~/.atst/config` の `ATST_ALERT_REMIND_MINUTES`（既定 `"30 120 720"` 分、`""` で届かない）。値動き・スプレッド・Ping などは継続中の通知が無い。
-- 外形監視（#136）: 発生中のキーのうち `PROCESS_` / `TARGET_` / `MONITORING_` / `TICK_` / `TRADE_` / `RUNNER_`（`RUNNER_TIMEOUT_HEARTBEAT` を除く）/ `LINE_QUOTA` があると、`heartbeat.sh` が外部サービスへ毎分 ping の代わりに `/fail` を送る（[HEARTBEAT](#key-heartbeat)）。
+- 継続中の通知（#141）: `PROCESS_*` / `MONITORING_*` / `TICK_*` / `TRADE_*` / `MARGIN_*` / `RUNNER_STUCK` は、発生したまま直らないと、発生の通知から 30 分 / 2 時間 / 12 時間後に `【継続中 30 分】` / `【継続中 2 時間】` / `【継続中 12 時間】` の書き出しで同じ文面が 1 回ずつ届く（1 件の異常につき最大 3 通。送れずに遅れたときは、その時点で達した最も先の段階の 1 通だけが届く。12 時間の後は復帰まで届かない）。間隔は `~/.atst/config` の `ATST_ALERT_REMIND_MINUTES`（既定 `"30 120 720"` 分、`""` で届かない）。値動き・スプレッド・Ping などは継続中の通知が無い。`MARGIN_` は、維持率が `ATST_THRESHOLD_MARGIN_LOWER` 以上 `ATST_THRESHOLD_MARGIN_UPPER` 未満の間は判定しないので、状態が発生のままでも継続中の通知は届かない。
+- 建玉の添え書き（#177）: `PROCESS_` / `MONITORING_` / `TICK_` / `TRADE_` の【発生】と【継続中】の末尾に ` 建玉 N 件（M 分前の監視データ。MT4 は待機注文を含みます）` が付くことがある。N は M 分前に書かれた最後の監視データの建玉数で、いまの件数ではない（MT4 は待機注文を含む）。付かないときは建玉が 0 件か、監視データが読めなかった。【復帰】には付かない。
+- 外形監視（#136）: 発生中のキーのうち `PROCESS_` / `TARGET_` / `MONITORING_` / `TICK_` / `TRADE_` / `RUNNER_`（`RUNNER_TIMEOUT_HEARTBEAT` を除く）/ `LINE_QUOTA` があると、`heartbeat.sh` が外部サービスへ毎分 ping の代わりに `/fail` を送る（[HEARTBEAT](#key-heartbeat)）。`MARGIN_` は相場・口座の状態なので `/fail` の対象外（`PRICE_` / `SPREAD_` と同じ）。
 - 毎分の監視の stderr（エラー・警告）は `~/.atst/log/check_all.log` に残る（#144）。回の先頭に `===== START <日時> pid=<pid> =====` の行、チェックが 0 以外で終わった回は `check_ping.sh: exit 3` のような行（打ち切りは `exit 124` / `exit 137`）、前の回が終わらず飛ばした回は `another run holds the lock (started ... s ago); skipped` の行が入る。
   ```bash
   tail -n 50 ~/.atst/log/check_all.log
@@ -319,6 +321,40 @@ tail -n 3 "<data>/MQL4/Files/terminal_monitoring.csv" | tr -d '\r' | awk -F, '{p
 
 **関連**: [docs/monitoring-csv.md](monitoring-csv.md)（列 9〜14）、[README](../README.md)「毎分の監視 (check_all.sh) の動き」、#158、#137（[TICK_](#key-tick)）、#141（継続中の通知）。
 
+<a id="key-margin"></a>
+
+### MARGIN_<MT名>: 証拠金維持率が下がった
+
+**キー名**: `MARGIN_<MT名>`。
+
+**通知文の例**:
+- `【発生】<MT 名> の証拠金維持率が 200% を下回りました: 150.00%（建玉 2 件。MT4 は待機注文を含みます）。このまま下がるとロスカット（強制決済）になります。`（200 は `ATST_THRESHOLD_MARGIN_LOWER`）
+- `【継続中 30 分】…`（30 分 / 2 時間 / 12 時間後。上と同じ文面。維持率が 200% 以上 300% 未満に戻って判定しない間は届かない）
+- `【復帰】<MT 名> の証拠金維持率が 300% 以上に戻りました: 320.00%。`（300 は `ATST_THRESHOLD_MARGIN_UPPER`）
+- `【復帰】<MT 名> に証拠金を使う建玉が無くなりました（建玉 0 件）。決済かロスカットの可能性があるので約定通知を確認してください。`
+- `【復帰】<MT 名> の証拠金維持率の監視を終了しました (ATST_THRESHOLD_MARGIN_LOWER が 0 です)。`（発生中に `ATST_THRESHOLD_MARGIN_LOWER=0` にしたとき）
+
+**意味**: `check_margin.sh`（#177）が、監視 EA の CSV の最後の完全な行（14 列の行）の列 13（建玉数）と列 14（証拠金維持率 %）を見て、建玉があって維持率が `ATST_THRESHOLD_MARGIN_LOWER`（既定 200）% 未満だと出す。維持率が下がり続けるとブローカーのマージンコールとロスカット（強制決済）になる。復帰は `ATST_THRESHOLD_MARGIN_UPPER`（既定 300）% 以上に戻ったとき。LOWER 以上 UPPER 未満の間は状態を変えず、判定しないので継続中の通知も届かない。維持率は整数部で比べる。列 13 が 0 か列 14 が 0（証拠金を使う建玉が無い。MT4 の待機注文だけ、両建てなど）のときは復帰として扱う。ロスカットで建玉が無くなったときも、この復帰が届くので、約定通知で何が起きたかを確かめる。CSV の停止（`MONITORING_` の担当）、古い監視 EA（8 列）、書きかけの行だけのときは判定しない。週末も判定する。既定の 200 / 300 は目安で、適正な値はレバレッジと戦略で大きく違う。設定した値が整数でない・範囲外のときは既定値で動き、`~/.atst/log/check_all.log` に毎分 1 行残る。
+
+**確認コマンド**:
+```bash
+./doctor.sh
+tail -n 3 "<data>/MQL4/Files/terminal_monitoring.csv" | tr -d '\r' | awk -F, '{print NF, $13, $14}'
+```
+`<data>` は `env -u WINEPREFIX ./mtctl.sh list` の `data=`。`14 2 150.00` なら 14 列で、建玉 2 件、維持率 150.00%。`doctor.sh` の `csv` の行の `cols 14` と、CSV の列 14 が `150.00` のような小数であることを確かめる（列が 14 に満たない、または整数だけ・負の値・文字列だと判定しない）。スマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）の口座の画面で、建玉・証拠金・維持率を見る。
+
+**安全な復旧手順**:
+- 読み取り専用の確認（上）を先に済ませる。atst は自動で何もしない（決済も入金もしない）。
+- 入金か建玉の縮小（一部の手動決済）は人が判断して行う。スマホの MT アプリで建玉と証拠金を見て、ロスカットまでの余裕を確かめる。
+- 発生が頻繁に出る・出ない場合は、`~/.atst/config` の `ATST_THRESHOLD_MARGIN_LOWER` / `ATST_THRESHOLD_MARGIN_UPPER` を、ブローカーのマージンコール・ロスカットの水準より上で、普段の維持率より下の値に直す。判定をやめるには `ATST_THRESHOLD_MARGIN_LOWER=0`（発生中なら終了の【復帰】が 1 回届く）。UPPER を LOWER 以下にすると LOWER と同じ値で動き、往復して通知が増える。
+- 【復帰】で建玉が無くなったと届いたときは、約定通知（決済かロスカット）を確認する。
+
+**それでも直らないとき**: スマホの MT アプリで建玉を確認し、必要なら手動で決済する。
+
+**注意**: 監視 EA を 14 列より前のもの（8 列）に戻すと `check_margin.sh` は判定しなくなり、`MARGIN_<MT名>` は発生（1）のまま残る（継続中の再通知も止まる）。列 14 の形が想定と違う EA でも同じ。`./doctor.sh` の `csv` の行が `cols 14` になっているか、CSV の列 14 が小数かを見て、監視 EA を更新して載せ直す。監視対象から外したときは `~/.atst/alert_status` の該当行を消す。新しく有効にした直後に維持率が LOWER 未満だとすぐ発生するので、先に閾値を調整する。`/fail` にはならない。
+
+**関連**: [docs/monitoring-csv.md](monitoring-csv.md)（列 13・14）、[README](../README.md)「毎分の監視 (check_all.sh) の動き」、#177、#141（継続中の通知）、[TRADE_](#key-trade)。
+
 <a id="key-ping"></a>
 
 ### PING_<MT名>: Ping の異常値
@@ -429,7 +465,7 @@ grep 'LINE send failed' ~/.atst/line_error.log | tail -n 5
 - `【継続中 30 分】毎分の監視 (check_all.sh) が、前回の実行が終わらないため <N> 秒以上止まっています`（30 分 / 2 時間 / 12 時間後）
 - `【復帰】毎分の監視 (check_all.sh) が再開しました`
 
-**意味**: `check_all.sh` は 1 回ずつしか動かない（`~/.atst/check_all.lock`）。次の回がロックを取れず、前の回の開始（`~/.atst/check_all.started`）から約 26 分（既定の `ATST_CHECK_TIMEOUT=40` で 1530 秒。`ATST_CHECK_TIMEOUT` に応じて変わる）以上たっていると出す。各チェックの打ち切り（`RUNNER_TIMEOUT_`）でも止まらない何かが残っている。**この間は毎分の監視が全部止まっている**。
+**意味**: `check_all.sh` は 1 回ずつしか動かない（`~/.atst/check_all.lock`）。次の回がロックを取れず、前の回の開始（`~/.atst/check_all.started`）から約 26 分（既定の `ATST_CHECK_TIMEOUT=40` で 1570 秒。`ATST_CHECK_TIMEOUT` に応じて変わる）以上たっていると出す。各チェックの打ち切り（`RUNNER_TIMEOUT_`）でも止まらない何かが残っている。**この間は毎分の監視が全部止まっている**。
 
 **確認コマンド**:
 ```bash
@@ -460,13 +496,14 @@ tail -n 50 ~/.atst/log/check_all.log
 
 ### RUNNER_TIMEOUT_<名前>: チェックが時間内に終わらない
 
-**キー名**: 次の 11 個（チェックごと）。
+**キー名**: 次の 12 個（チェックごと）。
 - `RUNNER_TIMEOUT_CHECK_REBOOT`（`check_reboot.sh`）
 - `RUNNER_TIMEOUT_CHECK_ORDER`（`check_order.sh`）
 - `RUNNER_TIMEOUT_CHECK_PROCESS`（`check_process.sh`）
 - `RUNNER_TIMEOUT_CHECK_MONITORING`（`check_monitoring.sh`）
 - `RUNNER_TIMEOUT_CHECK_TICK`（`check_tick.sh`）
 - `RUNNER_TIMEOUT_CHECK_TRADE_READY`（`check_trade_ready.sh`）
+- `RUNNER_TIMEOUT_CHECK_MARGIN`（`check_margin.sh`）
 - `RUNNER_TIMEOUT_CHECK_PING`（`check_ping.sh`）
 - `RUNNER_TIMEOUT_CHECK_PRICE`（`check_price.sh`）
 - `RUNNER_TIMEOUT_CHECK_SPREAD`（`check_spread.sh`）

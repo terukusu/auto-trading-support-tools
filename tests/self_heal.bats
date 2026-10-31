@@ -566,7 +566,7 @@ mtctl.sh [-q] [start] [B_MT5]" ]
   [ "$sh" -lt "$fl" ]
   [ "$(grep -c 'RUNNER_TIMEOUT_SELF_HEAL\|notify_timeout SELF_HEAL' "$f")" -ge 1 ]
   sed -n '/^# The longest one run/,/^stuck_after=/p' "$f" | grep -q self_heal
-  grep -q '10 \* cap + 975' "$f"
+  grep -q '11 \* cap + 975' "$f"
 }
 
 @test "SH-25: an MT lock that cannot be opened: nothing is done (AC7)" {
