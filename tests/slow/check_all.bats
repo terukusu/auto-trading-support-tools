@@ -11,7 +11,7 @@
 
 load ../test_helper
 
-CHECKS="check_reboot check_order check_process check_monitoring check_tick check_trade_ready check_ping check_price check_spread heartbeat"
+CHECKS="check_reboot check_order check_process check_monitoring check_tick check_trade_ready check_margin check_ping check_price check_spread heartbeat"
 
 setup() {
   local n
@@ -100,10 +100,10 @@ runlog() {
 }
 
 # What every run that could not use the log must still do (LOG-04a/b/c, LOG-09): all checks once
-# (check_order twice: 11 lines in calls.log), no push, and the check's stderr where it was (in $output), without a START line.
+# (check_order twice: 12 lines in calls.log), no push, and the check's stderr where it was (in $output), without a START line.
 assert_ran_unlogged() {
   [ "$status" -eq 0 ] || return 1
-  [ "$(wc -l < "$CALLS")" -eq 11 ] || return 1
+  [ "$(wc -l < "$CALLS")" -eq 12 ] || return 1
   [ "$(calls_of check_order.sh)" -eq 2 ] || return 1
   [ "$(atst_test_push_count)" -eq 0 ] || return 1
   [[ "$output" == *PING-STDERR-7f3a* ]] || return 1
@@ -138,6 +138,7 @@ check_process.sh [it's] [a  b] [*]
 check_monitoring.sh [it's] [a  b] [*]
 check_tick.sh [it's] [a  b] [*]
 check_trade_ready.sh [it's] [a  b] [*]
+check_margin.sh [it's] [a  b] [*]
 check_ping.sh [it's] [a  b] [*]
 check_price.sh [it's] [a  b] [*]
 check_spread.sh [it's] [a  b] [*]
@@ -206,12 +207,13 @@ heartbeat.sh"
   [ "$status" -eq 0 ]
   [ "$(atst_test_push_count)" -eq 0 ]
   [ -s "$HOME/.atst/uptime" ]
-  [ "$(wc -l < "$CALLS")" -eq 10 ]
+  [ "$(wc -l < "$CALLS")" -eq 11 ]
   [ "$(calls_of check_order.sh)" -eq 2 ]
   [ "$(calls_of check_process.sh)" -eq 1 ]
   [ "$(calls_of check_monitoring.sh)" -eq 1 ]
   [ "$(calls_of check_tick.sh)" -eq 1 ]
   [ "$(calls_of check_trade_ready.sh)" -eq 1 ]
+  [ "$(calls_of check_margin.sh)" -eq 1 ]
   [ "$(calls_of check_ping.sh)" -eq 1 ]
   [ "$(calls_of check_price.sh)" -eq 1 ]
   [ "$(calls_of check_spread.sh)" -eq 1 ]
@@ -239,6 +241,7 @@ heartbeat.sh"
   [ "$el" -le 12 ]
   [ "$(calls_of check_tick.sh)" -eq 1 ]
   [ "$(calls_of check_trade_ready.sh)" -eq 1 ]
+  [ "$(calls_of check_margin.sh)" -eq 1 ]
   [ "$(calls_of check_price.sh)" -eq 1 ]
   [ "$(calls_of check_spread.sh)" -eq 1 ]
   [ "$(calls_of heartbeat.sh)" -eq 1 ]
@@ -309,7 +312,7 @@ heartbeat.sh"
 
   wait "$pid"
   rm -f "$ATST_TEST_SANDBOX/bg.pid"
-  [ "$(wc -l < "$CALLS")" -eq 11 ]
+  [ "$(wc -l < "$CALLS")" -eq 12 ]
   [ "$(calls_of check_reboot.sh)" -eq 1 ]
   [ "$(calls_of check_order.sh)" -eq 2 ]
   [ "$(calls_of check_process.sh)" -eq 1 ]
@@ -323,7 +326,7 @@ heartbeat.sh"
   hold_lock "$HOME/.atst/check_all.lock"
   now=$(date +%s)
 
-  # TIMEOUT 2 gives 10 * 2 + 975 + 155 = 1150 seconds (+ 155: self_heal, #140); shorter or unknown
+  # TIMEOUT 2 gives 11 * 2 + 975 + 155 = 1152 seconds (+ 155: self_heal, #140); shorter or unknown
   # elapsed times say nothing.
   for v in "$(( now - 60 ))" "$(( now - 870 ))" abc "$(( now + 1000 ))" none; do
     if [ "$v" = none ]; then
@@ -482,13 +485,14 @@ EOF
   [ "$(stat -c %a "$HOME/.atst/check_all.started")" = "$ref" ]
   [ "$(stat -c %a "$HOME/.atst/check_all.lock")" = "$ref" ]
   [ "$(atst_test_push_count)" -eq 0 ]
-  [ "$(wc -l < "$CALLS")" -eq 11 ]
+  [ "$(wc -l < "$CALLS")" -eq 12 ]
   [ "$(calls_of check_order.sh)" -eq 2 ]
   [ "$(calls_of check_reboot.sh)" -eq 1 ]
   [ "$(calls_of check_process.sh)" -eq 1 ]
   [ "$(calls_of check_monitoring.sh)" -eq 1 ]
   [ "$(calls_of check_tick.sh)" -eq 1 ]
   [ "$(calls_of check_trade_ready.sh)" -eq 1 ]
+  [ "$(calls_of check_margin.sh)" -eq 1 ]
   [ "$(calls_of check_ping.sh)" -eq 1 ]
   [ "$(calls_of check_price.sh)" -eq 1 ]
   [ "$(calls_of check_spread.sh)" -eq 1 ]
@@ -670,7 +674,7 @@ EOF
   [ "$(runlog | grep -c PING-STDERR-7f3a)" -eq 1 ]
   [[ "$output" != *PING-STDERR-7f3a* ]]
   [ "$(runlog | grep -c '^===== START ')" -eq 1 ]
-  [ "$(wc -l < "$CALLS")" -eq 11 ]
+  [ "$(wc -l < "$CALLS")" -eq 12 ]
 }
 
 @test "LOG-12: an argument exits before the log is touched" {
@@ -708,7 +712,7 @@ EOF
   [ "$(runlog | grep -c PING-STDERR-7f3a)" -eq 1 ]
   [[ "$output" != *PING-STDERR-7f3a* ]]
   [ "$(runlog | grep -c '^===== START ')" -eq 1 ]
-  [ "$(wc -l < "$CALLS")" -eq 11 ]
+  [ "$(wc -l < "$CALLS")" -eq 12 ]
   [ "$(atst_test_push_count)" -eq 0 ]
 }
 
@@ -964,7 +968,7 @@ hb_ping_lines() {
   atst_test_stub_script "$home" self_heal.sh record
   run bash "$home/check_all.sh"
   [ "$status" -eq 0 ]
-  [ "$(wc -l < "$CALLS")" -eq 12 ]
+  [ "$(wc -l < "$CALLS")" -eq 13 ]
   [ "$(calls | tail -2)" = "heartbeat.sh
 self_heal.sh [A]" ]
 
@@ -983,7 +987,7 @@ self_heal.sh [A]" ]
   [ "$status" -eq 0 ]
   [ "$(calls_of mtctl.sh)" -eq 0 ]
   [ ! -e "$HOME/.atst/self_heal.log" ]
-  [ "$(wc -l < "$CALLS")" -eq 11 ]
+  [ "$(wc -l < "$CALLS")" -eq 12 ]
   [ "$(atst_test_push_count)" -eq 0 ]
 }
 
@@ -994,7 +998,7 @@ self_heal.sh [A]" ]
   run bash "$home/check_all.sh"
   [ "$status" -eq 0 ]
   [ "$(status_lines '^RUNNER_TIMEOUT_SELF_HEAL,1,')" -eq 1 ]
-  [ "$(wc -l < "$CALLS")" -eq 12 ]
+  [ "$(wc -l < "$CALLS")" -eq 13 ]
   [ "$(calls_of check_order.sh)" -eq 2 ]
   [ "$(calls_of heartbeat.sh)" -eq 1 ]
   [ "$(atst_test_push_count)" -eq 1 ]
@@ -1020,4 +1024,56 @@ self_heal.sh [A]" ]
   [ "$(grep -c '^mtctl.sh [0-9]* \[-q\] \[start\] \[A\]$' "$CALLS")" -eq 1 ]
   [ "$(wc -l < "$HOME/.atst/self_heal.log")" -eq 2 ]
   grep -q '^PROCESS_A_MT4,1,' "$ST"
+}
+
+@test "RUN-35: a hung check_margin is cut off as RUNNER_TIMEOUT_CHECK_MARGIN, the later checks still run (#177)" {
+  local t0 el
+  atst_test_stub_script "$home" check_margin.sh hang
+  t0=$(date +%s)
+  run timeout 60 bash "$home/check_all.sh"
+  el=$(( $(date +%s) - t0 ))
+  [ "$status" -eq 0 ]
+  [ "$el" -le 12 ]
+  [ "$(calls_of check_ping.sh)" -eq 1 ]
+  [ "$(calls_of check_price.sh)" -eq 1 ]
+  [ "$(calls_of check_spread.sh)" -eq 1 ]
+  [ "$(calls_of heartbeat.sh)" -eq 1 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(status_lines '^RUNNER_TIMEOUT_CHECK_MARGIN,1,')" -eq 1 ]
+  grep -qF '【発生】チェックが 2 秒で終わらず打ち切りました: check_margin.sh' "$ATST_TEST_CURL_LOG"
+
+  atst_test_stub_script "$home" check_margin.sh record
+  run timeout 60 bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 2 ]
+  [ "$(status_lines '^RUNNER_TIMEOUT_CHECK_MARGIN,0,')" -eq 1 ]
+  grep -qF '【復帰】チェックが時間内に終わるようになりました: check_margin.sh' "$ATST_TEST_CURL_LOG"
+}
+
+@test "RUN-36: stuck_after is 11 * cap + 975 + 155; the budget comment and README say so (#177)" {
+  local f="$repo/check_all.sh"
+  [ "$(grep -c '^stuck_after=\$(( 11 \* cap + 975 + 155 ))$' "$f")" -eq 1 ]
+  grep -qF '11 * cap + 55' "$f"
+  grep -qF '55 + 65 + 50 + 650 + 110 + 45 = 975' "$f"
+  grep -qF '1570 s with the default cap of 40' "$f"
+  [ "$(grep -A1 '^cut_trade_ready=0$' "$f" | tail -1)" = 'cut_margin=0' ]
+  grep -A1 'notify_timeout CHECK_TRADE_READY ' "$f" | tail -1 | grep -qF 'notify_timeout CHECK_MARGIN check_margin "$cut_margin" "$cap"'
+  grep -qF '1570 秒' "$repo/README.md"
+  [ "$(grep -cF '1530 秒' "$repo/README.md")" -eq 0 ]
+}
+
+@test "RUN-37: the real check_margin.sh through the runner: 2 positions at 150.00% are reported once (#177)" {
+  cp -p "$repo/check_margin.sh" "$home/"
+  atst_test_make_mt A_MT4 MT4
+  atst_test_set_targets A_MT4
+  atst_test_make_monitoring_csv A_MT4 10 150.0 10 0.01 12 100 '1,1,1,1,2,150.00'
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
+  [ "$(status_lines '^MARGIN_A_MT4,1,')" -eq 1 ]
+  grep -qF '【発生】A_MT4 の証拠金維持率が 200% を下回りました: 150.00%（建玉 2 件。' "$ATST_TEST_CURL_LOG"
+  [ "$(runlog | grep -c 'check_margin')" -eq 0 ]
+  run bash "$home/check_all.sh"
+  [ "$status" -eq 0 ]
+  [ "$(atst_test_push_count)" -eq 1 ]
 }

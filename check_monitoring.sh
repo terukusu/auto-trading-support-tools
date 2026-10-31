@@ -49,7 +49,7 @@ function do_check() {
   local target_name="$1"
   local target_fullname="$2"
 
-  local monitoring_file fire_msg verdict
+  local monitoring_file fire_msg verdict note=""
   local now elapsed last_timestamp threshold threshold_minute target_pid
 
   local alert_key=MONITORING_${target_fullname// /_}
@@ -96,6 +96,12 @@ function do_check() {
     verdict=1
   elif [ "$elapsed" -lt "$threshold" ]; then
     verdict=0
+  fi
+
+  # The positions of the last complete line, only when firing on stale data (no data, no line to read).
+  if [ "$verdict" == 1 ] && [ "$last_timestamp" -ne 0 ]; then
+    note=$(atst_positions_note "$target_name")
+    fire_msg+="${note:+ $note}"
   fi
 
   atst_update_alert "$alert_key" "$verdict" "$fire_msg" \

@@ -10,7 +10,8 @@
 #   CSV が止まっている (ATST_MONITORING_THRESHOLD。check_monitoring.sh が通知)、窓の外側に行が無い (起動直後)、
 #   窓の中に ATST_MONITORING_THRESHOLD 秒以上の空白がある (MT / 監視 EA の再開直後)、週末 (列 1 の UTC で
 #   金 20:00〜月 00:00。ATST_TRADE_READY_WEEKEND_SKIP=0 で週末も判定)。祝日は抑止しません。
-# - 列 13 (建玉数)・列 14 (証拠金維持率) は判定に使いません。
+# - 列 13 (建玉数) は判定に使わず、【発生】の文面の添え書き (atst_positions_note) にだけ使います。
+#   列 14 (証拠金維持率) は使いません (check_margin.sh が見ます)。
 #
 
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
@@ -19,7 +20,7 @@ function do_check() {
   local target_name="$1"
   local target_fullname="$2"
   local alert_key=TRADE_${target_fullname// /_}
-  local monitoring_file result last1 allbad allgood outside filled f9 f10 f11 f12 now verdict=""
+  local monitoring_file result last1 allbad allgood outside filled f9 f10 f11 f12 now verdict="" note=""
   local -a reasons=()
   local reason r
 
@@ -85,9 +86,11 @@ function do_check() {
   for r in "${reasons[@]}"; do
     reason+="${reason:+、}$r"
   done
+  # the positions of the last monitoring data, for the fire message only
+  [ "$verdict" == 1 ] && note=$(atst_positions_note "$target_name")
 
   atst_update_alert "$alert_key" "$verdict" \
-    "【発生】$target_name が $(( trade_threshold / 60 )) 分以上取引できない状態です: ${reason}。この間は自動売買が動きません（MetaTrader は動いていて監視データは更新されています）。" \
+    "【発生】$target_name が $(( trade_threshold / 60 )) 分以上取引できない状態です: ${reason}。この間は自動売買が動きません（MetaTrader は動いていて監視データは更新されています）。${note:+ $note}" \
     "【復帰】$target_name が取引できる状態に戻りました。"
 }
 

@@ -17,7 +17,7 @@ function do_check() {
   local target_name="$1"
   local target_fullname="$2"
   local alert_key=TICK_${target_fullname// /_}
-  local monitoring_file result last1 changed outside filled now verdict=""
+  local monitoring_file result last1 changed outside filled now verdict="" note=""
 
   monitoring_file=$(atst_get_monitoring_csv_path "$target_name")
   { [ -n "$monitoring_file" ] && [ -f "$monitoring_file" ]; } || return 0
@@ -63,8 +63,11 @@ function do_check() {
     verdict=1
   fi
 
+  # the positions of the last monitoring data, for the fire message only
+  [ "$verdict" == 1 ] && note=$(atst_positions_note "$target_name")
+
   atst_update_alert "$alert_key" "$verdict" \
-    "【発生】$target_name の価格データ（ティック）が $(( tick_threshold / 60 )) 分以上更新されていません。ブローカーとの接続断・ログアウト・銘柄の配信停止の可能性があります（MetaTrader は動いていて監視データは更新されています）。この間は自動売買が動きません。" \
+    "【発生】$target_name の価格データ（ティック）が $(( tick_threshold / 60 )) 分以上更新されていません。ブローカーとの接続断・ログアウト・銘柄の配信停止の可能性があります（MetaTrader は動いていて監視データは更新されています）。この間は自動売買が動きません。${note:+ $note}" \
     "【復帰】$target_name の価格データ（ティック）の更新が再開しました。"
 }
 

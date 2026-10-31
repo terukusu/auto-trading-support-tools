@@ -26,7 +26,7 @@ config の読み込み（`ATST_NOTIFY_SPOOL` の退避・復元、各項目の�
 
 ## 継続異常の再通知
 
-- 遷移が無くても、`PROCESS_*` / `MONITORING_*` / `TICK_*` / `TRADE_*` / `RUNNER_STUCK`（`atst_alert_remind_is_target` の固定一覧）が verdict 1・状態 1 のまま、`alert_status` の 3 列目（発生を送れた時刻）から `ATST_ALERT_REMIND_MINUTES` の段階に達したら、達した最上位の段階だけ【発生】を【継続中 N 分 / H 時間】に置き換えた文面で 1 回送る。
+- 遷移が無くても、`PROCESS_*` / `MONITORING_*` / `TICK_*` / `TRADE_*` / `MARGIN_*` / `RUNNER_STUCK`（`atst_alert_remind_is_target` の固定一覧）が verdict 1・状態 1 のまま、`alert_status` の 3 列目（発生を送れた時刻）から `ATST_ALERT_REMIND_MINUTES` の段階に達したら、達した最上位の段階だけ【発生】を【継続中 N 分 / H 時間】に置き換えた文面で 1 回送る。
 - `ATST_ALERT_REMIND_MINUTES` は config の項目。既定 `30 120 720` 分、`""` で OFF、不正値は stderr に 1 行出して既定。
 - 送れたら段階を `alert_status` の 4 列目に記録する（`キー,1,<epoch>,<段階>`）。`atst_set_alert_stage` が 3 列目を保って書き、遷移の記録 `atst_set_alert_status` で消える（次の発生は 1 段目から）。
 - 判定は `atst_alert_remind_due`。ロック内・flush でも、遷移ではなく段階で再判定する。スプール項目の verdict は `1:remind=<段階>`。
@@ -69,12 +69,12 @@ config の読み込み（`ATST_NOTIFY_SPOOL` の退避・復元、各項目の�
 
 ## check_all.sh の回の流れ
 
-- crontab の毎分の行は `check_all.sh` の 1 行だけ。固定の順で check_reboot → check_order → check_process / monitoring / tick / trade_ready / ping / price / spread → check_order（`ATST_ORDER_CHECK_INTERVAL` 秒後の 2 回目）→ heartbeat → self_heal（監視対象があるときだけ）を 1 回ずつ実行する（順次実行で同時多発を避ける）。
+- crontab の毎分の行は `check_all.sh` の 1 行だけ。固定の順で check_reboot → check_order → check_process / monitoring / tick / trade_ready / margin / ping / price / spread → check_order（`ATST_ORDER_CHECK_INTERVAL` 秒後の 2 回目）→ heartbeat → self_heal（監視対象があるときだけ）を 1 回ずつ実行する（順次実行で同時多発を避ける）。
 - MT 名は `ATST_TARGETS` から配列のまま渡す（eval 無し）。
 - 各チェックは `timeout`（`ATST_CHECK_TIMEOUT` 秒、heartbeat は 60 秒、self_heal は 150 秒）で打ち切り、打ち切りは `RUNNER_TIMEOUT_*` で LINE に通知する。1 つが失敗しても残りは実行する。
 - その回の通知は `atst_spool_begin`（flock 取得・`check_all.started` の後）〜 F1 `atst_spool_flush 2`（1 回目のチェック群と打ち切り通知の後、2 回目の check_order の前。最大 2 push）〜 2 回目の check_order・heartbeat・self_heal 〜 F2 `atst_spool_flush 1`（最大 1 push）〜 `atst_spool_end` の順で 1 通にまとめて送る（通常は 1 push、後から出た打ち切りか自己修復の通知があれば +1。約定通知は即時のまま）。
 - `unset ATST_NOTIFY_SPOOL` を common.sh の source 直後に行い、継承値を使わない。このため `atst_spool_begin` より前の `RUNNER_STUCK` 発生（ロックを取れなかった側の回）は即時に個別送信になり、復帰（`atst_spool_begin` の直後）・`RUNNER_TARGETS_EMPTY`・`RUNNER_TIMEOUT_*` はスプールに入る。
-- `flock -n` で多重起動しない。前の回が終わらず `stuck_after = 10 * cap + 975 + 155` 秒（cap は `ATST_CHECK_TIMEOUT`。155 は self_heal の 150 + KILL までの 5 秒。既定値で 1530 秒、約 26 分）以上止まっていれば `RUNNER_STUCK` を通知する。開始時刻は `~/.atst/check_all.started`。
+- `flock -n` で多重起動しない。前の回が終わらず `stuck_after = 11 * cap + 975 + 155` 秒（cap は `ATST_CHECK_TIMEOUT`。155 は self_heal の 150 + KILL までの 5 秒。既定値で 1570 秒、約 26 分）以上止まっていれば `RUNNER_STUCK` を通知する。開始時刻は `~/.atst/check_all.started`。
 - self_heal（`self_heal.sh`、#140）は opt-in の自己修復。`~/.atst/self_heal.enabled`（自分の所有・600 の通常ファイル）が無ければ alert_status も読まずに終わる。有効なら、F1 または前の回で【発生】が届いた（alert_status が 1 の）`PROCESS_<MT>` / `MONITORING_<MT>` だけを見て `mtctl.sh start` / `restart` を 1 回に 1 台まで呼び、`atst_notify_text` で【自己修復】を F2 に入れる（前に【発生】、後に【自己修復】）。alert_status には書かず（`SELF_HEAL_` キーは無い）、回数・クールダウン・停止通知済みは `~/.atst/self_heal.log` の行（`<epoch>,<MT>,<キー>,<op>,<begin|ok|fail|halt>`）で持つ。上限（24 時間に 3 回、固定）に達したら halt 行を先に書き、書けたときだけ【自己修復停止】を 1 通送る。`mtctl.sh` は wine を `setsid` で新しいセッションに起動するので、self_heal の打ち切り（プロセスグループへの TERM / KILL）で起動した MT は止まらない。
 - `ATST_TARGETS` が未設定・空・読み込み不能なら `RUNNER_TARGETS_EMPTY` を通知し、MT 名を要するチェックは実行しない。
 - 自分と子の stderr は common.sh の source 前に `command exec 2>>` で `~/.atst/log/check_all.log`（700/600）に追記し、回の先頭に START 行、子の非 0 終了とロック待ちで飛ばした回を 1 行ずつ書く。開けなければそのまま続行する（tee 等の中継は置かない）。
@@ -85,6 +85,10 @@ config の読み込み（`ATST_NOTIFY_SPOOL` の退避・復元、各項目の�
 - `check_tick.sh` が判定しない（verdict 空）のは、CSV の停止（`ATST_MONITORING_THRESHOLD`。`MONITORING_` が通知）・週末（列 1 の UTC で金 20:00〜月 00:00 を整数演算で判定、`ATST_TICK_WEEKEND_SKIP=0` で無効）・窓の外側に行が無い・窓の中の行の列 1 の間隔（窓内の最初の行は直前の窓外の行から）に `ATST_MONITORING_THRESHOLD` 秒以上の空白がある（MT / EA の再開直後）・列 2 が 0 の行。週末の判定は `atst_is_weekend_epoch`（common.sh。`check_trade_ready.sh` と共用）。
 - `check_trade_ready.sh`（#158）は監視 CSV の列 9〜12（接続・端末の自動売買ボタン・口座の取引許可・口座の EA 取引許可）が、列 1 の時刻で切った `ATST_TRADE_READY_THRESHOLD` 秒（既定 300、60〜86400、不正値は stderr に固定文 1 行で 300）の窓の中の完全な行（14 列以上・列 1 が数値・列 9〜12 がそれぞれちょうど `0` か `1`）ですべて不良（どれかが 0）なら `TRADE_<MT>` を発生、すべて良好なら復帰、混在なら状態を保つ。理由は最後の完全な行から作り、列 9 が 0 のときは列 11・12 の理由を出さない（切断中の口座情報は当てにならない）。
 - `check_trade_ready.sh` が判定しないのは、14 列の完全な行が無い（古い EA の 8 列だけ。stderr にも出さない）・CSV の停止・週末（`ATST_TRADE_READY_WEEKEND_SKIP=0` で無効）・窓の外側に完全な行が無い・窓の中に `ATST_MONITORING_THRESHOLD` 秒以上の空白がある（`check_tick.sh` と同じ規則。8 列の行は間隔にも窓外にも数えない）。
+- `check_margin.sh`（#177）は監視 CSV の最後の完全な行（`atst_monitoring_last_row`: 末尾 20 行のうち列 13 が整数・列 14 が小数の 14 列以上の行）の列 13（建玉数）と列 14（証拠金維持率 %）で `MARGIN_<MT>` を判定する。L = `ATST_THRESHOLD_MARGIN_LOWER`（既定 200、0〜999999）、U = `ATST_THRESHOLD_MARGIN_UPPER`（既定 300、1〜999999）。不正値は実行ごとに 1 項目 1 行の固定文を stderr（`check_all.log`）に出して既定、U が L 以下なら L と同じ値（その旨の 1 行）。上から順に、L が 0 なら復帰（CSV は読まず、状態 1 のときだけ終了の【復帰】）、列 13 が 0 または列 14 が 0（証拠金を使う建玉が無い）なら復帰、列 14 < L なら発生、列 14 >= U なら復帰、L <= 列 14 < U は verdict 空で状態を保つ。列 14 は整数部で比べる（awk の小数の解釈がロケールに依存するため）。
+- L <= 列 14 < U の間は verdict が空なので、`MARGIN_` が状態 1 のままでも【継続中】は出ない（再通知は verdict 1 の回だけ）。維持率が上がり切らない間は、再通知は止まる。
+- `check_margin.sh` が判定しない（verdict 空）のは、CSV が無い・完全な行が無い（古い EA の 8 列・書きかけの行だけ。stderr にも出さない）・CSV の停止（`ATST_MONITORING_THRESHOLD`。`MONITORING_` が通知）。週末も判定する。
+- 建玉の添え書き（`atst_positions_note`、lib/atst_mt.sh）は `PROCESS_` / `MONITORING_` / `TICK_` / `TRADE_` の【発生】と【継続中】だけの末尾に ` 建玉 N 件（M 分前の監視データ。MT4 は待機注文を含みます）` を足す。各スクリプトは verdict 1 のときだけ読む（【復帰】には付けない）。最後の完全な行の列 13 が 1 以上のときだけで、CSV・行が無いか 0 なら何も足さず、パスや価格など他の列は出さない。N は最後の監視データの件数でいまの件数ではない。
 - `check_daily.sh` は quota が取れた回に `LINE_QUOTA`（8 割以上で 1、未満・上限なしで 0）を `atst_set_alert_status` で直接書く。LINE 通知の無い、heartbeat 用の状態だけのキー（P1 の例外）。
 - `check_daily.sh` は `ATST_IMAGE_REPORT_DESKTOP` の行が無い旧 config に、デスクトップ画像の既定 OFF を `atst_update_alert IMAGE_REPORT_DEFAULT_CHANGED` で 1 度だけ案内する。
 - `check_daily.sh` は外形監視の URL が未設定なら、稼働OK に「外形監視: 未設定」の 1 行を足す（この行のためだけには送らない）。
@@ -94,7 +98,7 @@ config の読み込み（`ATST_NOTIFY_SPOOL` の退避・復元、各項目の�
 ## 外形監視（heartbeat.sh）
 
 - `check_all.sh` の最後に呼ばれる。URL（決め方は [docs/config.md](config.md#秘匿ファイル)）が未設定なら何もしない。
-- `alert_status` の値 1 のキーのうち `PROCESS_` / `TARGET_` / `MONITORING_` / `TICK_` / `TRADE_` / `RUNNER_`（`RUNNER_TIMEOUT_HEARTBEAT` を除く）/ `LINE_` で始まるもの（許可リスト。ロックなしで読むだけ）と、`atst_line_send_failing`（N は `ATST_HEARTBEAT_LINE_FAIL_COUNT`、不正値・未設定は 3）が真なら `LINE_SEND_FAILED` を並べる。
+- `alert_status` の値 1 のキーのうち `PROCESS_` / `TARGET_` / `MONITORING_` / `TICK_` / `TRADE_` / `RUNNER_`（`RUNNER_TIMEOUT_HEARTBEAT` を除く）/ `LINE_` で始まるもの（許可リスト。ロックなしで読むだけ。`MARGIN_` は入らない: 相場・口座の状態で、`PRICE_` / `SPREAD_` と同じ）と、`atst_line_send_failing`（N は `ATST_HEARTBEAT_LINE_FAIL_COUNT`、不正値・未設定は 3）が真なら `LINE_SEND_FAILED` を並べる。
 - 並べたものが空なら `<URL>` に ping（GET）、空でなければ `<URL>/fail` に POST する（本文はキー名だけ、`[A-Za-z0-9_ ]` 以外は `_`、1000 字まで）。
 - URL と本文は `curl -K` のプロセス置換で渡し、argv に載せない（`ps` で見えないように。URL を知っていれば誰でも生存を報告できる）。
 - curl の stderr は捨て、失敗時は URL を含まない 1 行を出して curl の終了コードで終わる。

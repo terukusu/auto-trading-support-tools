@@ -1,6 +1,6 @@
 # 監視 CSV の列契約（atst）
 
-監視 EA（`MQL4/Experts/TerminalMonitoring.mq4` / `MQL5/Experts/Advisors/TerminalMonitoring.mq5`）が書く `terminal_monitoring.csv` と `order_status` の契約をまとめる。`terminal_monitoring.csv` は外形監視（`check_monitoring.sh` / `check_tick.sh` / `check_trade_ready.sh` / `check_price.sh` / `check_spread.sh` / `check_ping.sh`、`report_image.sh`、`truncate_monitoring.sh`、`doctor.sh`）の唯一の入力なので、**列・書式・書き方を変える PR はこの文書を同じ PR で更新する**。
+監視 EA（`MQL4/Experts/TerminalMonitoring.mq4` / `MQL5/Experts/Advisors/TerminalMonitoring.mq5`）が書く `terminal_monitoring.csv` と `order_status` の契約をまとめる。`terminal_monitoring.csv` は外形監視（`check_monitoring.sh` / `check_tick.sh` / `check_trade_ready.sh` / `check_margin.sh` / `check_price.sh` / `check_spread.sh` / `check_ping.sh`、`check_process.sh`（【発生】の建玉の添え書き）、`report_image.sh`、`truncate_monitoring.sh`、`doctor.sh`）の唯一の入力なので、**列・書式・書き方を変える PR はこの文書を同じ PR で更新する**。
 
 MQL の行番号は `iconv -f UTF-16LE -t UTF-8 <file> | tr -d '\r' | cat -n` で数えたもの（BOM の行が 1 行目）。bash 側は行番号を書かず、スクリプト名と awk の式で示す。
 
@@ -31,7 +31,7 @@ MQL の行番号は `iconv -f UTF-16LE -t UTF-8 <file> | tr -d '\r' | cat -n` �
 
 | # | 名前 | 意味 | 型・書式 | 単位・時刻基準 | MQL4（行） | MQL5（行） | 読み手と用途 |
 |---|---|---|---|---|---|---|---|
-| 1 | time_gmt | 書き込んだ時刻 | epoch 秒の 10 進整数 | **UTC**。`TimeGMT()` は端末（Wine）のローカル時計と TZ から算出する（Wine 側の TZ が誤っているとずれる）。読み手は Linux の `date +%s` と直接比較する | M4:138 `(string)TimeGMT()` | M5:143 `(string)(long)TimeGMT()` | `check_monitoring.sh` / `doctor.sh`（鮮度）、`check_price.sh`（直近 600 秒）、`check_spread.sh`（直近 300 秒）、`report_image.sh`（期間の絞り込み・最終データ時刻・グラフの x）、`truncate_monitoring.sh`（保持期間）、`draw_graph.sh`（x 軸。`3600*9` を足す） |
+| 1 | time_gmt | 書き込んだ時刻 | epoch 秒の 10 進整数 | **UTC**。`TimeGMT()` は端末（Wine）のローカル時計と TZ から算出する（Wine 側の TZ が誤っているとずれる）。読み手は Linux の `date +%s` と直接比較する | M4:138 `(string)TimeGMT()` | M5:143 `(string)(long)TimeGMT()` | `check_monitoring.sh` / `doctor.sh`（鮮度）、`check_margin.sh` と建玉の添え書き（`atst_monitoring_last_row`。鮮度・経過分）、`check_price.sh`（直近 600 秒）、`check_spread.sh`（直近 300 秒）、`report_image.sh`（期間の絞り込み・最終データ時刻・グラフの x）、`truncate_monitoring.sh`（保持期間）、`draw_graph.sh`（x 軸。`3600*9` を足す） |
 | 2 | time_server | 最後のティックのサーバー時刻 | epoch 形式の整数 | 取引サーバーの時刻（**ブローカーの TZ。UTC ではない**）。`TimeCurrent()` は最後のティック受信時刻で、ティックが止まると進まない | M4:139 `(string)TimeCurrent()` | M5:144 `(string)(long)TimeCurrent()` | `check_tick.sh`（`ATST_TICK_THRESHOLD` 秒の窓の中で値が変わったか。列 1 との差は使わない）。テストの行は既定 0（`atst_test_make_monitoring_csv` の第 7 引数で指定） |
 | 3 | bid | Bid | 小数。double を `(string)` で文字列化した既定の書式（桁数は保証しない） | 価格 | M4:140 `(string)Bid` | M5:145 `(string)Bid`（M5:124-127 で `SymbolInfoTick` の `last_tick.bid` を代入） | `check_price.sh`（min/max）、`report_image.sh`（要約の安値・高値、グラフの y） |
 | 4 | ask | Ask | 列 3 と同じ | 価格 | M4:141 `(string)Ask` | M5:146 `(string)Ask`（`last_tick.ask`） | 現行の読み手なし |
@@ -43,8 +43,8 @@ MQL の行番号は `iconv -f UTF-16LE -t UTF-8 <file> | tr -d '\r' | cat -n` �
 | 10 | trade_allowed | 端末の自動売買ボタン（「自動売買」/「Algo Trading」）が ON か | `0` / `1` | — | M4:148 `(string)TerminalInfoInteger(TERMINAL_TRADE_ALLOWED)` | M5:153 同じ | `check_trade_ready.sh`（0 なら不良。理由「端末の自動売買ボタンが OFF です」） |
 | 11 | account_trade | 口座で取引が許可されているか（閲覧専用のパスワードでのログインなどで 0） | `0` / `1` | — | M4:149 `(string)AccountInfoInteger(ACCOUNT_TRADE_ALLOWED)` | M5:154 同じ | `check_trade_ready.sh`（0 なら不良。列 9 が 0 の間は理由に出さない） |
 | 12 | account_expert | 口座で EA の取引が許可されているか（ブローカー側の設定） | `0` / `1` | — | M4:150 `(string)AccountInfoInteger(ACCOUNT_TRADE_EXPERT)` | M5:155 同じ | `check_trade_ready.sh`（0 なら不良。列 9 が 0 の間は理由に出さない） |
-| 13 | positions | 建玉数 | 0 以上の整数 | 件。MQL4 は待機注文を含む、MQL5 はポジションだけ（ネッティング口座では銘柄ごとに 1） | M4:151 `(string)OrdersTotal()` | M5:156 `(string)PositionsTotal()` | 現行の読み手なし（書くだけ） |
-| 14 | margin_level | 証拠金維持率 | 小数 2 桁 | %。建玉が無いときは `0.00` | M4:152 `DoubleToStr(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL),2)+"\n"` | M5:157 `DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL),2)+"\n"` | 現行の読み手なし（書くだけ）。最終列なので CRLF 環境では `\r` が付きうる |
+| 13 | positions | 建玉数 | 0 以上の整数 | 件。MQL4 は待機注文を含む、MQL5 はポジションだけ（ネッティング口座では銘柄ごとに 1） | M4:151 `(string)OrdersTotal()` | M5:156 `(string)PositionsTotal()` | `check_margin.sh`（0 なら建玉なし）と、建玉の添え書き（`PROCESS_` / `MONITORING_` / `TICK_` / `TRADE_` の【発生】と【継続中】。1 以上のときだけ）。どちらも `atst_monitoring_last_row` 経由 |
+| 14 | margin_level | 証拠金維持率 | 小数 2 桁 | %。建玉が無いときは `0.00` | M4:152 `DoubleToStr(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL),2)+"\n"` | M5:157 `DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL),2)+"\n"` | `check_margin.sh`（`atst_monitoring_last_row` 経由。形式 `^[0-9]+\.[0-9]+$` の行だけを使うので書きかけの行は除かれ、CR は除去する。0 は証拠金を使う建玉なし）。最終列なので CRLF 環境では `\r` が付きうる |
 
 例（値は架空。時刻 2 つの差は例示）:
 
@@ -77,9 +77,12 @@ MQL の行番号は `iconv -f UTF-16LE -t UTF-8 <file> | tr -d '\r' | cat -n` �
 
 | スクリプト | 使う列 | 区分 | 読み方 | 前提・判定 |
 |---|---|---|---|---|
-| `check_monitoring.sh` | 1 | 監視 | `tail -n 20 \| tr -d '\r' \| awk -F, 'NF >= 8 && $1 ~ /^[0-9]+$/ {t = $1} END {print t}'`（最後の完全な行） | `now - t >= ATST_MONITORING_THRESHOLD`（既定 180 秒）で発生。行が無ければ MT プロセスの有無と起動からの経過を見て、稼働中かつ猶予を過ぎていれば「データがありません」 |
-| `check_tick.sh` | 1 2 | 監視 | `tr -d '\r'` した全体を `awk -F,` で 1 回走査し、`NF >= 8 && $1 ~ /^[0-9]+$/ && $2 ~ /^[1-9][0-9]*$/` の行だけを使う（最後の行の列 1 = last1、`last1 - T <= 列 1 <= last1` を窓、`T` = `ATST_TICK_THRESHOLD`（既定 600 秒）。列 1 > last1 の行は窓に入れない） | 判定しない: CSV・完全な行が無い、`now - last1 >= ATST_MONITORING_THRESHOLD`（CSV の停止は `MONITORING_`）、last1 が UTC の金 20:00〜月 00:00（`ATST_TICK_WEEKEND_SKIP=0` で判定）、窓の外側（`列 1 < last1 - T`）に行が無い、窓の中の行の列 1 の間隔（窓内の最初の行は直前の窓外の行から）に `ATST_MONITORING_THRESHOLD` 秒以上の空白がある（MT / 監視 EA の再開直後。EA は CSV を切り詰めないので停止前の行が窓外に残る）。窓内の列 2 の最小と最大が同じなら `TICK_<MT>` 発生、違えば復帰 |
-| `check_trade_ready.sh` | 1 9 10 11 12 | 監視 | `tr -d '\r'` した全体を `awk -F,` で 1 回走査し、`NF >= 14 && $1 ~ /^[0-9]+$/` かつ列 9〜12 がそれぞれ `^[01]$` の行（完全な行）だけを使う（8 列の行は窓にも窓外にも間隔の計算にも入れない）。窓は `check_tick.sh` と同じ（`T` = `ATST_TRADE_READY_THRESHOLD`、既定 300 秒） | 判定しない: CSV・完全な行が無い（古い EA の 8 列だけ。stderr にも出さない）、`now - last1 >= ATST_MONITORING_THRESHOLD`、last1 が UTC の金 20:00〜月 00:00（`ATST_TRADE_READY_WEEKEND_SKIP=0` で判定。判定は common.sh の `atst_is_weekend_epoch`）、窓の外側に完全な行が無い、窓の中に `ATST_MONITORING_THRESHOLD` 秒以上の空白がある（`check_tick.sh` と同じ規則）。窓内の完全な行がすべて不良（列 9〜12 のどれかが 0）なら `TRADE_<MT>` 発生、すべて良好（すべて 1）なら復帰、混在は状態を保つ。理由は最後の完全な行の列 9〜12 から作り、列 9 が 0 のときは列 11・12 の理由を出さない（切断中の口座情報は当てにならない）。列 13・14 は使わない |
+| `check_monitoring.sh` | 1 13 | 監視 | `tail -n 20 \| tr -d '\r' \| awk -F, 'NF >= 8 && $1 ~ /^[0-9]+$/ {t = $1} END {print t}'`（最後の完全な行） | `now - t >= ATST_MONITORING_THRESHOLD`（既定 180 秒）で発生。行が無ければ MT プロセスの有無と起動からの経過を見て、稼働中かつ猶予を過ぎていれば「データがありません」 |
+| `check_tick.sh` | 1 2 13 | 監視 | `tr -d '\r'` した全体を `awk -F,` で 1 回走査し、`NF >= 8 && $1 ~ /^[0-9]+$/ && $2 ~ /^[1-9][0-9]*$/` の行だけを使う（最後の行の列 1 = last1、`last1 - T <= 列 1 <= last1` を窓、`T` = `ATST_TICK_THRESHOLD`（既定 600 秒）。列 1 > last1 の行は窓に入れない） | 判定しない: CSV・完全な行が無い、`now - last1 >= ATST_MONITORING_THRESHOLD`（CSV の停止は `MONITORING_`）、last1 が UTC の金 20:00〜月 00:00（`ATST_TICK_WEEKEND_SKIP=0` で判定）、窓の外側（`列 1 < last1 - T`）に行が無い、窓の中の行の列 1 の間隔（窓内の最初の行は直前の窓外の行から）に `ATST_MONITORING_THRESHOLD` 秒以上の空白がある（MT / 監視 EA の再開直後。EA は CSV を切り詰めないので停止前の行が窓外に残る）。窓内の列 2 の最小と最大が同じなら `TICK_<MT>` 発生、違えば復帰 |
+| `check_trade_ready.sh` | 1 9 10 11 12 13 | 監視 | `tr -d '\r'` した全体を `awk -F,` で 1 回走査し、`NF >= 14 && $1 ~ /^[0-9]+$/` かつ列 9〜12 がそれぞれ `^[01]$` の行（完全な行）だけを使う（8 列の行は窓にも窓外にも間隔の計算にも入れない）。窓は `check_tick.sh` と同じ（`T` = `ATST_TRADE_READY_THRESHOLD`、既定 300 秒） | 判定しない: CSV・完全な行が無い（古い EA の 8 列だけ。stderr にも出さない）、`now - last1 >= ATST_MONITORING_THRESHOLD`、last1 が UTC の金 20:00〜月 00:00（`ATST_TRADE_READY_WEEKEND_SKIP=0` で判定。判定は common.sh の `atst_is_weekend_epoch`）、窓の外側に完全な行が無い、窓の中に `ATST_MONITORING_THRESHOLD` 秒以上の空白がある（`check_tick.sh` と同じ規則）。窓内の完全な行がすべて不良（列 9〜12 のどれかが 0）なら `TRADE_<MT>` 発生、すべて良好（すべて 1）なら復帰、混在は状態を保つ。理由は最後の完全な行の列 9〜12 から作り、列 9 が 0 のときは列 11・12 の理由を出さない（切断中の口座情報は当てにならない）。列 13 は【発生】の文面の建玉の添え書き（`atst_positions_note`）にだけ使い、列 14 は使わない |
+| `lib/atst_mt.sh` の `atst_monitoring_last_row` / `atst_positions_note` | 1 13 14 | 監視 | `tail -n 20 \| tr -d '\r' \| awk -F, 'NF >= 14 && $1 ~ /^[0-9]+$/ && $13 ~ /^[0-9]+$/ && $14 ~ /^[0-9]+\.[0-9]+$/ {r = $1 " " $13 " " $14} END {if (r != "") print r}'`（最後の完全な行）。値の長さは bash で確かめる（列 1 は 12 桁、列 13 は 9 桁、列 14 は小数点の前後それぞれ 15 桁まで） | 行が無ければ何も返さない（stderr にも出さない）。`atst_positions_note` は列 13 が 1 以上のときだけ「建玉 N 件（M 分前の監視データ。MT4 は待機注文を含みます）」を返す（M は列 1 からの経過分） |
+| `check_margin.sh` | 1 13 14 | 監視 | `atst_monitoring_last_row` の結果を使う（上の行） | 判定しない: CSV・完全な行が無い、`now - 列 1 >= ATST_MONITORING_THRESHOLD`。列 13 が 0 または列 14 が 0 なら復帰、列 14 の整数部が `ATST_THRESHOLD_MARGIN_LOWER`（既定 200）未満なら `MARGIN_<MT>` 発生、`ATST_THRESHOLD_MARGIN_UPPER`（既定 300）以上なら復帰、間は状態を保つ。週末も判定する |
+| `check_process.sh` | 1 13 | 監視 | `atst_positions_note` 経由（【発生】の文面にだけ使う） | プロセスが無いと判定したときだけ読む |
 | `doctor.sh` | 1 | 診断 | `check_monitoring.sh` と同じ式（最後の完全な行の `NF` も取る） | ファイル無し・行無し・`ATST_MONITORING_THRESHOLD` 秒以上古いときに NG。`last update` の行の末尾に `cols <NF>`、14 未満なら古い EA の補足行（判定は変えない。書きかけの行を読んだ瞬間は 9〜13 になりうるが表示だけ） |
 | `check_price.sh` | 1 3 7 | 監視 | 列 1・3: ファイル全体を `awk -F, 'BEGIN{min=10000; max=0} NF >= 8 { if ($1 > from) ...}'`（`from` = 600 秒前）で列 3 の min/max。CR 除去なし、列 1 の数値ガードなし。列 7: `tail -n 20 \| tr -d '\r' \| awk -F, 'NF >= 8 {p = $7} END {print p}'` | 列 7 は `^[0-9]*\.?[0-9]+$` かつ 0 でないこと。`(max - min) / pip` を `ATST_THRESHOLD_PRICE_UPPER` / `LOWER`（pips）と比較 |
 | `check_spread.sh` | 1 5 | 監視 | ファイル全体を `awk -F, 'BEGIN{max=0} NF >= 8 { if ($1 > from) ...}'`（`from` = 300 秒前）で列 5 の最大。CR 除去なし、列 1 の数値ガードなし | 結果が `^[0-9]+$` であること。`ATST_THRESHOLD_SPREAD_UPPER` / `LOWER`（point）と比較 |
@@ -91,12 +94,13 @@ MQL の行番号は `iconv -f UTF-16LE -t UTF-8 <file> | tr -d '\r' | cat -n` �
 | `check_order.sh` | なし | 注文通知 | CSV は読まない。`order_status` だけ（[order_status](#order_status)） | — |
 | `tests/test_helper.bash` | 1 2 3 4 5 6 7 8 | テスト | `atst_test_make_monitoring_csv` が `<epoch>,<time_server>,<bid>,<bid>,<spread>,<ping>,<pip>,USDJPY` を `MQL4/Files/terminal_monitoring.csv` に追記（sandbox 内のみ）。第 8 引数が空でなければ `,<第 8 引数>` を足して列 9 以降にする（例 `1,1,1,1,0,0.00` で 14 列） | 列 2 は第 7 引数（既定 0）、列 4 は bid と同値、ping の既定は 12（マイクロ秒）。`tests/check_monitoring.bats` は書きかけの行（列 1 の途中まで、改行無し）を実際に作って試す |
 
-- 現行の読み手が使わない列: 4、13、14。
+- 現行の読み手が使わない列: 4。
+- `check_monitoring.sh` / `check_tick.sh` / `check_trade_ready.sh` / `check_process.sh` の列 13 は、ヘルパ経由で【発生】の文面にだけ使う（判定には使わない）。
 - `heartbeat.sh` は CSV を読まない（`check_monitoring.sh` が立てた `MONITORING_*` の状態を見るだけ）。
 
 ## 部分行・空行・CR の規則
 
-- 読み手は「`NF >= 8` を満たす最後の行」を **最後の完全な行** として使う。末尾の書きかけの行（列が 8 に満たない行）と空行は無視する。列 9〜12 を使う `check_trade_ready.sh` だけは `NF >= 14` かつ列 9〜12 が `0` / `1` の行を完全な行とする（列 13 の後の `,` までで切れた書きかけの行は `NF` が 14 で列 14 が空になり、完全な行に数えうる。列 9〜12 は書き終わっているので判定には影響しない。K12）。
+- 読み手は「`NF >= 8` を満たす最後の行」を **最後の完全な行** として使う。末尾の書きかけの行（列が 8 に満たない行）と空行は無視する。列 9〜12 を使う `check_trade_ready.sh` だけは `NF >= 14` かつ列 9〜12 が `0` / `1` の行を完全な行とする（列 13 の後の `,` までで切れた書きかけの行は `NF` が 14 で列 14 が空になり、完全な行に数えうる。列 9〜12 は書き終わっているので判定には影響しない。K12）。列 13・14 を使う `atst_monitoring_last_row`（`check_margin.sh` と建玉の添え書き）は、列 13 が整数・列 14 が `数字.数字` の行だけを完全な行とするので、その書きかけの行は除く）。
 - 最新値を見る読み手は `tail -n 20` の範囲だけを見る（15 秒間隔で約 5 分ぶん）。20 行すべてが書きかけということは通常無い。`check_tick.sh` は時刻の窓で判定するので全件を走査する（行数に依存しない。K10）。
 - CR は行末の列（列 14。#158 より前の EA では列 8）や最後の値を読むときに `tr -d '\r'` で除去する。行末でない列だけを比較する全件走査では除去しないものがある（影響なし）。
 - 列 1 が数値（`^[0-9]+$`）でない行を無視するのは `check_monitoring.sh` / `check_tick.sh` / `check_trade_ready.sh` / `doctor.sh` だけ（`check_tick.sh` は列 2 も正の整数であることを、`check_trade_ready.sh` は列 9〜12 がそれぞれちょうど `0` か `1` であることを要求する）。
@@ -196,4 +200,4 @@ MQL の行番号は `iconv -f UTF-16LE -t UTF-8 <file> | tr -d '\r' | cat -n` �
 | K9 | `report_image.sh` のグラフ入力の awk は CR を除去しない（要約と列 8 は除去する） | 行末の列を読まないので現状は影響なし。列 8 を渡すように変えると効く | 記録のみ |
 | K10 | MQL5 の `OnTick` / `OnInit` は `if(MQL_TESTER)`（M5:75 / M5:99）で判定しており、`MQLInfoInteger(MQL_TESTER)` ではない。定数は非 0 なので実運用でも条件が真になる疑い。実機未確認 | 真なら MT5 は `OnTimer` に加えティック契機でも行を書き、行間隔が `INTERVAL`（15 秒）より短くなりうる。列の順序・個数・単位には影響しない。「`tail -n 20` で約 5 分」は MT5 では短くなりうる | 別 Issue 候補（調査） |
 | K11 | MQL5 は `SymbolInfoTick` の戻り値を見ない（M5:125） | 失敗時は列 3・4 が未定義（0 等）になりうる | 記録のみ |
-| K12 | `check_trade_ready.sh` の完全な行の条件は `NF >= 14` なので、列 13 の後の `,` まで書かれて列 14 が未だの書きかけの行（`NF` 14、列 14 が空）も完全な行に数えうる | 列 9〜12 は書き終わっているので不良・良好の数え方は変わらない。表示・判定への影響なし | 記録のみ |
+| K12 | `check_trade_ready.sh` の完全な行の条件は `NF >= 14` なので、列 13 の後の `,` まで書かれて列 14 が未だの書きかけの行（`NF` 14、列 14 が空）も完全な行に数えうる | 列 9〜12 は書き終わっているので不良・良好の数え方は変わらない。表示・判定への影響なし。`check_margin.sh` と建玉の添え書きは列 14 の形式で書きかけの行を除くので、この影響を受けない | 記録のみ |

@@ -245,3 +245,16 @@ ma_running() {
   [ "$(push_count)" -eq 0 ]
   ma_no_new_key
 }
+
+@test "M-PN: the 【発生】 of no data (no csv while MetaTrader runs) carries no positions note (#177)" {
+  atst_test_make_mt ATSTTEST_MT4 MT4
+  atst_test_set_config ATST_MONITORING_THRESHOLD 1
+  export ATST_PROC_ROOT=/proc
+  ATST_TEST_FAKE_PID=$(atst_test_fake_mt_process ATSTTEST_MT4)
+  sleep 2
+  run bash "$BATS_TEST_DIRNAME/../../check_monitoring.sh" ATSTTEST_MT4
+  [ "$status" -eq 0 ]
+  [ "$(push_count)" -eq 1 ]
+  grep -q 'モニタリングデータがありません' "$ATST_TEST_CURL_LOG"
+  [ "$(grep -c '建玉' "$ATST_TEST_CURL_LOG")" -eq 0 ]
+}
