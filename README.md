@@ -270,6 +270,7 @@ ATST_IMAGE_REPORT_DESKTOP=1
 * 元の crontab は `~/.atst/crontab.bak.<日時>` に残りますが、戻しても旧形式の行は動きません。
 * `ATST_TARGETS` が未設定のままだと、再起動時のMT4/5の自動起動(`@reboot` の行)も動きません。移行の前に必ず設定してください。
 * 移行後に動かないときや、設定が合っているか確かめたいときは、`doctor.sh` を実行してください([自己診断](#自己診断-doctorsh))。
+* 旧形式で使っていた `sleep_random.sh` と、`~/.atst/config` の `ATST_CHECK_RANDOM_DELAY_MAX` の行は撤去しました。`~/.atst/config` にこの行が残っていても害はありません。消してもかまいません。
 
 `setup_cron.sh` の動き:
 * crontab が空のときは、確認なしで新しいテンプレートを登録します。

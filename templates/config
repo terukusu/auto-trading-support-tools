@@ -1,9 +1,6 @@
 # この日数以上前のモニタリングデータは破棄します
 ATST_MONITORING_TRUNCATE_BEFORE=3
 
-# チェックが動くタイミングを散らすためのスリープの最大値 (旧形式の crontab (sleep_random.sh) 用)
-ATST_CHECK_RANDOM_DELAY_MAX=40
-
 # 過去 n 時間の値動きとスプレッドを、MT ごとの文字要約 (通貨ペア・スプレッドの最小/最大・安値/高値と値幅・最終データの時刻) で通知します。
 # ImgBB の API キー (setup_imgbb.sh) があるときはグラフの画像も付けます。0 の場合は通知しない。
 ATST_IMAGE_REPORT_TERM=24
