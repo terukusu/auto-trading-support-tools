@@ -1,12 +1,5 @@
 # shellcheck shell=bash
 # Sourced by common.sh only (ATST_HOME is set there). Do not source this file on its own.
-function atst_random_sleep() {
-  local max_sleep=${1:-30}
-  local random=$(( $(dd if=/dev/urandom bs=2 count=1 2> /dev/null | cksum | cut -d' ' -f1) % 32767 ))
-  local sleep_time=$(($random % $max_sleep))
-  sleep $sleep_time
-}
-
 function atst_log() {
   echo "[$(date "+%Y-%m-%d %H:%M:%S")] $*"
 }

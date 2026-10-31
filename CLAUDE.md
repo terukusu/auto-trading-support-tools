@@ -59,7 +59,7 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 
 - `run_with_targets.sh` — 毎分以外のジョブ（`mtctl.sh` / `truncate_monitoring.sh` / `report_image.sh` の固定 3 本のみ）に `ATST_TARGETS` の MT 名を付けて起動する（`exec`、eval 無し）。監視対象が無ければ実行せず stderr に出して非 0 終了。
 - `report_image.sh` / `draw_graph.sh` — 値動き/スプレッドの文字要約を LINE 通知。ImgBB の API キーがあるときだけグラフ画像、さらに `ATST_IMAGE_REPORT_DESKTOP=1` ならデスクトップ画像も（既定は送らない。口座番号・残高が写るため）。画像ホストとキーの規則・旧 config への案内は `docs/config.md`。
-- `sleep_random.sh`（旧形式の crontab の名残。新形式の `check_all.sh` は順次実行なので使わない）/ `truncate_monitoring.sh`（監視 CSV・wine ログ・`check_all.log` の切り詰め）/ `minimize_*.sh` / `purge_needless_packages.sh` — 補助。
+- `truncate_monitoring.sh`（監視 CSV・wine ログ・`check_all.log` の切り詰め）/ `minimize_*.sh` / `purge_needless_packages.sh` — 補助。
 
 ### 配布・テンプレート
 

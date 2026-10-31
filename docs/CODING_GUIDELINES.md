@@ -109,7 +109,7 @@ auto-trading-support-tools（bash + Wine + MetaTrader4/5 の自動売買サー�
 ## P11. cron から動くスクリプトの堅牢性（warn）
 
 - cron から動く前提のスクリプトは `PATH`・`cwd`・環境変数に依存しない（`common.sh` を絶対パス解決で source する既存パターン `. "$(cd "$(dirname "$BASH_SOURCE")"; pwd)/common.sh"` を踏襲）。
-- 毎分の監視は `check_all.sh` が固定の順で 1 つずつ実行する（同時多発の負荷を避ける設計。実行タイミングを散らす `sleep_random.sh` / `atst_random_sleep` は旧形式の crontab の行用）。毎分の監視を足すときは crontab に行を足さず `check_all.sh` の固定リストに足し、`run_check` の `timeout` の対象にして、打ち切りの通知（`RUNNER_TIMEOUT_*`）も付ける。毎分の監視の通知は `atst_update_alert`（状態あり）か `atst_notify_text`（文面だけ）で出す。`atst_send_to_line` を直接呼ぶと、その回のまとめ送信に入らず即時の個別 push になる（`check_order` の約定通知は即時でよい例外）。
+- 毎分の監視は `check_all.sh` が固定の順で 1 つずつ実行する（同時多発の負荷を避ける設計）。毎分の監視を足すときは crontab に行を足さず `check_all.sh` の固定リストに足し、`run_check` の `timeout` の対象にして、打ち切りの通知（`RUNNER_TIMEOUT_*`）も付ける。毎分の監視の通知は `atst_update_alert`（状態あり）か `atst_notify_text`（文面だけ）で出す。`atst_send_to_line` を直接呼ぶと、その回のまとめ送信に入らず即時の個別 push になる（`check_order` の約定通知は即時でよい例外）。
 - デバッグ用の固定パスへの出力・残骸（例: `>> $HOME/hoge` のような一時リダイレクト）を**残さない**。発見したら指摘。
 
 ## P12. 命名・構成の一貫性（warn）
