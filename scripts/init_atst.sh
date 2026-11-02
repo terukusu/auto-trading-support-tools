@@ -11,8 +11,8 @@
 # The version and the sha256 cannot be changed by arguments or environment variables on purpose.
 # A tag vX.Y.Z contains the init_atst.sh of the release before it; the gist is always updated from
 # scripts/init_atst.sh on master (see docs/RELEASE.md).
-ATST_VERSION=v1.6.0
-ATST_ZIP_SHA256=ec9ece45fdd863f2bc8836c4d07eedd2a8f60c587cbb3d4a4acc7294f335e758
+ATST_VERSION=v1.7.0
+ATST_ZIP_SHA256=025d4a0010929fe19966f395bb675ad36f241f708f3957714ee538742054cc07
 
 ATST_REPO_URL=https://github.com/terukusu/auto-trading-support-tools
 ATST_DEST_NAME=auto-trading-support-tools-master
