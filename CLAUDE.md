@@ -12,7 +12,8 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 
 利用者・運用者向け:
 
-- [README.md](README.md) — 概要・導入の入口・運用（利用者向け、です・ます調）。
+- [README.md](README.md) — 概要と導入の入口だけ（利用者向け、短く。使い方の手順は Wiki、細かい仕様は docs/REFERENCE.md）。
+- [docs/REFERENCE.md](docs/REFERENCE.md) — 設定・監視・通知・各スクリプトの詳しい仕様（利用者向け、です・ます調）。
 - GitHub Wiki — 導入手順の正本（別リポジトリ。clone の仕方は「作業の進め方」）。
 - [docs/RUNBOOK.md](docs/RUNBOOK.md) — 運用者向けの手順書。LINE の通知キーごとの確認・安全な復旧手順、MT の固まりの切り分け、VNC の罠、秘匿値の扱い。通知キー・通知文・確認コマンドを変えたら合わせて直す（各節のアンカー `key-*` は通知文からのリンク先として固定）。
 - [docs/MT_USER_SEPARATION.md](docs/MT_USER_SEPARATION.md) — MT 実行ユーザーを管理ユーザーと分ける 2 ユーザー構成の「未検証の構成例」（新規導入のみ。install は非対応）と `Z:` 撤去（`ATST_INSTALL_NO_ZDRIVE=1`）の位置づけ。
@@ -40,13 +41,13 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 ### 導入と設定
 
 - `install_required_for_mt.sh` — まっさらな VPS に GUI(VNC+wm2) / Wine / MT インストーラ一式を導入するメインスクリプト。VNC パスワードの作り方・MT インストーラの置き場・`Z:` の撤去の規則は `docs/config.md`。
-- `setup_*.sh` — `setup_heartbeat.sh`（外形監視の URL を `~/.atst/.heartbeat_url` に保存。保存の規則は `docs/config.md`）、`setup_cron.sh`（cron 設定。atst の行がある crontab には追記しない、EOF では変更しない。空でない crontab を書き換える前に `~/.atst/crontab.bak.<日時>`（600、自動では消さない）へ退避し、旧形式に Y のときは条件を満たせば `ATST_TARGETS` を config の末尾に追記する（crontab を書く前。config を自動で書き換える唯一の経路で、値は評価しない）。登録・移行案内・終了コードは README）、`setup_line.sh`（LINE トークン設定）、`setup_monitoring_ea.sh`（監視 EA 配置）、`setup_iptables.sh`（`templates/ip_rules_v4.txt`（`--v6` で v6）の `%%SSH_PORT%%` を `--port`（既定 22）で置換して stdout に出すだけ。適用・sudo・ファイル書き込みなし。common.sh を読まない。引数不正は exit 1、テンプレート異常は stdout 空で exit 2。警告・適用手順の案内は stderr）。
+- `setup_*.sh` — `setup_heartbeat.sh`（外形監視の URL を `~/.atst/.heartbeat_url` に保存。保存の規則は `docs/config.md`）、`setup_cron.sh`（cron 設定。atst の行がある crontab には追記しない、EOF では変更しない。空でない crontab を書き換える前に `~/.atst/crontab.bak.<日時>`（600、自動では消さない）へ退避し、旧形式に Y のときは条件を満たせば `ATST_TARGETS` を config の末尾に追記する（crontab を書く前。config を自動で書き換える唯一の経路で、値は評価しない）。登録・移行案内・終了コードは docs/REFERENCE.md）、`setup_line.sh`（LINE トークン設定）、`setup_monitoring_ea.sh`（監視 EA 配置）、`setup_iptables.sh`（`templates/ip_rules_v4.txt`（`--v6` で v6）の `%%SSH_PORT%%` を `--port`（既定 22）で置換して stdout に出すだけ。適用・sudo・ファイル書き込みなし。common.sh を読まない。引数不正は exit 1、テンプレート異常は stdout 空で exit 2。警告・適用手順の案内は stderr）。
 
 ### MT の操作・診断・手動の補助
 
-- `mtctl.sh` — 複数 MT の list/start/restart/status/stop/monitor。メッセージに使用中の WINEPREFIX を ` (WINEPREFIX=...)` で付ける（`-q` は無出力のまま）。`ATST_AUTO_ATTACH_EA=1` のときの start（StartUp ini）は `docs/config.md`。start / restart は X の起動待ち（`ATST_X_WAIT`）・MT ごとのロック・`setsid` での起動を持つ（規則と終了コードは README と `docs/config.md`）。
-- `doctor.sh` — 読み取り専用の自己診断（wine / prefix / ATST_TARGETS / EA・CSV / crontab 形式（旧形式・混在は NG） / 秘匿ファイル権限 / 外形監視・`check_all.log` の末尾・`auto_attach` を OK・NG・-- で表示。何も変更しない。各項目の判定は README）。
-- `snap.sh` — VNC デスクトップ (:1) を `vncsnapshot` で 1 枚撮って `~/.atst/snap/` に保存し、絶対パスだけを stdout に出す（スマホから ssh / scp で見る用。手動実行のみで cron には無い）。削除はそのディレクトリ直下の日時名の通常ファイルだけで、いま撮ったものは消さない。`~/.atst/snap` がシンボリックリンクなら撮らない。`--line` は `atst_send_to_line` で 1 push。`[error]` / `[notice]` は stderr。保持枚数・権限・終了コードは README。
+- `mtctl.sh` — 複数 MT の list/start/restart/status/stop/monitor。メッセージに使用中の WINEPREFIX を ` (WINEPREFIX=...)` で付ける（`-q` は無出力のまま）。`ATST_AUTO_ATTACH_EA=1` のときの start（StartUp ini）は `docs/config.md`。start / restart は X の起動待ち（`ATST_X_WAIT`）・MT ごとのロック・`setsid` での起動を持つ（規則と終了コードは `docs/REFERENCE.md` と `docs/config.md`）。
+- `doctor.sh` — 読み取り専用の自己診断（wine / prefix / ATST_TARGETS / EA・CSV / crontab 形式（旧形式・混在は NG） / 秘匿ファイル権限 / 外形監視・`check_all.log` の末尾・`auto_attach` を OK・NG・-- で表示。何も変更しない。各項目の判定は `docs/REFERENCE.md`）。
+- `snap.sh` — VNC デスクトップ (:1) を `vncsnapshot` で 1 枚撮って `~/.atst/snap/` に保存し、絶対パスだけを stdout に出す（スマホから ssh / scp で見る用。手動実行のみで cron には無い）。削除はそのディレクトリ直下の日時名の通常ファイルだけで、いま撮ったものは消さない。`~/.atst/snap` がシンボリックリンクなら撮らない。`--line` は `atst_send_to_line` で 1 push。`[error]` / `[notice]` は stderr。保持枚数・権限・終了コードは `docs/REFERENCE.md`。
 
 ### 毎分の監視
 
@@ -73,7 +74,7 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 
 ## 対応環境
 
-- ディストロ: Ubuntu 20.04 / 22.04 / 24.04、Debian 11 / 12 / 13（minimal 推奨）。現行版の実機検証済みは Ubuntu 24.04 / OpenVZ のみ（README に明記）。EOL 版（Ubuntu 14〜18 / Debian 8〜10 等）は非サポート。
+- ディストロ: Ubuntu 20.04 / 22.04 / 24.04、Debian 11 / 12 / 13（minimal 推奨）。現行版の実機検証済みは Ubuntu 24.04 / OpenVZ のみ（README と Wiki に明記）。EOL 版（Ubuntu 14〜18 / Debian 8〜10 等）は非サポート。
 - 仮想化: OpenVZ/Virtuozzo の格安 VPS 〜 KVM。カーネルは共有のことがある（OpenVZ ではカーネル入替・swap 作成不可）。
 - ランタイム: bash（一部 bash 固有構文を使用）、Wine 10 系（WineHQ stable を apt で固定、新規 prefix は `WINEARCH=win64`。理由は `docs/adr/0001-wine10-pin-and-win64.md`）。
 

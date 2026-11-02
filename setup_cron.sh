@@ -86,7 +86,7 @@ targets_appended=0
 
 if [ "$has_legacy" -eq 1 ]; then
   echo '[info] crontab に旧形式の行 (TARGET と wrapper.sh "$TARGET" ...) があります。'
-  echo '       README の「既存の crontab からの移行」を参照して、旧形式の行を新しい行に置き換えてください。'
+  echo '       docs/REFERENCE.md の「既存の crontab からの移行」を参照して、旧形式の行を新しい行に置き換えてください。'
   echo '       上書き (Y) を選ぶと crontab 全体が新しいテンプレートに置き換わり、独自に追加した行も消えます。'
   echo '       このスクリプトは旧形式の行を自動では削除しません。'
   echo '       wrapper.sh は撤去したため、旧形式の行は動きません (毎朝の報告に注意が付き、doctor.sh が NG になります)。'
@@ -160,7 +160,7 @@ else
   # Appending next to atst lines would register the jobs twice (@reboot start, the daily image and
   # report would run twice).
   echo "crontab に atst の行が既にあるため、追記しませんでした (二重登録になるため)。" 1>&2
-  echo "README の「既存の crontab からの移行」を参照して、crontab -e で行を置き換えてください。" 1>&2
+  echo "docs/REFERENCE.md の「既存の crontab からの移行」を参照して、crontab -e で行を置き換えてください。" 1>&2
   exit 1
 fi
 

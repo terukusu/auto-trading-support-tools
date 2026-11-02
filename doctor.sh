@@ -162,7 +162,7 @@ function doctor_check_config() {
       done < "$ATST_CONFIG_FILE"
     } 2>/dev/null
   fi
-  doctor_line OK config "旧形式 (bash として source). $n 行目 ($key) が KEY=VALUE 形式でない. README の「~/.atst/config の書き方」を参照"
+  doctor_line OK config "旧形式 (bash として source). $n 行目 ($key) が KEY=VALUE 形式でない. docs/REFERENCE.md の「~/.atst/config の書き方」を参照"
 }
 
 # Returns 0 when some element of ATST_TARGETS selects MetaTrader <index> (atst_find_mt_index gives the
@@ -311,7 +311,7 @@ function doctor_check_cron() {
       doctor_line OK "crontab -l" "new format (check_all.sh)"
       ;;
     legacy)
-      doctor_line NG "crontab -l" "旧形式 (wrapper.sh). wrapper.sh は撤去したため旧形式の行は動きません。setup_cron.sh で移行してください (README「既存の crontab からの移行」)"
+      doctor_line NG "crontab -l" "旧形式 (wrapper.sh). wrapper.sh は撤去したため旧形式の行は動きません。setup_cron.sh で移行してください (docs/REFERENCE.md「既存の crontab からの移行」)"
       ;;
     *)
       doctor_line NG "crontab -l" "no atst line (check_all.sh)"

@@ -1050,7 +1050,7 @@ self_heal.sh [A]" ]
   grep -qF '【復帰】チェックが時間内に終わるようになりました: check_margin.sh' "$ATST_TEST_CURL_LOG"
 }
 
-@test "RUN-36: stuck_after is 11 * cap + 975 + 155; the budget comment and README say so (#177)" {
+@test "RUN-36: stuck_after is 11 * cap + 975 + 155; the budget comment and docs/REFERENCE.md say so (#177)" {
   local f="$repo/check_all.sh"
   [ "$(grep -c '^stuck_after=\$(( 11 \* cap + 975 + 155 ))$' "$f")" -eq 1 ]
   grep -qF '11 * cap + 55' "$f"
@@ -1058,8 +1058,8 @@ self_heal.sh [A]" ]
   grep -qF '1570 s with the default cap of 40' "$f"
   [ "$(grep -A1 '^cut_trade_ready=0$' "$f" | tail -1)" = 'cut_margin=0' ]
   grep -A1 'notify_timeout CHECK_TRADE_READY ' "$f" | tail -1 | grep -qF 'notify_timeout CHECK_MARGIN check_margin "$cut_margin" "$cap"'
-  grep -qF '1570 秒' "$repo/README.md"
-  [ "$(grep -cF '1530 秒' "$repo/README.md")" -eq 0 ]
+  grep -qF '1570 秒' "$repo/docs/REFERENCE.md"
+  [ "$(grep -cF '1530 秒' "$repo/docs/REFERENCE.md")" -eq 0 ]
 }
 
 @test "RUN-37: the real check_margin.sh through the runner: 2 positions at 150.00% are reported once (#177)" {
