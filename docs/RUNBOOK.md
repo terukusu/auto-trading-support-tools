@@ -74,7 +74,7 @@ LINE の通知を受けた人が、まず何を見て、どこまでやってよ
 - `kill` するのは、pid を `./mtctl.sh status` や `ps -o pid,cmd -p <pid>` で確かめたものだけ。`pkill` / `killall` / `wineserver -k` は使わない（他の MT も巻き込む）。
 - `check_all.sh` や `check_*.sh` を手で実行しない（LINE に送り、状態を書き換える）。状態の確認は `./doctor.sh` で足りる。
 - 自己修復（opt-in）を有効にしている（`~/.atst/self_heal.enabled` がある）ときは、MT を手で止める前に `rm ~/.atst/self_heal.enabled` で無効にする（消さないと `PROCESS_` の【発生】の後に起動し直される）。作業が終わったら、使い続けるなら `touch ~/.atst/self_heal.enabled && chmod 600 ~/.atst/self_heal.enabled` で戻す（[自己修復](#key-self-heal)）。
-- `~/.atst/alert_status` を手で消さない・編集しない（同じ通知がもう一度届き、送信枠を使う）。例外は README「毎分の監視 (check_all.sh) の動き」にある、監視対象から外した MT のキーの行を消す場合だけ。
+- `~/.atst/alert_status` を手で消さない・編集しない（同じ通知がもう一度届き、送信枠を使う）。例外は REFERENCE.md「毎分の監視 (check_all.sh) の動き」にある、監視対象から外した MT のキーの行を消す場合だけ。
 - atst の更新は、リリース zip か `scripts/init_atst.sh` で全体を入れ替える。`*.sh` だけを手でコピーしない（`common.sh` が `lib/` を読むので、`lib/` が欠けると監視が正しく動かない）。
 - 手順の練習や検証は、使い捨ての VPS か MT 非稼働・建玉なしの検証機で行い、稼働中の本番 VPS では試さない（CLAUDE.md「実行・検証」と同じ）。
 - `sudo` が要る操作（apt、VPS の再起動、サービスの操作）は RUNBOOK の範囲外。必要になったら朝まで待つか、別途判断する。
@@ -125,7 +125,7 @@ env -u WINEPREFIX ./mtctl.sh status "<MT 名>"
 
 **それでも直らないとき**: スマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）で建玉を確認し、必要なら手動決済する。朝まで待ってよい条件は [安全の原則](#安全の原則) の最後の項。
 
-**関連**: [README](../README.md)「既存の crontab からの移行」（`@reboot` の行）、Wiki [setup_monitoring](../../../wiki/setup_monitoring)。
+**関連**: [REFERENCE](REFERENCE.md)「既存の crontab からの移行」（`@reboot` の行）、Wiki [setup_monitoring](../../../wiki/setup_monitoring)。
 
 <a id="key-process"></a>
 
@@ -163,7 +163,7 @@ tail -n 30 ~/.atst/wine_*.log
 
 **それでも直らないとき**: 起動しても落ちるなら `wine_*.log` の末尾を Issue に貼って相談する（口座番号などが写っていないか目で見てから）。その間はスマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）で建玉を見て、必要なら手動決済する。MT が止まっている間は EA の決済が動かないので、建玉があるなら朝まで待たない。
 
-**関連**: [README](../README.md) の `mtctl.sh` の使い方と「自己診断 (doctor.sh)」、#132（WINEPREFIX の表示と `doctor.sh`）、#141（継続中の通知）。
+**関連**: [REFERENCE](REFERENCE.md) の「mtctl.sh の使い方」と「自己診断 (doctor.sh)」、#132（WINEPREFIX の表示と `doctor.sh`）、#141（継続中の通知）。
 
 <a id="key-target"></a>
 
@@ -193,7 +193,7 @@ bash -n ~/.atst/config
 
 **それでも直らないとき**: スマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）で建玉を見る。この間は監視が効いていないので、建玉があるなら朝まで待たずに直すか、スマホで見張る。
 
-**関連**: [README](../README.md)「監視するMT4/5の指定 (ATST_TARGETS)」。
+**関連**: [REFERENCE](REFERENCE.md)「監視するMT4/5の指定 (ATST_TARGETS)」。
 
 <a id="key-monitoring"></a>
 
@@ -224,7 +224,7 @@ env -u WINEPREFIX ./mtctl.sh monitor "<MT 名>"
 
 **それでも直らないとき**: MT の再インストールはせず、`./doctor.sh` の出力を Issue に貼って相談する。その間はスマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）で建玉を見て、必要なら手動決済する。固まっている MT では EA の決済も動かないので、建玉があるなら朝まで待たない。
 
-**関連**: [docs/monitoring-csv.md](monitoring-csv.md)、[README](../README.md)「毎分の監視 (check_all.sh) の動き」、Wiki [setup_monitoring](../../../wiki/setup_monitoring)、#141（継続中の通知）、#149（CSV の列契約）。
+**関連**: [docs/monitoring-csv.md](monitoring-csv.md)、[REFERENCE](REFERENCE.md)「毎分の監視 (check_all.sh) の動き」、Wiki [setup_monitoring](../../../wiki/setup_monitoring)、#141（継続中の通知）、#149（CSV の列契約）。
 
 <a id="key-monitoring-auto-attach"></a>
 
@@ -255,7 +255,7 @@ tail -n 20 ~/.atst/wine_<名前を小文字にしたもの>.log
 
 **それでも直らないとき**: MT の再インストールはせず、`./doctor.sh` の出力を Issue に貼って相談する。その間は手作業で EA を載せれば監視は動く。手で置いたチャートと自動配置のチャートで EA が二重にならないよう注意する（同じ CSV に 2 つの EA が書く）。
 
-**関連**: [docs/monitoring-csv.md](monitoring-csv.md)、[README](../README.md)「監視 EA の自動配置」、#133、#141（継続中の通知）。
+**関連**: [docs/monitoring-csv.md](monitoring-csv.md)、[REFERENCE](REFERENCE.md)「監視 EA の自動配置 (ATST_AUTO_ATTACH_EA、試験導入)」、#133、#141（継続中の通知）。
 
 <a id="key-tick"></a>
 
@@ -285,7 +285,7 @@ tail -n 5 "<data>/MQL4/Files/terminal_monitoring.csv"
 
 **それでも直らないとき**: スマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）で建玉を確認し、必要なら手動決済する。ティックが来ない間は EA の決済も動かない。ブローカー側の障害ならブローカーに問い合わせる。
 
-**関連**: [docs/monitoring-csv.md](monitoring-csv.md)（列 2）、[README](../README.md)「毎分の監視 (check_all.sh) の動き」、#137（第 1 段）、#158（第 2 段: 接続・自動売買の許可を EA 側で見る。[TRADE_](#key-trade)）、#141（継続中の通知）。
+**関連**: [docs/monitoring-csv.md](monitoring-csv.md)（列 2）、[REFERENCE](REFERENCE.md)「毎分の監視 (check_all.sh) の動き」、#137（第 1 段）、#158（第 2 段: 接続・自動売買の許可を EA 側で見る。[TRADE_](#key-trade)）、#141（継続中の通知）。
 
 <a id="key-trade"></a>
 
@@ -317,9 +317,9 @@ tail -n 3 "<data>/MQL4/Files/terminal_monitoring.csv" | tr -d '\r' | awk -F, '{p
 
 **それでも直らないとき**: スマホの MT アプリで建玉を確認し、必要なら手動決済する。取引できない間は EA の決済も動かない。
 
-**注意**: 監視 EA を #158 より前のもの（8 列）に戻すと `check_trade_ready.sh` は判定しなくなり、`TRADE_<MT名>` は発生（1）のまま残る（外形監視の `/fail` は続く。継続中の再通知は判定が止まるので送られない）。`./doctor.sh` の `csv` の行が `cols 14` になっているかを見て、監視 EA を更新して載せ直す（README の「取引できない状態」）。監視対象から外したときは `~/.atst/alert_status` の該当行を消す。自動売買ボタンを意図して長期間 OFF にしていても、発生と継続中の通知が届き、外形監視は `/fail` になる（無効にする設定はなく、閾値の上限は 86400 秒）。
+**注意**: 監視 EA を #158 より前のもの（8 列）に戻すと `check_trade_ready.sh` は判定しなくなり、`TRADE_<MT名>` は発生（1）のまま残る（外形監視の `/fail` は続く。継続中の再通知は判定が止まるので送られない）。`./doctor.sh` の `csv` の行が `cols 14` になっているかを見て、監視 EA を更新して載せ直す（REFERENCE.md「毎分の監視 (check_all.sh) の動き」の取引できない状態）。監視対象から外したときは `~/.atst/alert_status` の該当行を消す。自動売買ボタンを意図して長期間 OFF にしていても、発生と継続中の通知が届き、外形監視は `/fail` になる（無効にする設定はなく、閾値の上限は 86400 秒）。
 
-**関連**: [docs/monitoring-csv.md](monitoring-csv.md)（列 9〜14）、[README](../README.md)「毎分の監視 (check_all.sh) の動き」、#158、#137（[TICK_](#key-tick)）、#141（継続中の通知）。
+**関連**: [docs/monitoring-csv.md](monitoring-csv.md)（列 9〜14）、[REFERENCE](REFERENCE.md)「毎分の監視 (check_all.sh) の動き」、#158、#137（[TICK_](#key-tick)）、#141（継続中の通知）。
 
 <a id="key-margin"></a>
 
@@ -353,7 +353,7 @@ tail -n 3 "<data>/MQL4/Files/terminal_monitoring.csv" | tr -d '\r' | awk -F, '{p
 
 **注意**: 監視 EA を 14 列より前のもの（8 列）に戻すと `check_margin.sh` は判定しなくなり、`MARGIN_<MT名>` は発生（1）のまま残る（継続中の再通知も止まる）。列 14 の形が想定と違う EA でも同じ。`./doctor.sh` の `csv` の行が `cols 14` になっているか、CSV の列 14 が小数かを見て、監視 EA を更新して載せ直す。監視対象から外したときは `~/.atst/alert_status` の該当行を消す。新しく有効にした直後に維持率が LOWER 未満だとすぐ発生するので、先に閾値を調整する。`/fail` にはならない。
 
-**関連**: [docs/monitoring-csv.md](monitoring-csv.md)（列 13・14）、[README](../README.md)「毎分の監視 (check_all.sh) の動き」、#177、#141（継続中の通知）、[TRADE_](#key-trade)。
+**関連**: [docs/monitoring-csv.md](monitoring-csv.md)（列 13・14）、[REFERENCE](REFERENCE.md)「毎分の監視 (check_all.sh) の動き」、#177、#141（継続中の通知）、[TRADE_](#key-trade)。
 
 <a id="key-ping"></a>
 
@@ -490,7 +490,7 @@ tail -n 50 ~/.atst/log/check_all.log
 
 **それでも直らないとき**: `uptime` の load が高い・`top` で wineserver や MT が張り付いているなら [MT の固まりの切り分け](#mt-の固まりの切り分け)へ。監視が止まっている間は、スマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）で建玉を見る。
 
-**関連**: [README](../README.md)「毎分の監視 (check_all.sh) の動き」、#141（継続中の通知）、#144（`check_all.log`）。
+**関連**: [REFERENCE](REFERENCE.md)「毎分の監視 (check_all.sh) の動き」、#141（継続中の通知）、#144（`check_all.log`）。
 
 <a id="key-runner-timeout"></a>
 
@@ -534,7 +534,7 @@ tail -n 50 ~/.atst/log/check_all.log
 
 **それでも直らないとき**: 監視が部分的に効いていないので、スマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）で建玉を見る。`./doctor.sh` の出力と `check_all.log` の末尾（目で確かめてから）を Issue に貼って相談する。
 
-**関連**: [README](../README.md)「毎分の監視 (check_all.sh) の動き」、#144（`check_all.log`）。
+**関連**: [REFERENCE](REFERENCE.md)「毎分の監視 (check_all.sh) の動き」、#144（`check_all.log`）。
 
 <a id="key-runner-targets-empty"></a>
 
@@ -564,7 +564,7 @@ tail -n 50 ~/.atst/log/check_all.log
 
 **それでも直らないとき**: 監視も約定通知も止まっているので、スマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）で建玉を見る。
 
-**関連**: [README](../README.md)「監視するMT4/5の指定 (ATST_TARGETS)」。
+**関連**: [REFERENCE](REFERENCE.md)「監視するMT4/5の指定 (ATST_TARGETS)」。
 
 <a id="key-self-heal"></a>
 
@@ -600,7 +600,7 @@ grep -n 'x_wait' ~/.atst/wine_*.log | tail -n 3
 
 **それでも直らないとき**: `self_heal.enabled` を消したまま、スマホの MT アプリで建玉を見て、`./doctor.sh` の出力・`self_heal.log`・`wine_*.log` の末尾（目で確かめてから）を Issue に貼って相談する。
 
-**関連**: [README](../README.md)「自己修復 (opt-in、既定 OFF)」、[docs/CODING_GUIDELINES.md](CODING_GUIDELINES.md) P1 の例外、#140。
+**関連**: [REFERENCE](REFERENCE.md)「自己修復 (opt-in、既定 OFF)」、[docs/CODING_GUIDELINES.md](CODING_GUIDELINES.md) P1 の例外、#140。
 
 <a id="key-image-report-default-changed"></a>
 
@@ -623,7 +623,7 @@ grep -n 'ATST_IMAGE_REPORT_DESKTOP' ~/.atst/config
 
 **それでも直らないとき**: 該当なし（運用への影響は無い）。
 
-**関連**: [README](../README.md)「デスクトップ画像の通知の移行」、#135。
+**関連**: [REFERENCE](REFERENCE.md)「デスクトップ画像の通知の移行」、#135。
 
 <a id="crontab-legacy"></a>
 
@@ -652,7 +652,7 @@ ls -l ~/.atst/crontab.bak.*
 
 **それでも直らないとき**: `./doctor.sh` の出力（crontab の内容そのものは貼らない）を Issue に貼って相談する。
 
-**関連**: [README](../README.md)「既存の crontab からの移行」、#143。
+**関連**: [REFERENCE](REFERENCE.md)「既存の crontab からの移行」、#143。
 
 <a id="key-line-quota"></a>
 
@@ -680,7 +680,7 @@ grep 'LINE send failed' ~/.atst/line_error.log | tail -n 5
 
 **それでも直らないとき**: 上限に達したら、月末まではスマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）で建玉を見る。外形監視が頼りになる。
 
-**関連**: [README](../README.md)「毎分の監視 (check_all.sh) の動き」（`/fail` になるもの）、#136。
+**関連**: [REFERENCE](REFERENCE.md)「毎分の監視 (check_all.sh) の動き」（`/fail` になるもの）、#136。
 
 <a id="key-image-upload-failed"></a>
 
@@ -703,7 +703,7 @@ grep 'upload:imgbb' ~/.atst/line_error.log | tail -n 5
 
 **それでも直らないとき**: 画像が無くても運用には影響しない。キーを消して文字要約だけにしてもよい。
 
-**関連**: [README](../README.md)「デスクトップ画像の通知の移行」、#135。
+**関連**: [REFERENCE](REFERENCE.md)「デスクトップ画像の通知の移行」、#135。
 
 <a id="key-heartbeat"></a>
 
@@ -729,7 +729,7 @@ grep 'LINE send failed' ~/.atst/line_error.log | tail -n 5
 `check_all.started` の更新時刻が直近（1〜2 分以内）なら毎分の監視は動いている。`doctor.sh` の `crontab -l` 行と `heartbeat` 行（`.heartbeat_url` と `ATST_HEARTBEAT_URL` のどちらが使われているか）を見る。URL を `curl` で手で叩かない（URL が履歴と `ps` に残る）。
 
 **安全な復旧手順**:
-- `/fail`: 外部サービスの画面（ログ）の本文か `grep ',1,' ~/.atst/alert_status` で発生中のキーを見て、そのキーの節へ。`LINE_SEND_FAILED` なら [ORDER](#key-order) の LINE 側の確認と [LINE_QUOTA](#key-line-quota)。監視対象から外した MT のキーが残って `/fail` が続く場合は、README「毎分の監視 (check_all.sh) の動き」に従ってそのキーの行を消す。
+- `/fail`: 外部サービスの画面（ログ）の本文か `grep ',1,' ~/.atst/alert_status` で発生中のキーを見て、そのキーの節へ。`LINE_SEND_FAILED` なら [ORDER](#key-order) の LINE 側の確認と [LINE_QUOTA](#key-line-quota)。監視対象から外した MT のキーが残って `/fail` が続く場合は、REFERENCE.md「毎分の監視 (check_all.sh) の動き」に従ってそのキーの行を消す。
 - ping の途絶で ssh が通らない: VPS 事業者のコンソールで状態を見る（再起動など `sudo` 相当の操作は範囲外）。
 - ping の途絶で ssh が通る: `crontab -l` が空なら、退避してから `./setup_cron.sh` で登録し直す（空でなければ使わない。atst の行がある crontab には追記しない）。
   ```bash
@@ -740,7 +740,7 @@ grep 'LINE send failed' ~/.atst/line_error.log | tail -n 5
 
 **それでも直らないとき**: スマホの MT アプリ（[setup_mobile_mt](../../../wiki/setup_mobile_mt)）で建玉・残高を見て、必要なら手動決済する。朝まで待ってよいのは建玉が無いときだけ。
 
-**関連**: [README](../README.md)「毎分の監視 (check_all.sh) の動き」、Wiki [setup_heartbeat](../../../wiki/setup_heartbeat)、#136。
+**関連**: [REFERENCE](REFERENCE.md)「毎分の監視 (check_all.sh) の動き」、Wiki [setup_heartbeat](../../../wiki/setup_heartbeat)、#136。
 
 ## MT の固まりの切り分け
 
