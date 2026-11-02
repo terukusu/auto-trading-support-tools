@@ -8,4 +8,5 @@
 [ -r $HOME/.Xresources ] && xrdb $HOME/.Xresources
 xsetroot -solid grey -cursor_name left_ptr
 vncconfig -iconic &
-x-window-manager &
+# No window manager: MetaTrader on Wine froze under wm2 and clicks landed off target (ADR 0002).
+# Windows have no frame and cannot be moved; MetaTrader fills the screen as it is.

@@ -456,7 +456,8 @@ function install_packages_misc_and_needed_by_mt4() {
   ensure_time_sync
 
   # install gui
-  sudo -E apt-get $APT_OPT install tightvncserver fonts-vlgothic xterm wm2 \
+  # No window manager (wm2 is no longer installed): see disable_window_manager_in_xstartup (ADR 0002).
+  sudo -E apt-get $APT_OPT install tightvncserver fonts-vlgothic xterm \
     || { echo "[error] failed to install the VNC server / desktop packages." >&2; return 1; }
 
   # install wine
@@ -596,6 +597,27 @@ EOS
 #####################################################
 # Setup VNC server (seup only. not start service here)
 #####################################################
+#####################################################
+# Stop starting a window manager in an existing ~/.vnc/xstartup (ADR 0002). Under wm2, MetaTrader on
+# Wine froze (terminal.exe, wineserver and Xtightvnc busy; it resumed when the window manager was
+# killed) and clicks landed a few pixels off. The line written by the old template is commented out
+# and the previous file is kept as ~/.vnc/xstartup.bak.<date>. Takes effect when the VNC server
+# restarts (start_vncserver_service). Any other xstartup is left as it is.
+#####################################################
+function disable_window_manager_in_xstartup() {
+  local f="$HOME/.vnc/xstartup" backup
+  [ -f "$f" ] && [ ! -L "$f" ] || return 0
+  grep -qx 'x-window-manager &' "$f" || return 0
+  backup="$f.bak.$(date +%Y%m%d%H%M%S)"
+  cp -p "$f" "$backup" || { echo "[warn] could not back up $f; the window manager line was left as it is." >&2; return 0; }
+  if sed -i 's/^x-window-manager &$/# x-window-manager \&   # disabled by atst: MetaTrader froze under wm2 (ADR 0002)/' "$f"; then
+    echo "Disabled the window manager in $f (previous file saved as $backup)."
+  else
+    echo "[warn] could not edit $f; the window manager line was left as it is." >&2
+  fi
+  return 0
+}
+
 function setup_vncserver {
   if [ -n "$IS_SYSTEMD" ]; then
     # for systemd
@@ -636,6 +658,7 @@ function setup_vncserver {
     # install xstartup
     install -m 755 -D "$DIR_TEMPLATES/xstartup" "$HOME/.vnc/xstartup"
   fi
+  disable_window_manager_in_xstartup
 
   # A new VNC password: VNC_PASSWORD if given, otherwise random and shown once by verify_and_report
   # (#146). An existing ~/.vnc/passwd is kept as it is. The file is made 600 from the start (umask in
