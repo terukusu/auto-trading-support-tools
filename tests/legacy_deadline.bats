@@ -137,6 +137,7 @@ run_setup_cron() {
     [ "$(cat "$repo"/*.sh "$repo"/lib/*.sh | grep -c -- "$w")" -eq 0 ] || { echo "$w"; false; }
   done
   [ "$(grep -c '2027-05-31' "$repo/README.md")" -eq 0 ]
+  [ "$(grep -c '2027-05-31' "$repo/docs/REFERENCE.md")" -eq 0 ]
   [ ! -e "$repo/wrapper.sh" ]
 }
 
