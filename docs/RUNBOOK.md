@@ -764,19 +764,24 @@ diff <(echo "$a") <(echo "$b")
 
 **判定**: `status=running` で CSV の更新が止まり、main thread か wineserver が 100% 近くに張り付いていれば固まり。張り付いていなければ EA がチャートから外れた可能性がある（[MONITORING_](#key-monitoring) の「ありません」側）。
 
-**既知の原因**: VNC のウィンドウマネージャー wm2（[ADR 0002](adr/0002-no-window-manager.md)）。wm2 の下では、メニューやダイアログの操作をきっかけに main thread・wineserver・Xtightvnc の CPU が張り付いて固まる。2026-10 に本番で 2 回（「記事」タブを開いていた）、`@reboot` の直後にも同じ固まり方をした。検証用の VM では、wm2 を止めるとすぐに動き出した。新しい版のインストーラは wm2 を起動しない。古い版で入れた環境は、下の「wm2 を止める」を先に試す。
+**既知の原因**: VNC のウィンドウマネージャー wm2（[ADR 0002](adr/0002-no-window-manager.md)、[ADR 0003](adr/0003-icewm.md)）。wm2 の下では、メニューやダイアログの操作をきっかけに main thread・wineserver・Xtightvnc の CPU が張り付いて固まる。2026-10 に本番で 2 回（「記事」タブを開いていた）、`@reboot` の直後にも同じ固まり方をした。検証用の VM では、wm2 を止めるとすぐに動き出した。v1.8.0 以降のインストーラは wm2 の代わりに IceWM を使う。古い版で入れた環境は、下の「IceWM に切り替える」を先に行う。
 
-**wm2 を止める**（MT を動かしたまま行える。建玉にも影響しない）:
+**IceWM に切り替える**（MT を動かしたまま行える。建玉にも影響しない）:
 ```bash
-grep -n 'x-window-manager' ~/.vnc/xstartup            # 行頭に # が無ければ wm2 が起動する設定
-sed -i 's/^x-window-manager &$/# &/' ~/.vnc/xstartup  # 次の VNC の起動から wm2 を起動しない
-pkill -u "$USER" -f '^x-window-manager$'              # 動いている wm2 を止める
+grep -n 'x-window-manager\|window manager\|icewm' ~/.vnc/xstartup   # icewm & の行があれば切り替え済み
+sudo apt-get install -y --no-install-recommends icewm
+cp -p ~/.vnc/xstartup ~/.vnc/xstartup.bak.$(date +%Y%m%d%H%M%S)
+sed -i -e 's/^x-window-manager &$/icewm \&/' -e 's/^# x-window-manager & .*disabled by atst.*$/icewm \&/' \
+  -e 's/^# No window manager: .*$/icewm \&/' ~/.vnc/xstartup        # wm2 の行・v1.7.0 の行を icewm & にする
+pkill -u "$USER" -f '^x-window-manager$'               # 動いている wm2 を止める（固まっていた MT は数秒で動き出す）
+DISPLAY=:1 setsid icewm > /dev/null 2>&1 < /dev/null &  # IceWM を起動する（次からは VNC の起動時に自動で起動する）
+WINEDEBUG=-all wine reg add 'HKCU\Software\Wine\X11 Driver' /v Decorated /t REG_SZ /d N /f
 ```
-止めると、MT の窓の枠が消え、窓は動かせなくなる。固まっていた MT は数秒で動き出す。インストーラ（`init_atst.sh`）を再実行した場合は、xstartup の行を自動でコメントにする（元のファイルは `~/.vnc/xstartup.bak.<日時>`）。
+最後の行（Wine が MT の窓の枠を描く設定）は、MT を次に起動したときから効く。それまでは MT の窓の辺をつかめないが、操作には困らない。インストーラ（`init_atst.sh`）を再実行した場合は、これらを自動で行う（元の xstartup は `~/.vnc/xstartup.bak.<日時>`）。
 
 **復旧**:
 1. [安全の原則](#安全の原則) の「MT を止める前に行うこと」（建玉の確認、pid と名前の確認）。
-2. wm2 が動いていれば、上の「wm2 を止める」を行い、CSV の更新が戻るか見る。
+2. wm2 が動いていれば（`pgrep -u "$USER" -fx x-window-manager`）、上の「IceWM に切り替える」を行い、CSV の更新が戻るか見る。
 3. 効かなければ止める。
    ```bash
    env -u WINEPREFIX ./mtctl.sh stop "<MT 名>"
@@ -794,7 +799,8 @@ pkill -u "$USER" -f '^x-window-manager$'              # 動いている wm2 を�
 
 ## VNC の既知の罠
 
-- 古い版で入れた環境で wm2 が動いていると、MT が固まり、クリックが数ピクセルずれる。[MT の固まりの切り分け](#mt-の固まりの切り分け) の「wm2 を止める」で直る。
+- 古い版で入れた環境で wm2 が動いていると、MT が固まり、クリックが数ピクセルずれる。[MT の固まりの切り分け](#mt-の固まりの切り分け) の「IceWM に切り替える」で直る。
+- 2 つ以上の MT は、画面下の IceWM のタスクバーで切り替える。MT の窓はタイトルバーで動かし、辺や角で大きさを変えられる。
 - 右上の「閉じる」と「最小化」を取り違えない。閉じてしまったら `PROCESS_` の発生が届くので、[PROCESS_](#key-process) の手順で `start` する。
 - EA の動作は「自動売買」ボタンの状態で確かめる（キーボードの操作ではなくボタンを見る）。
 - VNC のパスワードを忘れたとき: 新規インストールで作ったパスワードは結果表示（途中で止まった回は終了時）に 1 回しか出ない。VPS 上で `vncpasswd` を実行して設定し直し、MT が動いていない時に VNC サービスを再起動する（再起動は範囲外）。
