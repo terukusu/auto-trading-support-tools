@@ -40,7 +40,7 @@ Linux + Wine + MetaTrader4/5（以下 MT4/5）で構成する **FX 自動売買�
 
 ### 導入と設定
 
-- `install_required_for_mt.sh` — まっさらな VPS に GUI(VNC。ウィンドウマネージャーは使わない、ADR 0002) / Wine / MT インストーラ一式を導入するメインスクリプト。VNC パスワードの作り方・MT インストーラの置き場・`Z:` の撤去の規則は `docs/config.md`。
+- `install_required_for_mt.sh` — まっさらな VPS に GUI(VNC + IceWM、ADR 0003) / Wine / MT インストーラ一式を導入するメインスクリプト。VNC パスワードの作り方・MT インストーラの置き場・`Z:` の撤去の規則は `docs/config.md`。
 - `setup_*.sh` — `setup_heartbeat.sh`（外形監視の URL を `~/.atst/.heartbeat_url` に保存。保存の規則は `docs/config.md`）、`setup_cron.sh`（cron 設定。atst の行がある crontab には追記しない、EOF では変更しない。空でない crontab を書き換える前に `~/.atst/crontab.bak.<日時>`（600、自動では消さない）へ退避し、旧形式に Y のときは条件を満たせば `ATST_TARGETS` を config の末尾に追記する（crontab を書く前。config を自動で書き換える唯一の経路で、値は評価しない）。登録・移行案内・終了コードは docs/REFERENCE.md）、`setup_line.sh`（LINE トークン設定）、`setup_monitoring_ea.sh`（監視 EA 配置）、`setup_iptables.sh`（`templates/ip_rules_v4.txt`（`--v6` で v6）の `%%SSH_PORT%%` を `--port`（既定 22）で置換して stdout に出すだけ。適用・sudo・ファイル書き込みなし。common.sh を読まない。引数不正は exit 1、テンプレート異常は stdout 空で exit 2。警告・適用手順の案内は stderr）。
 
 ### MT の操作・診断・手動の補助

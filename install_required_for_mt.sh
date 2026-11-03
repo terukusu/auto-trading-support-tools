@@ -456,7 +456,9 @@ function install_packages_misc_and_needed_by_mt4() {
   ensure_time_sync
 
   # install gui
-  # No window manager (wm2 is no longer installed): see disable_window_manager_in_xstartup (ADR 0002).
+  # IceWM, not wm2 (ADR 0003): see use_icewm_in_xstartup. Installed alone (no recommends) to stay small.
+  sudo -E apt-get $APT_OPT install --no-install-recommends icewm \
+    || { echo "[error] failed to install the window manager (icewm)." >&2; return 1; }
   sudo -E apt-get $APT_OPT install tightvncserver fonts-vlgothic xterm \
     || { echo "[error] failed to install the VNC server / desktop packages." >&2; return 1; }
 
@@ -598,20 +600,27 @@ EOS
 # Setup VNC server (seup only. not start service here)
 #####################################################
 #####################################################
-# Stop starting a window manager in an existing ~/.vnc/xstartup (ADR 0002). Under wm2, MetaTrader on
-# Wine froze (terminal.exe, wineserver and Xtightvnc busy; it resumed when the window manager was
-# killed) and clicks landed a few pixels off. The line written by the old template is commented out
-# and the previous file is kept as ~/.vnc/xstartup.bak.<date>. Takes effect when the VNC server
-# restarts (start_vncserver_service). Any other xstartup is left as it is.
+# Start IceWM instead of the old window manager in an existing ~/.vnc/xstartup (ADR 0003). Under
+# wm2, MetaTrader on Wine froze (terminal.exe, wineserver and Xtightvnc busy; it resumed when wm2
+# was killed) and clicks landed a few pixels off. Exact lines written by older versions become
+# "icewm &": "x-window-manager &" of the old template (wm2), the line v1.7.0's installer commented out,
+# and the comment of v1.7.0's template (no window manager; its second comment line is removed). The previous file is kept as ~/.vnc/xstartup.bak.<date>. Takes effect when the VNC server
+# restarts (start_vncserver_service). Any other xstartup (one that already starts icewm, a custom
+# one, a symlink) is left as it is.
 #####################################################
-function disable_window_manager_in_xstartup() {
+function use_icewm_in_xstartup() {
   local f="$HOME/.vnc/xstartup" backup
   [ -f "$f" ] && [ ! -L "$f" ] || return 0
-  grep -qx 'x-window-manager &' "$f" || return 0
+  grep -q '^[[:space:]]*icewm' "$f" && return 0
+  grep -qx -e 'x-window-manager &' -e '# x-window-manager &   # disabled by atst: MetaTrader froze under wm2 (ADR 0002)' \
+    -e '# No window manager: MetaTrader on Wine froze under wm2 and clicks landed off target (ADR 0002).' "$f" || return 0
   backup="$f.bak.$(date +%Y%m%d%H%M%S)"
   cp -p "$f" "$backup" || { echo "[warn] could not back up $f; the window manager line was left as it is." >&2; return 0; }
-  if sed -i 's/^x-window-manager &$/# x-window-manager \&   # disabled by atst: MetaTrader froze under wm2 (ADR 0002)/' "$f"; then
-    echo "Disabled the window manager in $f (previous file saved as $backup)."
+  if sed -i -e 's/^x-window-manager &$/icewm \&/' \
+      -e 's/^# x-window-manager &   # disabled by atst: MetaTrader froze under wm2 (ADR 0002)$/icewm \&/' \
+      -e 's/^# No window manager: MetaTrader on Wine froze under wm2 and clicks landed off target (ADR 0002)\.$/icewm \&/' \
+      -e '/^# Windows have no frame and cannot be moved; MetaTrader fills the screen as it is\.$/d' "$f"; then
+    echo "Switched the window manager in $f to IceWM (previous file saved as $backup)."
   else
     echo "[warn] could not edit $f; the window manager line was left as it is." >&2
   fi
@@ -658,7 +667,7 @@ function setup_vncserver {
     # install xstartup
     install -m 755 -D "$DIR_TEMPLATES/xstartup" "$HOME/.vnc/xstartup"
   fi
-  disable_window_manager_in_xstartup
+  use_icewm_in_xstartup
 
   # A new VNC password: VNC_PASSWORD if given, otherwise random and shown once by verify_and_report
   # (#146). An existing ~/.vnc/passwd is kept as it is. The file is made 600 from the start (umask in
@@ -813,6 +822,15 @@ function setup_wine {
   font_replace_exist=$(cat "$WINEPREFIX/user.reg" | tr -d '\r' | grep -o '\[Software\\\\Wine\\\\Fonts\\\\Replacements\]')
   if [ -z "$font_replace_exist" ]; then
     cat "$DIR_TEMPLATES/font_replace.reg" >> "$WINEPREFIX/user.reg"
+  fi
+
+  # Wine draws the frames of its windows itself (ADR 0003). Otherwise MetaTrader opens at the full
+  # screen size with the window manager's frame off screen, and its edges cannot be grabbed. Set on
+  # every run (also for an existing prefix); it applies to windows created after it.
+  if WINEDEBUG=-all wine reg add 'HKCU\Software\Wine\X11 Driver' /v Decorated /t REG_SZ /d N /f > /dev/null 2>&1; then
+    wineserver -w
+  else
+    echo "[warn] could not set Decorated=N for Wine; MetaTrader windows may not be resizable." >&2
   fi
 
   # ~/.bash_profile may still export the arch of a previous (e.g. deleted 32-bit) prefix; a

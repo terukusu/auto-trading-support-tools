@@ -23,8 +23,9 @@
 * 既存パッケージの最新化
 * 可能ならば swap 領域の作成
 * vncserver
-    * 要するに最小構成のGUI。ウィンドウマネージャーは使わない(wm2 の下で MT が固まったため。[ADR 0002](adr/0002-no-window-manager.md))
-    * 既存の `~/.vnc/xstartup` の `x-window-manager &` の行はコメントにする(元のファイルは `~/.vnc/xstartup.bak.<日時>`)
+    * 要するに最小構成のGUI。ウィンドウマネージャーは軽い IceWM(以前の wm2 の下で MT が固まったため。[ADR 0003](adr/0003-icewm.md))。画面下のタスクバーで複数の MT を切り替えられる
+    * MT の窓の枠とタイトルバーは Wine が描く(Wine の `Decorated=N`。窓の辺や角で大きさを変えられる)
+    * 既存の `~/.vnc/xstartup` の wm2 の行(`x-window-manager &`、v1.7.0 がコメントにした行)は `icewm &` に置き換える(元のファイルは `~/.vnc/xstartup.bak.<日時>`)
     * VNC のパスワードはインストール時に英数字 8 文字を乱数で作り、最後の結果表示に `[ OK ] VNC password: ...` として 1 回だけ出します(途中で止まったときも、終了時に未表示なら 1 回出します)。控えてください(インストールの出力を `| tee` などでファイルに保存するとパスワードもそこに残ります)
     * 控え忘れたときは VPS 上で `vncpasswd` を実行して設定し直し、MetaTrader が動いていない時に `sudo systemctl restart vncserver@:1` します
     * 既に `~/.vnc/passwd` がある環境(再実行を含む)ではパスワードを変えません
